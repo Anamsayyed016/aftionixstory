@@ -7,7 +7,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 STATE_FILE="$ROOT_DIR/.deploy-active"
-UPSTREAM_FILE="/etc/nginx/snippets/storyverse-upstream.conf"
 SITE_FILE="/etc/nginx/sites-available/aftionix.tech"
 
 if [[ ! -f .env ]]; then
@@ -15,41 +14,8 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-if [[ ! -f "$UPSTREAM_FILE" ]]; then
-  echo "==> Creating Nginx upstream snippet"
-  mkdir -p /etc/nginx/snippets
-  cat >"$UPSTREAM_FILE" <<'EOF'
-upstream storyverse_backend {
-    server 127.0.0.1:3000;
-    keepalive 32;
-}
-EOF
-fi
-
-# Ensure site proxies via upstream (idempotent, HTTPS server only).
-if grep -q 'proxy_pass http://127.0.0.1:3000;' "$SITE_FILE" 2>/dev/null; then
-  echo "==> Pointing Nginx HTTPS site at storyverse_backend upstream"
-  python3 - <<'PY'
-from pathlib import Path
-path = Path("/etc/nginx/sites-available/aftionix.tech")
-text = path.read_text()
-if "include /etc/nginx/snippets/storyverse-upstream.conf;" not in text:
-    text = text.replace(
-        "server_name aftionix.tech www.aftionix.tech;\n\n    location / {",
-        "server_name aftionix.tech www.aftionix.tech;\n\n    include /etc/nginx/snippets/storyverse-upstream.conf;\n\n    location / {",
-        1,
-    )
-text = text.replace(
-    "proxy_pass http://127.0.0.1:3000;",
-    "proxy_pass http://storyverse_backend;",
-    1,
-)
-path.write_text(text)
-print("nginx site updated")
-PY
-  nginx -t
-  systemctl reload nginx
-fi
+# Clean any invalid upstream snippet from earlier attempts.
+rm -f /etc/nginx/snippets/storyverse-upstream.conf
 
 ACTIVE="$(cat "$STATE_FILE" 2>/dev/null || true)"
 LEGACY=0
@@ -111,9 +77,10 @@ docker compose up -d --no-deps --force-recreate "web_${NEXT}"
 
 echo "==> Health-checking http://127.0.0.1:${NEXT_PORT}/"
 ok=0
-for _ in $(seq 1 36); do
+for i in $(seq 1 45); do
   if curl -fsS -o /dev/null "http://127.0.0.1:${NEXT_PORT}/"; then
     ok=1
+    echo "healthy after ${i} attempt(s)"
     break
   fi
   sleep 2
@@ -125,12 +92,32 @@ if [[ "$ok" -ne 1 ]]; then
 fi
 
 echo "==> Switching Nginx traffic to :${NEXT_PORT}"
-cat >"$UPSTREAM_FILE" <<EOF
-upstream storyverse_backend {
-    server 127.0.0.1:${NEXT_PORT};
-    keepalive 32;
-}
-EOF
+python3 - <<PY
+from pathlib import Path
+import re
+path = Path("${SITE_FILE}")
+text = path.read_text()
+next_port = "${NEXT_PORT}"
+replaced = False
+out = []
+for line in text.splitlines(keepends=True):
+    if (not replaced) and re.search(r"proxy_pass http://127\\.0\\.0\\.1:(3000|3001);", line):
+        indent = re.match(r"^(\\s*)", line).group(1)
+        out.append(f"{indent}proxy_pass http://127.0.0.1:{next_port};\n")
+        replaced = True
+    elif (not replaced) and "proxy_pass http://storyverse_backend;" in line:
+        indent = re.match(r"^(\\s*)", line).group(1)
+        out.append(f"{indent}proxy_pass http://127.0.0.1:{next_port};\n")
+        replaced = True
+    else:
+        if "storyverse-upstream.conf" in line:
+            continue
+        out.append(line)
+if not replaced:
+    raise SystemExit("Could not find proxy_pass target to update in Nginx site config")
+path.write_text("".join(out))
+print(f"nginx proxy_pass -> 127.0.0.1:{next_port}")
+PY
 nginx -t
 systemctl reload nginx
 
