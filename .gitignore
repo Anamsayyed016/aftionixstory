@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# blue/green deploy state on the VPS (created at runtime)
+.deploy-active
+
 # vercel
 .vercel
 

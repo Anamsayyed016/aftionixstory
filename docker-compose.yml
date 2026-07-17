@@ -10,14 +10,21 @@ services:
     volumes:
       - storyverse_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-storyverse} -d ${POSTGRES_DB:-storyverse}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-storyverse} -d ${POSTGRES_DB:-storyverse}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  web:
+  # Blue/green app slots for zero-downtime standalone deploys.
+  # Only one should receive Nginx traffic at a time.
+  web_blue:
     build: .
-    container_name: storyverse-ai
+    image: storyverse-ai-web:latest
+    container_name: storyverse-ai-blue
     restart: unless-stopped
     depends_on:
       db:
@@ -31,6 +38,48 @@ services:
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       AUTH_TRUST_HOST: "true"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  web_green:
+    build: .
+    image: storyverse-ai-web:latest
+    container_name: storyverse-ai-green
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3001:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      AUTH_TRUST_HOST: "true"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
 volumes:
   storyverse_pgdata:
