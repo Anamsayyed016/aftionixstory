@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+AGENTS.md
+CLAUDE.md
+.eslintrc*
+eslint.config.mjs
+.dockerignore
+Dockerfile
+docker-compose.yml

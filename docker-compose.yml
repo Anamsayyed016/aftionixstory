@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    container_name: storyverse-ai
+    restart: unless-stopped
+    ports:
+      - "80:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"

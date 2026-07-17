@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+@import "@fontsource/fraunces/400.css";
+@import "@fontsource/fraunces/500.css";
+@import "@fontsource/fraunces/600.css";
+@import "@fontsource/fraunces/600-italic.css";
+@import "@fontsource/fraunces/700.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+:root {
+  /* Base surfaces */
+  --sv-void: #0a080d;         /* soft black page background */
+  --sv-charcoal: #0e0b12;     /* deep charcoal base */
+  --sv-panel: #17131d;        /* card / panel surface */
+  --sv-panel-raised: #1e1826; /* elevated panel */
+  --sv-border: #2b2333;       /* soft border */
+  --sv-border-strong: #3a2f47;
+
+  /* Accents */
+  --sv-violet: #7c5cff;
+  --sv-violet-soft: #a48bff;
+  --sv-lilac: #c084fc;
+  --sv-rose: #e8b4c8;
+  --sv-rose-dim: #b98a9c;
+
+  /* Text */
+  --sv-ink: #f4f1f8;
+  --sv-ink-dim: #b8b0c7;
+  --sv-ink-faint: #7d7590;
+
+  /* Semantic */
+  --sv-success: #6fcf97;
+  --sv-warning: #e0b25c;
+  --sv-danger: #e0708a;
+
+  --sv-radius-sm: 0.5rem;
+  --sv-radius-md: 0.875rem;
+  --sv-radius-lg: 1.25rem;
+  --sv-radius-xl: 1.75rem;
+}
+
+@theme inline {
+  --color-void: var(--sv-void);
+  --color-charcoal: var(--sv-charcoal);
+  --color-panel: var(--sv-panel);
+  --color-panel-raised: var(--sv-panel-raised);
+  --color-border: var(--sv-border);
+  --color-border-strong: var(--sv-border-strong);
+
+  --color-violet: var(--sv-violet);
+  --color-violet-soft: var(--sv-violet-soft);
+  --color-lilac: var(--sv-lilac);
+  --color-rose: var(--sv-rose);
+  --color-rose-dim: var(--sv-rose-dim);
+
+  --color-ink: var(--sv-ink);
+  --color-ink-dim: var(--sv-ink-dim);
+  --color-ink-faint: var(--sv-ink-faint);
+
+  --color-success: var(--sv-success);
+  --color-warning: var(--sv-warning);
+  --color-danger: var(--sv-danger);
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-sm: var(--sv-radius-sm);
+  --radius-md: var(--sv-radius-md);
+  --radius-lg: var(--sv-radius-lg);
+  --radius-xl: var(--sv-radius-xl);
+}
+
+* {
+  border-color: var(--sv-border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--sv-void);
+  color: var(--sv-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+}
+
+::selection {
+  background: var(--sv-violet);
+  color: white;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--sv-border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--sv-void);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sv-violet-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--sv-lilac);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Manuscript paper-grain texture — the signature surface for episode/story content */
+.sv-manuscript {
+  position: relative;
+  background:
+    radial-gradient(ellipse at top left, rgba(124, 92, 255, 0.06), transparent 55%),
+    var(--sv-panel);
+}
+.sv-manuscript::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.sv-glass {
+  background: rgba(23, 19, 29, 0.72);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sv-gradient-text {
+  background: linear-gradient(120deg, var(--sv-ink) 20%, var(--sv-lilac) 55%, var(--sv-rose) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
