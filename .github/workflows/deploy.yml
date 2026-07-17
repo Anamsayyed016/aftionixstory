@@ -63,8 +63,9 @@ jobs:
               --network storyverse-ai_default \
               -v /var/www/storyverse-ai/prisma:/prisma \
               -e DATABASE_URL \
+              -w /tmp \
               node:22-alpine \
-              sh -c "npm install --no-save prisma@6.19.3 >/dev/null && npx prisma migrate deploy --schema=/prisma/schema.prisma"
+              sh -lc "npm install prisma@6.19.3 && npx prisma migrate deploy --schema=/prisma/schema.prisma"
 
             echo "==> Health check"
             sleep 3
