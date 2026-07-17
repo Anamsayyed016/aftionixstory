@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, Play, Sparkles, BookMarked, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,14 +54,18 @@ export function Hero() {
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" className="group">
-                Start Your Story
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </Button>
-              <Button size="lg" variant="secondary" className="group">
-                <Play className="h-4 w-4" />
-                View Demo
-              </Button>
+              <Link href="/sign-up">
+                <Button size="lg" className="group">
+                  Start Your Story
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </Button>
+              </Link>
+              <a href="#how-it-works">
+                <Button size="lg" variant="secondary" className="group">
+                  <Play className="h-4 w-4" />
+                  View Demo
+                </Button>
+              </a>
             </div>
 
             <div className="mt-10 flex items-center gap-6 text-sm text-ink-faint">

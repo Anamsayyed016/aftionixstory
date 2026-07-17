@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/ui/container";
@@ -29,10 +30,12 @@ export function FinalCta() {
           <p className="mx-auto mt-4 max-w-lg text-ink-dim">
             Start free. No credit card, no character limit, no forgetting.
           </p>
-          <Button size="lg" className="group mt-8">
-            Start Your Story
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Button>
+          <Link href="/sign-up">
+            <Button size="lg" className="group mt-8">
+              Start Your Story
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Button>
+          </Link>
         </motion.div>
       </Container>
     </section>

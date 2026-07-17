@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  FREE
+  WRITER
+  STUDIO
+}
+
+enum StoryVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+enum StoryStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CharacterStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum GenerationAction {
+  NEW_EPISODE
+  CONTINUE
+  REGENERATE
+  IMPROVE_WRITING
+  MORE_ROMANTIC
+  MORE_EMOTIONAL
+  ADD_COMEDY
+}
+
+enum GenerationStatus {
+  DRAFT
+  SAVED
+  FAILED
+}
+
+model User {
+  id                     String    @id @default(cuid())
+  name                   String?
+  email                  String    @unique
+  emailVerified          DateTime?
+  image                  String?
+  passwordHash           String?
+  plan                   Plan      @default(FREE)
+  monthlyGenerationCount Int       @default(0)
+  generationLimit        Int       @default(20)
+  generationPeriodStart  DateTime  @default(now())
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  stories        Story[]
+  generationLogs GenerationLog[]
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Story {
+  id                 String          @id @default(cuid())
+  userId             String
+  title              String
+  slug               String
+  description        String?         @db.Text
+  genre              String
+  language           String
+  storyType          String?
+  visibility         StoryVisibility @default(PRIVATE)
+  writingStyle       String?
+  dialogueStyle      String?
+  pointOfView        String?
+  episodeLength      String?
+  tone               String?
+  romanceLevel       String?
+  pacing             String?
+  customInstructions String?         @db.Text
+  setting            String?         @db.Text
+  timePeriod         String?
+  mainConflict       String?         @db.Text
+  initialPlot        String?         @db.Text
+  worldRules         String?         @db.Text
+  contentBoundaries  String?         @db.Text
+  currentSummary     String?         @db.Text
+  status             StoryStatus     @default(DRAFT)
+  totalEpisodes      Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characters     Character[]
+  relationships  CharacterRelationship[]
+  writingRules   WritingRule[]
+  episodes       Episode[]
+  generationLogs GenerationLog[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@index([status])
+  @@index([updatedAt])
+  @@index([visibility])
+}
+
+model Character {
+  id             String          @id @default(cuid())
+  storyId        String
+  name           String
+  age            Int?
+  gender         String?
+  role           String
+  appearance     String?         @db.Text
+  personality    String          @db.Text
+  background     String?         @db.Text
+  speakingStyle  String?         @db.Text
+  secrets        String?         @db.Text
+  emotionalState String?         @db.Text
+  status         CharacterStatus @default(ACTIVE)
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  story                 Story                   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  outgoingRelationships CharacterRelationship[] @relation("RelationshipSource")
+  incomingRelationships CharacterRelationship[] @relation("RelationshipTarget")
+
+  @@index([storyId])
+  @@index([status])
+  @@index([role])
+  @@index([name])
+}
+
+model CharacterRelationship {
+  id                String   @id @default(cuid())
+  storyId           String
+  sourceCharacterId String
+  targetCharacterId String
+  relationshipType  String
+  description       String?  @db.Text
+  currentStatus     String?
+  emotionalDynamic  String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  story           Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  sourceCharacter Character @relation("RelationshipSource", fields: [sourceCharacterId], references: [id], onDelete: Restrict)
+  targetCharacter Character @relation("RelationshipTarget", fields: [targetCharacterId], references: [id], onDelete: Restrict)
+
+  @@unique([storyId, sourceCharacterId, targetCharacterId, relationshipType])
+  @@index([storyId])
+  @@index([sourceCharacterId])
+  @@index([targetCharacterId])
+}
+
+model WritingRule {
+  id        String   @id @default(cuid())
+  storyId   String
+  rule      String   @db.Text
+  category  String?
+  priority  Int      @default(5)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([storyId])
+  @@index([isActive])
+  @@index([priority])
+}
+
+model Episode {
+  id               String            @id @default(cuid())
+  storyId          String
+  episodeNumber    Int
+  title            String
+  content          String            @db.Text
+  summary          String?           @db.Text
+  userInstruction  String?           @db.Text
+  generationAction GenerationAction?
+  generationStatus GenerationStatus  @default(SAVED)
+  wordCount        Int
+  version          Int               @default(1)
+  isPublished      Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  story          Story            @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  versions       EpisodeVersion[]
+  generationLogs GenerationLog[]
+
+  @@unique([storyId, episodeNumber])
+  @@index([storyId])
+  @@index([storyId, createdAt])
+  @@index([generationStatus])
+  @@index([updatedAt])
+}
+
+model EpisodeVersion {
+  id            String   @id @default(cuid())
+  episodeId     String
+  versionNumber Int
+  title         String?
+  content       String   @db.Text
+  summary       String?  @db.Text
+  changeReason  String?
+  createdAt     DateTime @default(now())
+
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([episodeId, versionNumber])
+  @@index([episodeId])
+  @@index([createdAt])
+}
+
+model GenerationLog {
+  id                    String           @id @default(cuid())
+  userId                String
+  storyId               String
+  episodeId             String?
+  provider              String
+  model                 String
+  action                GenerationAction
+  inputCharacters       Int?
+  outputCharacters      Int?
+  estimatedInputTokens  Int?
+  estimatedOutputTokens Int?
+  durationMs            Int
+  success               Boolean
+  errorCode             String?
+  requestId             String
+  createdAt             DateTime         @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story   Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  episode Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, requestId])
+  @@index([userId])
+  @@index([storyId])
+  @@index([episodeId])
+  @@index([createdAt])
+  @@index([success])
+  @@index([requestId])
+}
