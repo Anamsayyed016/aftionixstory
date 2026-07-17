@@ -54,12 +54,16 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Button variant="ghost" size="sm">
-            Sign In
-          </Button>
-          <Button variant="primary" size="sm">
-            Start Writing
-          </Button>
+          <Link href="/sign-in">
+            <Button variant="ghost" size="sm">
+              Sign In
+            </Button>
+          </Link>
+          <Link href="/sign-up">
+            <Button variant="primary" size="sm">
+              Start Writing
+            </Button>
+          </Link>
         </div>
 
         <button
@@ -92,12 +96,16 @@ export function SiteHeader() {
                 </a>
               ))}
               <div className="mt-2 flex flex-col gap-3">
-                <Button variant="secondary" className="w-full">
-                  Sign In
-                </Button>
-                <Button variant="primary" className="w-full">
-                  Start Writing
-                </Button>
+                <Link href="/sign-in" onClick={() => setOpen(false)}>
+                  <Button variant="secondary" className="w-full">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/sign-up" onClick={() => setOpen(false)}>
+                  <Button variant="primary" className="w-full">
+                    Start Writing
+                  </Button>
+                </Link>
               </div>
             </Container>
           </motion.div>
