@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { Plan, Story, StoryStatus } from "@prisma/client";
+
 import { prisma } from "@/lib/db";
 import {
   countUserStories,
@@ -10,7 +12,25 @@ import { countActiveWritingRules } from "@/lib/data/writing-rules";
 import { getEffectiveGenerationLimit } from "@/lib/plans";
 import { resolveUsagePeriod } from "@/lib/usage/period";
 
-export async function getDashboardStats(userId: string) {
+export type DashboardRecentStory = Story & {
+  _count: { characters: number };
+};
+
+export type DashboardStats = {
+  totalStories: number;
+  activeStories: number;
+  draftStories: number;
+  totalCharacters: number;
+  activeWritingRules: number;
+  monthlyGenerations: number;
+  generationLimit: number;
+  plan: Plan | "FREE";
+  recentStories: DashboardRecentStory[];
+};
+
+export async function getDashboardStats(
+  userId: string
+): Promise<DashboardStats> {
   const [
     totalStories,
     activeStories,
@@ -21,8 +41,8 @@ export async function getDashboardStats(userId: string) {
     recentStories,
   ] = await Promise.all([
     countUserStories(userId),
-    countUserStoriesByStatus(userId, "ACTIVE"),
-    countUserStoriesByStatus(userId, "DRAFT"),
+    countUserStoriesByStatus(userId, "ACTIVE" satisfies StoryStatus),
+    countUserStoriesByStatus(userId, "DRAFT" satisfies StoryStatus),
     countUserCharacters(userId),
     countActiveWritingRules(userId),
     prisma.user.findUnique({
