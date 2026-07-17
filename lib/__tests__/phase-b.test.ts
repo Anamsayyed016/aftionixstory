@@ -28,10 +28,12 @@ describe("plan limits", () => {
   it("returns free defaults", () => {
     expect(getPlanLimits("FREE").maxStories).toBe(3);
     expect(getPlanLimits("FREE").maxActiveCharactersPerStory).toBe(15);
+    expect(getPlanLimits("FREE").generationLimit).toBe(20);
   });
 
   it("returns writer limits", () => {
     expect(getPlanLimits("WRITER").maxStories).toBe(25);
+    expect(getPlanLimits("WRITER").generationLimit).toBe(300);
   });
 });
 

@@ -11,7 +11,7 @@ export const PLAN_LIMITS = {
     label: "Writer",
     maxStories: 25,
     maxActiveCharactersPerStory: 40,
-    generationLimit: 200,
+    generationLimit: 300,
   },
   STUDIO: {
     label: "Studio",
@@ -26,4 +26,13 @@ export function getPlanLimits(plan: string) {
     return PLAN_LIMITS[plan];
   }
   return PLAN_LIMITS.FREE;
+}
+
+export function getEffectiveGenerationLimit(user: {
+  plan: string;
+  generationLimit?: number;
+}) {
+  // Centralized plan config is the source of truth for Phase C limits.
+  void user.generationLimit;
+  return getPlanLimits(user.plan).generationLimit;
 }

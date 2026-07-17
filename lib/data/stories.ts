@@ -85,8 +85,26 @@ export async function getOwnedStoryDetail(userId: string, storyId: string) {
         orderBy: { createdAt: "asc" },
       },
       writingRules: { orderBy: [{ priority: "desc" }, { createdAt: "asc" }] },
+      episodes: {
+        where: { generationStatus: "SAVED" },
+        orderBy: { episodeNumber: "asc" },
+        select: {
+          id: true,
+          episodeNumber: true,
+          title: true,
+          summary: true,
+          wordCount: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
       _count: {
-        select: { characters: true, relationships: true, writingRules: true },
+        select: {
+          characters: true,
+          relationships: true,
+          writingRules: true,
+          episodes: true,
+        },
       },
     },
   });

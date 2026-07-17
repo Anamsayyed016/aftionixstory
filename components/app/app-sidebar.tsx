@@ -78,8 +78,8 @@ export function AppSidebar({
             Coming later
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-dim">
-            Memories and AI episode generation are not available yet (Phase C/D).
-            Open a story to manage its characters.
+            Persistent memories and plot threads arrive in a later phase. Open a
+            story workspace to generate and save episodes now.
           </p>
         </div>
       </nav>

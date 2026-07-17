@@ -5,7 +5,7 @@ import { z } from "zod";
  * Import only from server modules (never from client components).
  */
 
-const serverSchema = z.object({
+const baseSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
@@ -18,11 +18,32 @@ const serverSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
 });
 
-export type ServerEnv = z.infer<typeof serverSchema>;
+const aiSchema = z
+  .object({
+    AI_PROVIDER: z.enum(["gemini", "mock"]).default("gemini"),
+    GEMINI_API_KEY: z.string().optional().default(""),
+    GEMINI_STORY_MODEL: z.string().default("gemini-2.0-flash"),
+    GEMINI_SUMMARY_MODEL: z.string().default("gemini-2.0-flash"),
+    AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+    AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+    AI_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+    AI_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+  })
+  .superRefine((data, ctx) => {
+    if (data.AI_PROVIDER === "gemini" && !data.GEMINI_API_KEY.trim()) {
+      // Soft: validated at request time via getAiEnvStrict / provider.
+      // Build-time may not have keys; keep optional at parse.
+      void ctx;
+    }
+  });
 
-let cached: ServerEnv | null = null;
+export type ServerEnv = z.infer<typeof baseSchema>;
+export type AiEnv = z.infer<typeof aiSchema>;
 
-function readRawEnv() {
+let cachedBase: ServerEnv | null = null;
+let cachedAi: AiEnv | null = null;
+
+function readRawBaseEnv() {
   return {
     NODE_ENV: process.env.NODE_ENV,
     DATABASE_URL: process.env.DATABASE_URL,
@@ -35,22 +56,61 @@ function readRawEnv() {
   };
 }
 
+function readRawAiEnv() {
+  return {
+    AI_PROVIDER: process.env.AI_PROVIDER || "gemini",
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
+    GEMINI_STORY_MODEL:
+      process.env.GEMINI_STORY_MODEL || "gemini-2.0-flash",
+    GEMINI_SUMMARY_MODEL:
+      process.env.GEMINI_SUMMARY_MODEL ||
+      process.env.GEMINI_STORY_MODEL ||
+      "gemini-2.0-flash",
+    AI_REQUEST_TIMEOUT_MS: process.env.AI_REQUEST_TIMEOUT_MS || "60000",
+    AI_MAX_RETRIES: process.env.AI_MAX_RETRIES || "2",
+    AI_RATE_LIMIT_WINDOW_MS: process.env.AI_RATE_LIMIT_WINDOW_MS || "60000",
+    AI_RATE_LIMIT_MAX: process.env.AI_RATE_LIMIT_MAX || "10",
+  };
+}
+
 /**
  * Parse and cache validated env. Throws on invalid configuration.
  * Call from server code at request time — not at module top-level in
  * modules that may be evaluated during `next build` without secrets.
  */
 export function getEnv(): ServerEnv {
-  if (cached) return cached;
-  const parsed = serverSchema.safeParse(readRawEnv());
+  if (cachedBase) return cachedBase;
+  const parsed = baseSchema.safeParse(readRawBaseEnv());
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((i) => `${i.path.join(".")}: ${i.message}`)
       .join("; ");
     throw new Error(`Invalid environment configuration: ${details}`);
   }
-  cached = parsed.data;
-  return cached;
+  cachedBase = parsed.data;
+  return cachedBase;
+}
+
+export function getAiEnv(): AiEnv {
+  if (cachedAi) return cachedAi;
+  const parsed = aiSchema.safeParse(readRawAiEnv());
+  if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
+    throw new Error(`Invalid AI environment configuration: ${details}`);
+  }
+  cachedAi = parsed.data;
+  return cachedAi;
+}
+
+/** Require Gemini key when provider is gemini (call before generation). */
+export function assertGeminiConfigured(): AiEnv {
+  const env = getAiEnv();
+  if (env.AI_PROVIDER === "gemini" && !env.GEMINI_API_KEY.trim()) {
+    throw new Error("AI_NOT_CONFIGURED");
+  }
+  return env;
 }
 
 export function isGoogleOAuthConfigured(): boolean {
@@ -58,4 +118,10 @@ export function isGoogleOAuthConfigured(): boolean {
   const secret =
     process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET;
   return Boolean(id && secret);
+}
+
+/** Test helper — clear caches between Vitest cases. */
+export function __resetEnvCacheForTests() {
+  cachedBase = null;
+  cachedAi = null;
 }

@@ -91,6 +91,23 @@ export async function requireWritingRuleOwnership(ruleId: string) {
   return { user, writingRule, story: writingRule.story };
 }
 
+export async function requireEpisodeOwnership(episodeId: string) {
+  const user = await requireAuthenticatedUser();
+  const episode = await prisma.episode.findFirst({
+    where: {
+      id: episodeId,
+      story: { userId: user.id },
+    },
+    include: { story: true },
+  });
+
+  if (!episode) {
+    throw new AuthzError("NOT_FOUND", "Episode not found.");
+  }
+
+  return { user, episode, story: episode.story };
+}
+
 export function authzToActionError(error: unknown) {
   if (error instanceof AuthzError) {
     return {

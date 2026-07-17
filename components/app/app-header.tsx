@@ -24,7 +24,13 @@ function titleForPath(pathname: string) {
   return "Workspace";
 }
 
-export function AppHeader({ userName }: { userName: string }) {
+export function AppHeader({
+  userName,
+  usage,
+}: {
+  userName: string;
+  usage?: { used: number; limit: number };
+}) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
   const title = titleForPath(pathname);
@@ -50,7 +56,17 @@ export function AppHeader({ userName }: { userName: string }) {
             </h1>
           </div>
         </div>
-        <p className="hidden text-sm text-ink-dim sm:block">{userName}</p>
+        <div className="flex items-center gap-3">
+          {usage && (
+            <p
+              className="hidden font-mono text-[11px] text-ink-faint sm:block"
+              title="Successful AI generations this month"
+            >
+              Generations {usage.used}/{usage.limit}
+            </p>
+          )}
+          <p className="hidden text-sm text-ink-dim md:block">{userName}</p>
+        </div>
       </div>
 
       <AnimatePresence>

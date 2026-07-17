@@ -24,8 +24,8 @@ export default async function DashboardPage() {
           Welcome, {firstName}
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-dim">
-          Your stories, characters, and writing rules live here. AI episode
-          generation arrives in Phase C.
+          Your stories, characters, and AI episode workspace live here. Open a
+          story to generate and save episodes.
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export default async function DashboardPage() {
               /{stats.generationLimit}
             </span>
           </p>
-          <p className="mt-1 text-xs text-ink-dim">Unused until Phase C AI</p>
+          <p className="mt-1 text-xs text-ink-dim">Successful AI generations this month</p>
         </GlassCard>
         <GlassCard className="p-5">
           <p className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
@@ -144,8 +144,7 @@ export default async function DashboardPage() {
         <div>
           <h3 className="font-display text-lg text-ink">Coming next</h3>
           <p className="mt-1 text-sm text-ink-dim">
-            Episodes, Gemini generation, and memory extraction are Phase C/D —
-            not available here yet.
+            Persistent memories and plot threads arrive in a later phase.
           </p>
         </div>
       </GlassCard>

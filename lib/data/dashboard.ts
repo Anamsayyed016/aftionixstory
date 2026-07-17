@@ -7,6 +7,8 @@ import {
 } from "@/lib/data/stories";
 import { countUserCharacters } from "@/lib/data/characters";
 import { countActiveWritingRules } from "@/lib/data/writing-rules";
+import { getEffectiveGenerationLimit } from "@/lib/plans";
+import { resolveUsagePeriod } from "@/lib/usage/period";
 
 export async function getDashboardStats(userId: string) {
   const [
@@ -29,6 +31,7 @@ export async function getDashboardStats(userId: string) {
         plan: true,
         monthlyGenerationCount: true,
         generationLimit: true,
+        generationPeriodStart: true,
       },
     }),
     prisma.story.findMany({
@@ -41,14 +44,24 @@ export async function getDashboardStats(userId: string) {
     }),
   ]);
 
+  const period = user
+    ? resolveUsagePeriod(
+        user.generationPeriodStart,
+        user.monthlyGenerationCount
+      )
+    : null;
+
   return {
     totalStories,
     activeStories,
     draftStories,
     totalCharacters,
     activeWritingRules,
-    monthlyGenerations: user?.monthlyGenerationCount ?? 0,
-    generationLimit: user?.generationLimit ?? 20,
+    monthlyGenerations: period?.monthlyGenerationCount ?? 0,
+    generationLimit: getEffectiveGenerationLimit({
+      plan: user?.plan ?? "FREE",
+      generationLimit: user?.generationLimit,
+    }),
     plan: user?.plan ?? "FREE",
     recentStories,
   };
