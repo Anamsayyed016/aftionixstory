@@ -1,11 +1,36 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: storyverse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-storyverse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-storyverse}
+    volumes:
+      - storyverse_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-storyverse} -d ${POSTGRES_DB:-storyverse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   web:
     build: .
     container_name: storyverse-ai
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000"
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      AUTH_TRUST_HOST: "true"
+
+volumes:
+  storyverse_pgdata:

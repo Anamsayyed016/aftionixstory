@@ -29,16 +29,42 @@ jobs:
             set -euo pipefail
             cd /var/www/storyverse-ai
 
+            if [ ! -f .env ]; then
+              echo "ERROR: /var/www/storyverse-ai/.env is missing."
+              echo "Create it on the VPS before deploying (AUTH_SECRET, AUTH_URL, DATABASE_URL, POSTGRES_PASSWORD)."
+              exit 1
+            fi
+
             echo "==> Fetching latest main from GitHub"
             git fetch origin main
             git checkout main
             git reset --hard origin/main
 
-            echo "==> Stopping previous app container"
+            echo "==> Stopping previous app containers"
             docker compose down || true
 
-            echo "==> Rebuilding and restarting Docker app"
+            echo "==> Rebuilding and restarting Docker stack"
             docker compose up -d --build
+
+            echo "==> Waiting for Postgres"
+            for i in $(seq 1 30); do
+              if docker compose exec -T db pg_isready -U storyverse >/dev/null 2>&1; then
+                break
+              fi
+              sleep 2
+            done
+
+            echo "==> Applying Prisma migrations"
+            set -a
+            # shellcheck disable=SC1091
+            . ./.env
+            set +a
+            docker run --rm \
+              --network storyverse-ai_default \
+              -v /var/www/storyverse-ai/prisma:/prisma \
+              -e DATABASE_URL \
+              node:22-alpine \
+              sh -c "npm install --no-save prisma@6.19.3 >/dev/null && npx prisma migrate deploy --schema=/prisma/schema.prisma"
 
             echo "==> Health check"
             sleep 3

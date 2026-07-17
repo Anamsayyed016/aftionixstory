@@ -67,6 +67,7 @@ function buildProviders(): NextAuthConfig["providers"] {
  * Session strategy: JWT (required for Credentials; adapter still stores users/accounts).
  */
 export const authConfig = {
+  trustHost: true,
   pages: {
     signIn: "/sign-in",
     error: "/sign-in",
