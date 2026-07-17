@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, BookOpen, LayoutDashboard, Library, Settings } from "lucide-react";
+import { Menu, X, BookOpen, LayoutDashboard, Library, Settings, PenLine } from "lucide-react";
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/stories", label: "My Stories", icon: Library },
+  { href: "/stories/new", label: "Create Story", icon: PenLine },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

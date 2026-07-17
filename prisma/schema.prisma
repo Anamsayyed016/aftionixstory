@@ -13,6 +13,23 @@ enum Plan {
   STUDIO
 }
 
+enum StoryVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+enum StoryStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CharacterStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 model User {
   id                     String    @id @default(cuid())
   name                   String?
@@ -28,6 +45,7 @@ model User {
 
   accounts Account[]
   sessions Session[]
+  stories  Story[]
 
   @@index([email])
   @@index([createdAt])
@@ -69,4 +87,113 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Story {
+  id                 String          @id @default(cuid())
+  userId             String
+  title              String
+  slug               String
+  description        String?         @db.Text
+  genre              String
+  language           String
+  storyType          String?
+  visibility         StoryVisibility @default(PRIVATE)
+  writingStyle       String?
+  dialogueStyle      String?
+  pointOfView        String?
+  episodeLength      String?
+  tone               String?
+  romanceLevel       String?
+  pacing             String?
+  customInstructions String?         @db.Text
+  setting            String?         @db.Text
+  timePeriod         String?
+  mainConflict       String?         @db.Text
+  initialPlot        String?         @db.Text
+  worldRules         String?         @db.Text
+  contentBoundaries  String?         @db.Text
+  currentSummary     String?         @db.Text
+  status             StoryStatus     @default(DRAFT)
+  totalEpisodes      Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  user          User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characters    Character[]
+  relationships CharacterRelationship[]
+  writingRules  WritingRule[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@index([status])
+  @@index([updatedAt])
+  @@index([visibility])
+}
+
+model Character {
+  id             String          @id @default(cuid())
+  storyId        String
+  name           String
+  age            Int?
+  gender         String?
+  role           String
+  appearance     String?         @db.Text
+  personality    String          @db.Text
+  background     String?         @db.Text
+  speakingStyle  String?         @db.Text
+  secrets        String?         @db.Text
+  emotionalState String?         @db.Text
+  status         CharacterStatus @default(ACTIVE)
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  story                 Story                   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  outgoingRelationships CharacterRelationship[] @relation("RelationshipSource")
+  incomingRelationships CharacterRelationship[] @relation("RelationshipTarget")
+
+  @@index([storyId])
+  @@index([status])
+  @@index([role])
+  @@index([name])
+}
+
+model CharacterRelationship {
+  id                String   @id @default(cuid())
+  storyId           String
+  sourceCharacterId String
+  targetCharacterId String
+  relationshipType  String
+  description       String?  @db.Text
+  currentStatus     String?
+  emotionalDynamic  String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  story           Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  sourceCharacter Character @relation("RelationshipSource", fields: [sourceCharacterId], references: [id], onDelete: Restrict)
+  targetCharacter Character @relation("RelationshipTarget", fields: [targetCharacterId], references: [id], onDelete: Restrict)
+
+  @@unique([storyId, sourceCharacterId, targetCharacterId, relationshipType])
+  @@index([storyId])
+  @@index([sourceCharacterId])
+  @@index([targetCharacterId])
+}
+
+model WritingRule {
+  id        String   @id @default(cuid())
+  storyId   String
+  rule      String   @db.Text
+  category  String?
+  priority  Int      @default(5)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([storyId])
+  @@index([isActive])
+  @@index([priority])
 }

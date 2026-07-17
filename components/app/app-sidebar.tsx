@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   Library,
   Settings,
-  Sparkles,
+  PenLine,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/stories", label: "My Stories", icon: Library },
+  { href: "/stories/new", label: "Create Story", icon: PenLine },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -47,9 +48,14 @@ export function AppSidebar({
 
       <nav className="flex flex-1 flex-col gap-1 p-3">
         {NAV.map((item) => {
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
+          const active =
+            item.href === "/stories"
+              ? pathname === "/stories" ||
+                (pathname.startsWith("/stories/") &&
+                  !pathname.startsWith("/stories/new"))
+              : pathname === item.href ||
+                pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}
@@ -68,13 +74,12 @@ export function AppSidebar({
         })}
 
         <div className="mt-4 rounded-md border border-border/80 bg-panel/50 p-3">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-ink-faint">
-            <Sparkles className="h-3.5 w-3.5 text-violet-soft" />
-            Coming soon
+          <div className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+            Coming later
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-dim">
-            Create Story, Characters, Memories, and AI episode generation arrive
-            in the next phases.
+            Memories and AI episode generation are not available yet (Phase C/D).
+            Open a story to manage its characters.
           </p>
         </div>
       </nav>
