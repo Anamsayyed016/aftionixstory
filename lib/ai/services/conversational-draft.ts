@@ -2,15 +2,18 @@ import "server-only";
 
 import { AIError } from "@/lib/ai/errors";
 import { logAiEvent } from "@/lib/ai/logger";
-import { getAIProvider } from "@/lib/ai/registry";
-import { countWords } from "@/lib/ai/token-estimator";
 import { getAiEnv, resolveStoryModel } from "@/lib/env";
+import {
+  formatLanguagePromptBlock,
+  readLanguagePreferences,
+} from "@/lib/story-agent/language-preferences";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import {
   assertGenerationRateLimit,
   assertWithinGenerationLimit,
   incrementSuccessfulGeneration,
 } from "@/lib/usage/generation";
+import { generateCreativeText } from "@/lib/ai/services/creative-text";
 
 export type ConversationalDraftResult = {
   title: string;
@@ -47,13 +50,21 @@ function buildOpeningPrompt(params: {
 
   const rules = params.memory.writingRules.map((r) => `- ${r.rule}`).join("\n");
   const prefs = params.memory.userPreferences;
+  const langPrefs = readLanguagePreferences({
+    narrationLanguage: prefs.narrationLanguage,
+    dialogueLanguage: prefs.dialogueLanguage,
+    scriptPreference: prefs.scriptPreference,
+    mirrorUserLanguage: prefs.mirrorUserLanguage,
+    storyLanguage: sm.language,
+  });
+  const languageBlock = formatLanguagePromptBlock(langPrefs);
 
   const system = `You are StoryVerse's fiction writer. Write vivid serialized episode prose.
 
 Rules:
 - Write the opening episode / scene the user asked for.
 - Use only established facts from memory. Do not invent major new relationships without need.
-- Mirror the user's language (English / Hindi / Hinglish).
+- Follow LANGUAGE REQUIREMENTS exactly.
 - Prefer third-person unless memory says otherwise.
 - Keep pacing readable for web serialization.
 - If loud dialogue is requested, use UPPERCASE sparingly for shouted lines.
@@ -69,7 +80,10 @@ Genre: ${(sm.genre ?? []).join(", ") || "unspecified"}
 Tone: ${(sm.tone ?? []).join(", ") || "unspecified"}
 Setting: ${sm.setting || "unspecified"}
 Plot notes: ${sm.plot || "none"}
-Language hint: ${sm.language || prefs.dialogueLanguage || "mirror user"}
+LANGUAGE REQUIREMENTS:
+${languageBlock}
+- Narration: ${langPrefs.narrationLanguage}
+- Dialogue: ${langPrefs.dialogueLanguage}
 POV: ${sm.pov || "third person"}
 Pacing: ${sm.pacing || (prefs.slowBurn ? "slow burn" : "balanced")}
 
@@ -100,18 +114,6 @@ Write Episode 1 / the requested draft now.`;
   return { system, prompt };
 }
 
-function parseTitleBody(raw: string): { title: string; content: string } {
-  const text = raw.trim();
-  const match = text.match(/^TITLE:\s*(.+)\s*\n---\s*\n([\s\S]+)$/i);
-  if (match) {
-    return { title: match[1].trim().slice(0, 160), content: match[2].trim() };
-  }
-  const lines = text.split("\n");
-  const title = (lines[0] || "Episode 1").replace(/^#+\s*/, "").slice(0, 160);
-  const content = lines.slice(1).join("\n").trim() || text;
-  return { title, content };
-}
-
 /**
  * Creative opening/revision draft WITHOUT requiring a Story DB row.
  * Uses the story-generation model profile (not the agent model).
@@ -128,31 +130,38 @@ export async function generateConversationalDraft(params: {
 
   const env = getAiEnv();
   const model = resolveStoryModel(env);
-  const provider = getAIProvider();
   const { system, prompt } = buildOpeningPrompt({
     memory: params.memory,
     userInstruction: params.userInstruction,
     reviseContent: params.reviseExistingContent,
   });
 
+  const langPrefs = readLanguagePreferences({
+    narrationLanguage: params.memory.userPreferences.narrationLanguage,
+    dialogueLanguage: params.memory.userPreferences.dialogueLanguage,
+    scriptPreference: params.memory.userPreferences.scriptPreference,
+    mirrorUserLanguage: params.memory.userPreferences.mirrorUserLanguage,
+    storyLanguage: params.memory.storyMemory.language,
+  });
+
   logAiEvent("info", "ai.story_agent.creative_draft", {
     operation: "story_agent_opening_draft",
-    provider: provider.name,
     model,
     requestId: params.clientRequestId,
+    narrationLanguage: langPrefs.narrationLanguage,
+    dialogueLanguage: langPrefs.dialogueLanguage,
   });
 
-  const result = await provider.generateText({
+  const result = await generateCreativeText({
     systemInstruction: system,
     prompt,
+    operation: "story_agent_opening_draft",
     temperature: 0.85,
     maxOutputTokens: 4096,
-    model,
-    operation: "story_agent_opening_draft",
+    languagePrefs: langPrefs,
   });
 
-  const parsed = parseTitleBody(result.text);
-  if (parsed.content.trim().length < 80) {
+  if (result.content.trim().length < 80) {
     throw new AIError(
       "AI_INVALID_RESPONSE",
       "The story draft came back too short. Please try again.",
@@ -163,9 +172,9 @@ export async function generateConversationalDraft(params: {
   await incrementSuccessfulGeneration(params.userId);
 
   return {
-    title: parsed.title || "Episode 1",
-    content: parsed.content,
-    wordCount: countWords(parsed.content),
+    title: result.title || "Episode 1",
+    content: result.content,
+    wordCount: result.wordCount,
     clientRequestId: params.clientRequestId,
     provider: result.provider,
     model: result.model,

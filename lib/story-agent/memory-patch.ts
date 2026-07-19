@@ -231,6 +231,9 @@ export function applyMemoryPatch(
     writingRules,
     userPreferences: {
       dialogueLanguage: preferences.dialogueLanguage,
+      narrationLanguage: preferences.narrationLanguage,
+      scriptPreference: preferences.scriptPreference,
+      mirrorUserLanguage: preferences.mirrorUserLanguage ?? true,
       format: preferences.format,
       episodeLength: preferences.episodeLength,
       uppercaseForLoudDialogue: preferences.uppercaseForLoudDialogue ?? false,

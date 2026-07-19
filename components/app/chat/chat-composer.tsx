@@ -14,6 +14,9 @@ import { CHAT_MAX_CHARS } from "@/lib/chat/constants";
 import { canSendMessage, shouldSendOnKeyDown } from "@/lib/chat/utils";
 import { cn } from "@/lib/utils";
 
+/** ~8–10 lines at text-sm / leading-relaxed */
+const TEXTAREA_MAX_PX = 208;
+
 type ChatComposerProps = {
   value: string;
   onChange: (value: string) => void;
@@ -42,7 +45,7 @@ export function ChatComposer({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_PX)}px`;
   }, []);
 
   useEffect(() => {
@@ -56,26 +59,40 @@ export function ChatComposer({
   }
 
   return (
-    <div className="border-t border-border/80 bg-panel/80 p-3 backdrop-blur-md sm:p-4">
+    <div className="bg-panel/80 p-3 backdrop-blur-md sm:p-4">
       <label htmlFor={labelId} className="sr-only">
         Message
       </label>
       <div className="rounded-2xl border border-border bg-charcoal/70 p-2 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.8)] focus-within:border-violet-soft/60 focus-within:ring-2 focus-within:ring-lilac/25">
-        <textarea
-          id={labelId}
-          ref={textareaRef}
-          rows={1}
-          value={value}
-          disabled={disabled || busy}
-          placeholder={placeholder}
-          maxLength={CHAT_MAX_CHARS}
-          onChange={(event) => onChange(event.target.value)}
-          onKeyDown={handleKeyDown}
-          aria-describedby={countId}
-          aria-label="Chat message"
-          className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-2.5 py-2 text-sm leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none disabled:opacity-60"
-        />
-        <div className="flex items-center justify-between gap-3 px-1 pb-1">
+        <div className="flex items-end gap-2">
+          <textarea
+            id={labelId}
+            ref={textareaRef}
+            rows={1}
+            value={value}
+            disabled={disabled || busy}
+            placeholder={placeholder}
+            maxLength={CHAT_MAX_CHARS}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+            aria-describedby={countId}
+            aria-label="Chat message"
+            className="max-h-[13rem] min-h-[44px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2.5 py-2 text-sm leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none disabled:opacity-60"
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="mb-0.5 shrink-0 rounded-xl"
+            disabled={!canSend}
+            loading={busy}
+            onClick={onSend}
+            aria-label="Send message"
+          >
+            {!busy ? <SendHorizontal className="h-4 w-4" aria-hidden /> : null}
+            <span className="hidden sm:inline">Send</span>
+          </Button>
+        </div>
+        <div className="flex items-center justify-between gap-3 px-1 pb-0.5 pt-1">
           <p
             id={countId}
             className={cn(
@@ -86,23 +103,11 @@ export function ChatComposer({
           >
             {length}/{CHAT_MAX_CHARS}
           </p>
-          <Button
-            type="button"
-            size="sm"
-            className="rounded-xl"
-            disabled={!canSend}
-            loading={busy}
-            onClick={onSend}
-            aria-label="Send message"
-          >
-            {!busy ? <SendHorizontal className="h-4 w-4" aria-hidden /> : null}
-            Send
-          </Button>
+          <p className="text-[10px] text-ink-faint sm:text-[11px]">
+            Enter to send · Shift+Enter for a new line
+          </p>
         </div>
       </div>
-      <p className="mt-2 text-[11px] text-ink-faint">
-        Enter to send · Shift+Enter for a new line
-      </p>
     </div>
   );
 }

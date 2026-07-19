@@ -4,7 +4,7 @@ import { NewStoryEntry } from "@/components/app/new-story-entry";
 
 export default function NewStoryPage() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
         <p className="text-xs text-violet-soft">Create</p>
         <h2 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">

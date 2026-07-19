@@ -1,3 +1,7 @@
+import {
+  detectLanguageInstruction,
+  readLanguagePreferences,
+} from "@/lib/story-agent/language-preferences";
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 
@@ -13,6 +17,8 @@ export type IntentRoute = {
   /** Optional fixed reply (no model needed). */
   fixedReply?: string;
   reason: string;
+  /** Language detection metadata for observability. */
+  languageLabel?: string;
 };
 
 const DO_NOT_START = [
@@ -79,6 +85,8 @@ const REVISE = [
   /\bslow\s+karo\b/i,
   /\bromance\s+add\b/i,
   /\bdialogue\s+improve\b/i,
+  /\bdialogues?\s+natural\b/i,
+  /\bnatural\s+karo\b/i,
   /\bmore\s+emotional\b/i,
   /\buppercase\b.*\bdialogue/i,
   /\bprevious\s+scene\b/i,
@@ -122,8 +130,20 @@ function anyMatch(patterns: RegExp[], text: string): boolean {
   return patterns.some((re) => re.test(text));
 }
 
+function hasDraft(memory?: StoryMemory | null): boolean {
+  return Boolean(memory?.latestDraft?.content?.trim());
+}
+
 /**
  * Fast deterministic pre-router. High-confidence matches skip LLM classification.
+ *
+ * Priority:
+ * 1. safety/control
+ * 2. save/create
+ * 3. language/style revision when latestDraft exists
+ * 4. creative writing
+ * 5. memory/preference (incl. language without draft)
+ * 6. general conversation
  */
 export function routeIntent(
   userMessage: string,
@@ -140,7 +160,7 @@ export function routeIntent(
     };
   }
 
-  // Safety first
+  // 1. Safety first
   if (anyMatch(DO_NOT_START, text)) {
     const wantsOptions =
       anyMatch(BRAINSTORM, text) || /\boptions?\b/i.test(text);
@@ -156,6 +176,46 @@ export function routeIntent(
     };
   }
 
+  // 2. Explicit save / create
+  if (anyMatch(SAVE, text)) {
+    return {
+      operation: "save_episode",
+      confidence: "high",
+      skipClassifier: true,
+      reason: "save_episode",
+    };
+  }
+
+  if (anyMatch(CREATE, text)) {
+    return {
+      operation: "create_story",
+      confidence: "high",
+      skipClassifier: true,
+      reason: "create_story",
+    };
+  }
+
+  const existingLang = readLanguagePreferences({
+    narrationLanguage: memory?.userPreferences.narrationLanguage,
+    dialogueLanguage: memory?.userPreferences.dialogueLanguage,
+    scriptPreference: memory?.userPreferences.scriptPreference,
+    mirrorUserLanguage: memory?.userPreferences.mirrorUserLanguage,
+    storyLanguage: memory?.storyMemory.language,
+  });
+  const lang = detectLanguageInstruction(text, existingLang);
+
+  // 3. Language / style revision when an unsaved draft exists
+  if (hasDraft(memory) && (lang.matched || anyMatch(REVISE, text))) {
+    return {
+      operation: "revise_draft",
+      confidence: "high",
+      skipClassifier: true,
+      reason: lang.matched ? "language_revise_draft" : "revise_pattern",
+      languageLabel: lang.matched ? lang.detectedLabel : undefined,
+    };
+  }
+
+  // 4. Creative writing commands
   if (anyMatch(WRITE_SCENE, text)) {
     return {
       operation: "write_scene",
@@ -163,6 +223,7 @@ export function routeIntent(
       skipClassifier: true,
       clearGenerationBlock: true,
       reason: "write_scene_pattern",
+      languageLabel: lang.matched ? lang.detectedLabel : undefined,
     };
   }
 
@@ -186,30 +247,30 @@ export function routeIntent(
     };
   }
 
+  // 5. Language preference without draft — memory only, no generation
+  if (lang.matched) {
+    const dlg = lang.resolved.dialogueLanguage;
+    const nar = lang.resolved.narrationLanguage;
+    const desc =
+      nar === dlg
+        ? `${nar}`
+        : `narration ${nar}, dialogues ${dlg}`;
+    return {
+      operation: "memory_update",
+      confidence: "high",
+      skipClassifier: true,
+      fixedReply: `Theek hai — ab se writing ${desc} me rakhungi. Jab scene ya episode likhne bolo, isi language me likhungi.`,
+      reason: "language_preference_only",
+      languageLabel: lang.detectedLabel,
+    };
+  }
+
   if (anyMatch(REVISE, text)) {
     return {
       operation: "revise_draft",
-      confidence: memory?.latestDraft?.content ? "high" : "medium",
-      skipClassifier: Boolean(memory?.latestDraft?.content),
-      reason: "revise_pattern",
-    };
-  }
-
-  if (anyMatch(SAVE, text)) {
-    return {
-      operation: "save_episode",
-      confidence: "high",
-      skipClassifier: true,
-      reason: "save_episode",
-    };
-  }
-
-  if (anyMatch(CREATE, text)) {
-    return {
-      operation: "create_story",
-      confidence: "high",
-      skipClassifier: true,
-      reason: "create_story",
+      confidence: "medium",
+      skipClassifier: false,
+      reason: "revise_pattern_no_draft",
     };
   }
 
@@ -244,7 +305,7 @@ export function routeIntent(
     return {
       operation: "memory_update",
       confidence: "high",
-      skipClassifier: false, // still use structured agent for patch quality
+      skipClassifier: false,
       reason: "memory_pattern",
     };
   }

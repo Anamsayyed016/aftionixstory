@@ -108,6 +108,9 @@ export const storyMemoryCoreSchema = z.object({
 
 export const userPreferencesSchema = z.object({
   dialogueLanguage: optionalString,
+  narrationLanguage: optionalString,
+  scriptPreference: optionalString,
+  mirrorUserLanguage: z.boolean().optional().default(true),
   format: optionalString,
   episodeLength: optionalString,
   uppercaseForLoudDialogue: z.boolean().optional().default(false),
@@ -143,6 +146,7 @@ export const storyMemorySchema = z.object({
     uppercaseForLoudDialogue: false,
     slowBurn: false,
     doNotStartYet: false,
+    mirrorUserLanguage: true,
     avoid: [],
   }),
   latestDraft: latestDraftSchema.default(null),

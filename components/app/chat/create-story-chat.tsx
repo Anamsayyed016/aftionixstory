@@ -440,7 +440,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   return (
     <div
       className={cn(
-        "flex h-full min-h-[520px] overflow-hidden rounded-2xl border border-border bg-panel/80 shadow-[0_24px_60px_-40px_rgba(0,0,0,0.85)]",
+        "flex h-full min-h-0 overflow-hidden rounded-2xl border border-border bg-panel/80 shadow-[0_24px_60px_-40px_rgba(0,0,0,0.85)]",
         className
       )}
     >
@@ -455,8 +455,11 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         onMobileClose={() => setHistoryOpen(false)}
       />
 
-      <section aria-label={copy.title} className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-start justify-between gap-3 border-b border-border/80 px-3 py-3 sm:px-4">
+      <section
+        aria-label={copy.title}
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      >
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border/80 px-3 py-3 sm:px-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <button
@@ -526,115 +529,121 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           </div>
         </header>
 
-        <StoryProgress memory={memory} statusText={memoryStatus} />
-
-        <div className="min-h-0 flex-1">
-          <ChatMessageList
-            messages={messages}
-            emptyTitle={copy.emptyTitle}
-            emptyDescription={copy.emptyDescription}
-            suggestions={CREATE_SUGGESTIONS}
-            onSelectSuggestion={handleSelectSuggestion}
-            disabled={creating || restoring || archivedConversation}
-            busy={busy && !restoring}
-            onRetryError={handleRetry}
-          />
+        <div className="shrink-0">
+          <StoryProgress memory={memory} statusText={memoryStatus} />
         </div>
 
-        {suggestions.length > 0 && !busy ? (
-          <div className="flex flex-wrap gap-2 border-t border-border/50 px-3 py-2 sm:px-4">
-            {suggestions.slice(0, 4).map((suggestion) => (
-              <button
-                key={suggestion.id}
-                type="button"
-                disabled={creating || restoring || archivedConversation}
-                onClick={() => handleSelectSuggestion(suggestion)}
-                className="rounded-full border border-border bg-charcoal/50 px-3 py-1 text-xs text-ink-dim transition-colors hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
-              >
-                {suggestion.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <ChatMessageList
+              messages={messages}
+              emptyTitle={copy.emptyTitle}
+              emptyDescription={copy.emptyDescription}
+              suggestions={CREATE_SUGGESTIONS}
+              onSelectSuggestion={handleSelectSuggestion}
+              disabled={creating || restoring || archivedConversation}
+              busy={busy && !restoring}
+              onRetryError={handleRetry}
+              className="h-auto min-h-0 overflow-visible"
+            />
 
-        {episodePreview ? (
-          <div className="border-t border-border/60 bg-charcoal/40 px-3 py-3 sm:px-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-violet-soft">
-                Unsaved {episodePreview.draftKind === "scene" ? "scene" : "draft"}
-              </p>
-              <p className="text-[11px] text-ink-faint">
-                {episodePreview.wordCount} words
-              </p>
-            </div>
-            <p className="mt-0.5 truncate text-sm font-medium text-ink">
-              {episodePreview.title}
-            </p>
-            <p className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-ink-dim">
-              {episodePreview.content}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy || creating || archivedConversation}
-                className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
-                onClick={() => void sendPrompt("Rewrite the previous scene.")}
-              >
-                Rewrite
-              </button>
-              <button
-                type="button"
-                disabled={busy || creating || archivedConversation}
-                className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
-                onClick={() =>
-                  void sendPrompt(
-                    "Make the previous scene slower and more emotional."
-                  )
-                }
-              >
-                More emotional
-              </button>
-              <button
-                type="button"
-                disabled={busy || creating || archivedConversation}
-                className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
-                onClick={() => void sendPrompt("Continue from here.")}
-              >
-                Continue
-              </button>
-              <button
-                type="button"
-                disabled={busy || creating || archivedConversation}
-                className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(episodePreview.content);
-                }}
-              >
-                Copy
-              </button>
-              {storyDraft && !linkedStoryId ? (
-                <button
-                  type="button"
-                  disabled={busy || creating || archivedConversation}
-                  className="rounded-full border border-violet-soft/40 px-3 py-1 text-[11px] text-violet-soft hover:bg-violet/10 disabled:opacity-50"
-                  onClick={() => setReviewOpen(true)}
-                >
-                  Use in story
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
+            {suggestions.length > 0 && !busy ? (
+              <div className="flex flex-wrap gap-2 border-t border-border/50 px-3 py-2 sm:px-4">
+                {suggestions.slice(0, 4).map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    disabled={creating || restoring || archivedConversation}
+                    onClick={() => handleSelectSuggestion(suggestion)}
+                    className="rounded-full border border-border bg-charcoal/50 px-3 py-1 text-xs text-ink-dim transition-colors hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                  >
+                    {suggestion.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
 
-        <div className="pb-[max(0px,env(safe-area-inset-bottom))]">
-          <ChatComposer
-            value={draft}
-            onChange={setDraft}
-            onSend={handleSend}
-            placeholder={copy.placeholder}
-            disabled={creating || restoring || archivedConversation}
-            busy={busy}
-          />
+            {episodePreview ? (
+              <div className="border-t border-border/60 bg-charcoal/40 px-3 py-3 sm:px-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-violet-soft">
+                    Unsaved{" "}
+                    {episodePreview.draftKind === "scene" ? "scene" : "draft"}
+                  </p>
+                  <p className="text-[11px] text-ink-faint">
+                    {episodePreview.wordCount} words
+                  </p>
+                </div>
+                <p className="mt-0.5 truncate text-sm font-medium text-ink">
+                  {episodePreview.title}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-ink-dim">
+                  {episodePreview.content}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy || creating || archivedConversation}
+                    className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                    onClick={() => void sendPrompt("Rewrite the previous scene.")}
+                  >
+                    Rewrite
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || creating || archivedConversation}
+                    className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                    onClick={() =>
+                      void sendPrompt(
+                        "Make the previous scene slower and more emotional."
+                      )
+                    }
+                  >
+                    More emotional
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || creating || archivedConversation}
+                    className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                    onClick={() => void sendPrompt("Continue from here.")}
+                  >
+                    Continue
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || creating || archivedConversation}
+                    className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(episodePreview.content);
+                    }}
+                  >
+                    Copy
+                  </button>
+                  {storyDraft && !linkedStoryId ? (
+                    <button
+                      type="button"
+                      disabled={busy || creating || archivedConversation}
+                      className="rounded-full border border-violet-soft/40 px-3 py-1 text-[11px] text-violet-soft hover:bg-violet/10 disabled:opacity-50"
+                      onClick={() => setReviewOpen(true)}
+                    >
+                      Use in story
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="shrink-0 border-t border-border/80 pb-[max(0px,env(safe-area-inset-bottom))]">
+            <ChatComposer
+              value={draft}
+              onChange={setDraft}
+              onSend={handleSend}
+              placeholder={copy.placeholder}
+              disabled={creating || restoring || archivedConversation}
+              busy={busy}
+            />
+          </div>
         </div>
       </section>
 

@@ -6,6 +6,11 @@ import { getAIProvider } from "@/lib/ai/registry";
 import { countWords } from "@/lib/ai/token-estimator";
 import type { AIProvider } from "@/lib/ai/types";
 import { getAiEnv, resolveCreativeModel } from "@/lib/env";
+import {
+  checkLanguageCompliance,
+  formatLanguagePromptBlock,
+  type LanguagePreferences,
+} from "@/lib/story-agent/language-preferences";
 
 export type CreativeTextResult = {
   text: string;
@@ -16,6 +21,7 @@ export type CreativeTextResult = {
   model: string;
   durationMs: number;
   retryCount: number;
+  languageComplianceRetry?: boolean;
 };
 
 /** True if the model dumped a JSON tool envelope instead of prose. */
@@ -24,7 +30,6 @@ export function looksLikeJsonDump(text: string): boolean {
   if (!t.startsWith("{") && !t.startsWith("[")) return false;
   try {
     const parsed = JSON.parse(t) as Record<string, unknown>;
-    // Known accidental wrappers — extract later; still "json dump"
     return (
       typeof parsed === "object" &&
       parsed !== null &&
@@ -38,21 +43,19 @@ export function looksLikeJsonDump(text: string): boolean {
   }
 }
 
-/**
- * If the provider wrapped prose in a known JSON field, extract it safely.
- * Otherwise return null (do not run extraction validation).
- */
 export function extractProseFromAccidentalJson(raw: string): string | null {
   const t = raw.trim();
   if (!t.startsWith("{")) return null;
   try {
     const parsed = JSON.parse(t) as Record<string, unknown>;
     for (const key of ["content", "scene", "draft", "text", "prose"]) {
-      if (typeof parsed[key] === "string" && String(parsed[key]).trim().length > 40) {
+      if (
+        typeof parsed[key] === "string" &&
+        String(parsed[key]).trim().length > 40
+      ) {
         return String(parsed[key]).trim();
       }
     }
-    // Never treat assistantReply as the scene body if it looks like a short chat reply
     if (
       typeof parsed.assistantReply === "string" &&
       String(parsed.assistantReply).trim().length > 200 &&
@@ -135,7 +138,8 @@ export function validateCreativeProse(
 
 /**
  * Plain-text creative generation. Never uses JSON response_format.
- * Empty response → one retry. No JSON schema repair.
+ * Empty response → one retry. Language miss → one stricter retry.
+ * No JSON schema repair.
  */
 export async function generateCreativeText(params: {
   systemInstruction: string;
@@ -144,23 +148,27 @@ export async function generateCreativeText(params: {
   temperature?: number;
   maxOutputTokens?: number;
   provider?: AIProvider;
+  languagePrefs?: LanguagePreferences;
 }): Promise<CreativeTextResult> {
   const env = getAiEnv();
   const model = resolveCreativeModel(env);
   const provider = params.provider ?? getAIProvider();
   let retryCount = 0;
+  let languageComplianceRetry = false;
 
   logAiEvent("info", "ai.creative_text.start", {
     operation: params.operation,
     provider: provider.name,
     model,
     outputMode: "text",
+    narrationLanguage: params.languagePrefs?.narrationLanguage,
+    dialogueLanguage: params.languagePrefs?.dialogueLanguage,
   });
 
-  const call = async () =>
+  const call = async (system: string, prompt: string) =>
     provider.generateText({
-      systemInstruction: params.systemInstruction,
-      prompt: params.prompt,
+      systemInstruction: system,
+      prompt,
       temperature: params.temperature ?? 0.85,
       maxOutputTokens: params.maxOutputTokens ?? 4096,
       model,
@@ -168,13 +176,41 @@ export async function generateCreativeText(params: {
       outputMode: "text",
     });
 
-  let result = await call();
+  let result = await call(params.systemInstruction, params.prompt);
   if (!result.text.trim()) {
     retryCount = 1;
-    result = await call();
+    result = await call(params.systemInstruction, params.prompt);
   }
 
-  const validated = validateCreativeProse(result.text);
+  let validated = validateCreativeProse(result.text);
+
+  if (params.languagePrefs) {
+    const compliance = checkLanguageCompliance(
+      validated.content,
+      params.languagePrefs
+    );
+    if (!compliance.ok) {
+      languageComplianceRetry = true;
+      retryCount += 1;
+      const reminder = `
+
+STRICT LANGUAGE REMINDER (previous output ignored language):
+${formatLanguagePromptBlock(params.languagePrefs)}
+Rewrite the entire scene again in the required language. Prose only.`;
+      result = await call(
+        params.systemInstruction,
+        `${params.prompt}${reminder}`
+      );
+      validated = validateCreativeProse(result.text);
+      logAiEvent("info", "ai.creative_text.language_retry", {
+        operation: params.operation,
+        languageComplianceRetry: true,
+        reason: compliance.reason,
+        narrationLanguage: params.languagePrefs.narrationLanguage,
+        dialogueLanguage: params.languagePrefs.dialogueLanguage,
+      });
+    }
+  }
 
   logAiEvent("info", "ai.creative_text.ok", {
     operation: params.operation,
@@ -184,6 +220,7 @@ export async function generateCreativeText(params: {
     durationMs: result.durationMs,
     responseLength: result.text.length,
     retryCount,
+    languageComplianceRetry,
     validation: "ok",
   });
 
@@ -196,5 +233,6 @@ export async function generateCreativeText(params: {
     model: result.model,
     durationMs: result.durationMs,
     retryCount,
+    languageComplianceRetry,
   };
 }

@@ -21,6 +21,7 @@ export type WriteSceneResult = {
   model: string;
   durationMs: number;
   retryCount: number;
+  languageComplianceRetry?: boolean;
 };
 
 /**
@@ -45,7 +46,7 @@ export async function generateWriteScene(params: {
 
   const { system, prompt } =
     params.mode === "revise"
-      ? buildReviseDraftPrompt(ctx)
+      ? buildReviseDraftPrompt(ctx, ctx.languagePrefs)
       : buildWriteScenePrompt(ctx);
 
   const result = await generateCreativeText({
@@ -58,12 +59,15 @@ export async function generateWriteScene(params: {
     temperature: 0.85,
     maxOutputTokens: 4096,
     provider: params.provider,
+    languagePrefs: ctx.languagePrefs,
   });
 
   await incrementSuccessfulGeneration(params.userId);
 
   return {
-    title: result.title || (params.mode === "revise" ? "Revised draft" : "Scene draft"),
+    title:
+      result.title ||
+      (params.mode === "revise" ? "Revised draft" : "Scene draft"),
     content: result.content,
     wordCount: result.wordCount,
     draftKind: params.mode === "revise" ? "rewrite" : "scene",
@@ -71,5 +75,6 @@ export async function generateWriteScene(params: {
     model: result.model,
     durationMs: result.durationMs,
     retryCount: result.retryCount,
+    languageComplianceRetry: result.languageComplianceRetry,
   };
 }

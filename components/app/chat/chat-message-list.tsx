@@ -6,6 +6,7 @@ import { ChatEmptyState } from "@/components/app/chat/chat-empty-state";
 import { ChatMessageBubble } from "@/components/app/chat/chat-message-bubble";
 import { ChatTypingIndicator } from "@/components/app/chat/chat-typing-indicator";
 import type { ChatMessage, ChatSuggestion } from "@/lib/chat/types";
+import { cn } from "@/lib/utils";
 
 type ChatMessageListProps = {
   messages: ChatMessage[];
@@ -16,6 +17,7 @@ type ChatMessageListProps = {
   disabled?: boolean;
   busy?: boolean;
   onRetryError?: () => void;
+  className?: string;
 };
 
 export function ChatMessageList({
@@ -27,6 +29,7 @@ export function ChatMessageList({
   disabled = false,
   busy = false,
   onRetryError,
+  className,
 }: ChatMessageListProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -51,7 +54,10 @@ export function ChatMessageList({
 
   return (
     <div
-      className="flex h-full flex-col gap-3 overflow-y-auto px-3 py-4 sm:px-5"
+      className={cn(
+        "flex h-full flex-col gap-3 overflow-y-auto px-3 py-4 sm:px-5",
+        className
+      )}
       role="log"
       aria-live="polite"
       aria-relevant="additions"

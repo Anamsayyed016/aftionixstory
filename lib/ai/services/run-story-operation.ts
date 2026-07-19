@@ -21,6 +21,11 @@ import { generateWriteScene } from "@/lib/ai/services/write-scene";
 import { getAiEnv, resolveAgentModel } from "@/lib/env";
 import { routeStoryAgentAction } from "@/lib/story-agent/action-router";
 import { routeIntent } from "@/lib/story-agent/intent-router";
+import {
+  detectLanguageInstruction,
+  languagePrefsToStoryLanguageLabel,
+  readLanguagePreferences,
+} from "@/lib/story-agent/language-preferences";
 import { describeMemoryStatus } from "@/lib/story-agent/memory-patch";
 import type { NormalizedTurnResult } from "@/lib/story-agent/operation-result";
 import {
@@ -32,6 +37,43 @@ import {
   type StoryAgentTurnResult,
   type StoryMemory,
 } from "@/lib/story-agent/schema";
+
+function applyLanguagePrefsToMemory(
+  memory: StoryMemory,
+  userMessage: string
+): { memory: StoryMemory; languageLabel?: string } {
+  const existing = readLanguagePreferences({
+    narrationLanguage: memory.userPreferences.narrationLanguage,
+    dialogueLanguage: memory.userPreferences.dialogueLanguage,
+    scriptPreference: memory.userPreferences.scriptPreference,
+    mirrorUserLanguage: memory.userPreferences.mirrorUserLanguage,
+    storyLanguage: memory.storyMemory.language,
+  });
+  const detected = detectLanguageInstruction(userMessage, existing);
+  if (!detected.matched) {
+    return { memory };
+  }
+
+  const resolved = detected.resolved;
+  return {
+    memory: {
+      ...memory,
+      storyMemory: {
+        ...memory.storyMemory,
+        language: languagePrefsToStoryLanguageLabel(resolved),
+      },
+      userPreferences: {
+        ...memory.userPreferences,
+        narrationLanguage: resolved.narrationLanguage,
+        dialogueLanguage: resolved.dialogueLanguage,
+        scriptPreference: resolved.scriptPreference,
+        mirrorUserLanguage: resolved.mirrorUserLanguage,
+      },
+      updatedAt: new Date().toISOString(),
+    },
+    languageLabel: detected.detectedLabel,
+  };
+}
 
 function emptyPatch(): StoryAgentTurnResult["memoryPatch"] {
   return {
@@ -153,6 +195,8 @@ export async function runStoryOperation(params: {
 }): Promise<NormalizedTurnResult> {
   const started = Date.now();
   let memory = seedMemoryFromMessage(params.memory, params.userMessage);
+  const langApplied = applyLanguagePrefsToMemory(memory, params.userMessage);
+  memory = langApplied.memory;
   const route = routeIntent(params.userMessage, memory);
   const operation = route.operation;
 
@@ -198,6 +242,9 @@ export async function runStoryOperation(params: {
         event: "story_operation.turn",
         operation,
         detectedIntent: route.reason,
+        languageLabel: route.languageLabel ?? langApplied.languageLabel,
+        narrationLanguage: memory.userPreferences.narrationLanguage,
+        dialogueLanguage: memory.userPreferences.dialogueLanguage,
         outputMode: "none",
         provider: null,
         model: null,
@@ -272,12 +319,17 @@ export async function runStoryOperation(params: {
           event: "story_operation.turn",
           operation,
           detectedIntent: route.reason,
+          languageLabel: route.languageLabel ?? langApplied.languageLabel,
+          narrationLanguage: memory.userPreferences.narrationLanguage,
+          dialogueLanguage: memory.userPreferences.dialogueLanguage,
+          revisionTriggered: operation === "revise_draft",
           outputMode: "text",
           provider: scene.provider,
           model: scene.model,
           durationMs: scene.durationMs,
           responseLength: scene.content.length,
           retryCount: scene.retryCount,
+          languageComplianceRetry: scene.languageComplianceRetry ?? false,
           validation: "ok",
           conversationId: params.conversationId,
           turnRequestId: params.turnRequestId,

@@ -1,10 +1,17 @@
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import type { StoryMemory } from "@/lib/story-agent/schema";
+import {
+  detectLanguageInstruction,
+  languagePrefsToStoryLanguageLabel,
+  readLanguagePreferences,
+  type LanguagePreferences,
+} from "@/lib/story-agent/language-preferences";
 
 export type CompactStoryContext = {
   operation: StoryOperation;
   userInstruction: string;
   languageHint: string;
+  languagePrefs: LanguagePreferences;
   concept?: string;
   title?: string;
   genre: string[];
@@ -30,6 +37,7 @@ export type CompactStoryContext = {
   writingRules: string[];
   preferences: {
     dialogueLanguage?: string;
+    narrationLanguage?: string;
     uppercaseForLoudDialogue: boolean;
     slowBurn: boolean;
     avoid: string[];
@@ -88,6 +96,20 @@ export function extractMentionedCharacters(
 }
 
 function detectLanguageHint(message: string, memory: StoryMemory): string {
+  const prefs = readLanguagePreferences({
+    narrationLanguage: memory.userPreferences.narrationLanguage,
+    dialogueLanguage: memory.userPreferences.dialogueLanguage,
+    scriptPreference: memory.userPreferences.scriptPreference,
+    mirrorUserLanguage: memory.userPreferences.mirrorUserLanguage,
+    storyLanguage: memory.storyMemory.language,
+  });
+  const detected = detectLanguageInstruction(message, prefs);
+  if (detected.matched) {
+    return languagePrefsToStoryLanguageLabel(detected.resolved);
+  }
+  if (!prefs.mirrorUserLanguage) {
+    return languagePrefsToStoryLanguageLabel(prefs);
+  }
   if (memory.userPreferences.dialogueLanguage) {
     return memory.userPreferences.dialogueLanguage;
   }
@@ -178,16 +200,27 @@ export function buildStoryContext(params: {
     operation === "continue_episode" ||
     operation === "write_scene"
       ? draftContent
-        ? draftContent.slice(0, operation === "revise_draft" ? 6000 : 1200)
+        ? draftContent.slice(0, operation === "revise_draft" ? 12000 : 1200)
         : undefined
       : draftContent
         ? draftContent.slice(0, 400)
         : undefined;
 
+  const basePrefs = readLanguagePreferences({
+    narrationLanguage: memory.userPreferences.narrationLanguage,
+    dialogueLanguage: memory.userPreferences.dialogueLanguage,
+    scriptPreference: memory.userPreferences.scriptPreference,
+    mirrorUserLanguage: memory.userPreferences.mirrorUserLanguage,
+    storyLanguage: memory.storyMemory.language,
+  });
+  const langDetect = detectLanguageInstruction(userMessage, basePrefs);
+  const languagePrefs = langDetect.matched ? langDetect.resolved : basePrefs;
+
   return {
     operation,
     userInstruction: userMessage,
     languageHint: detectLanguageHint(userMessage, memory),
+    languagePrefs,
     concept: memory.storyMemory.concept,
     title: memory.storyMemory.title,
     genre: memory.storyMemory.genre ?? [],
@@ -206,7 +239,11 @@ export function buildStoryContext(params: {
     })),
     writingRules: memory.writingRules.map((r) => r.rule),
     preferences: {
-      dialogueLanguage: memory.userPreferences.dialogueLanguage ?? undefined,
+      dialogueLanguage:
+        languagePrefs.dialogueLanguage ||
+        memory.userPreferences.dialogueLanguage ||
+        undefined,
+      narrationLanguage: languagePrefs.narrationLanguage,
       uppercaseForLoudDialogue: Boolean(
         memory.userPreferences.uppercaseForLoudDialogue
       ),
@@ -259,12 +296,26 @@ export function seedMemoryFromMessage(
     }
   }
 
+  const langDetect = detectLanguageInstruction(
+    userMessage,
+    readLanguagePreferences({
+      narrationLanguage: memory.userPreferences.narrationLanguage,
+      dialogueLanguage: memory.userPreferences.dialogueLanguage,
+      scriptPreference: memory.userPreferences.scriptPreference,
+      mirrorUserLanguage: memory.userPreferences.mirrorUserLanguage,
+      storyLanguage: memory.storyMemory.language,
+    })
+  );
+
   return {
     ...memory,
     characters,
     storyMemory: {
       ...memory.storyMemory,
       concept: concept ?? memory.storyMemory.concept,
+      language: langDetect.matched
+        ? languagePrefsToStoryLanguageLabel(langDetect.resolved)
+        : memory.storyMemory.language,
       genre:
         memory.storyMemory.genre.length > 0
           ? memory.storyMemory.genre
@@ -276,6 +327,15 @@ export function seedMemoryFromMessage(
                 ? ["fantasy"]
                 : memory.storyMemory.genre,
     },
+    userPreferences: langDetect.matched
+      ? {
+          ...memory.userPreferences,
+          narrationLanguage: langDetect.resolved.narrationLanguage,
+          dialogueLanguage: langDetect.resolved.dialogueLanguage,
+          scriptPreference: langDetect.resolved.scriptPreference,
+          mirrorUserLanguage: langDetect.resolved.mirrorUserLanguage,
+        }
+      : memory.userPreferences,
     updatedAt: new Date().toISOString(),
   };
 }
