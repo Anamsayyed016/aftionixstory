@@ -22,9 +22,11 @@ import { getAiEnv, resolveAgentModel } from "@/lib/env";
 import { routeStoryAgentAction } from "@/lib/story-agent/action-router";
 import { routeIntent } from "@/lib/story-agent/intent-router";
 import {
-  buildConceptBrainstormReply,
   extractStoryConcept,
+  looksLikeHardcodedConceptTemplate,
   looksLikeOnboardingGreeting,
+  PROVIDER_FAILURE_USER_MESSAGE,
+  responseFingerprint,
   responseMentionsTopic,
 } from "@/lib/story-agent/concept-reply";
 import { resolveSceneRequest } from "@/lib/story-agent/entity-resolver";
@@ -42,6 +44,7 @@ import {
 import {
   friendlyMessageForCode,
   isStoryAgentError,
+  StoryAgentError,
 } from "@/lib/story-agent/errors";
 import { describeMemoryStatus } from "@/lib/story-agent/memory-patch";
 import type { NormalizedTurnResult } from "@/lib/story-agent/operation-result";
@@ -371,92 +374,148 @@ export async function runStoryOperation(params: {
     };
   }
 
-  // ---- Concept / brainstorm without fixed reply: answer the current message ----
+  // ---- Concept / brainstorm: live provider only (no fake story templates) ----
   if (
     operation === "brainstorm" ||
     operation === "suggest_options" ||
     route.reason === "concept_create_request"
   ) {
-    const concept = buildConceptBrainstormReply(params.userMessage);
+    const conceptMeta = extractStoryConcept(params.userMessage);
     memory = {
       ...memory,
       storyMemory: {
         ...memory.storyMemory,
-        concept: memory.storyMemory.concept || concept.memoryConcept,
+        concept: memory.storyMemory.concept || conceptMeta.topicLabel,
         genre:
           memory.storyMemory.genre.length > 0
             ? memory.storyMemory.genre
-            : extractStoryConcept(params.userMessage).genreHints.slice(0, 2),
+            : conceptMeta.genreHints.slice(0, 2),
       },
       updatedAt: new Date().toISOString(),
     };
 
-    // Prefer LLM when available; fall back to topic-aware reply (never onboarding greeting)
-    let assistantReply = concept.assistantReply;
-    let suggestions = concept.suggestions;
-    let providerResultValid = false;
-    let fallbackUsed = true;
-    let fallbackReason = "concept_deterministic";
+    const isProviderReplyUsable = (reply: string) => {
+      const text = reply.trim();
+      if (!text) return false;
+      if (looksLikeOnboardingGreeting(text)) return false;
+      if (looksLikeHardcodedConceptTemplate(text)) return false;
+      return (
+        responseMentionsTopic(text, conceptMeta.topicLabel) ||
+        /opening|situation|option|concept|scene|character|horror|comedy|thriller|romance|fantasy|conflict|kiss|suggest/i.test(
+          text
+        ) ||
+        text.length > 80
+      );
+    };
+
+    let providerCallMade = false;
+    let providerSuccess = false;
+    let fallbackUsed = false;
+    let fallbackType: string | undefined;
     let providerName: string | undefined;
     let modelName: string | undefined;
     let durationMs = Date.now() - started;
+    let assistantReply = "";
+    let suggestions: Array<{ label: string; prompt: string }> = [];
 
     try {
-      const agent = await runStructuredAgent({
+      providerCallMade = true;
+      let agent = await runStructuredAgent({
         operation: "brainstorm",
         memory,
         userMessage: params.userMessage,
         recentMessages: params.recentMessages,
       });
-      const reply = agent.decision.assistantReply?.trim() || "";
-      const topic = extractStoryConcept(params.userMessage).topicLabel;
-      const relevant =
-        reply.length > 0 &&
-        !looksLikeOnboardingGreeting(reply) &&
-        (responseMentionsTopic(reply, topic) ||
-          /obstacle|conflict|direction|build|concept|opening/i.test(reply));
+      let reply = agent.decision.assistantReply?.trim() || "";
 
-      if (relevant) {
-        assistantReply = reply;
-        suggestions =
-          agent.decision.suggestions?.length > 0
-            ? agent.decision.suggestions
-            : concept.suggestions;
-        memory = mergeDecisionIntoMemory(memory, agent.decision);
-        if (!memory.storyMemory.concept) {
-          memory = {
-            ...memory,
-            storyMemory: {
-              ...memory.storyMemory,
-              concept: concept.memoryConcept,
-            },
-          };
-        }
-        providerResultValid = true;
-        fallbackUsed = false;
-        fallbackReason = "";
-        providerName = agent.provider;
-        modelName = agent.model;
-        durationMs = agent.durationMs;
-      } else {
-        fallbackReason = looksLikeOnboardingGreeting(reply)
-          ? "rejected_onboarding_greeting"
-          : "low_relevance_retry";
-        // one stricter deterministic path — do not show greeting
-        assistantReply = concept.assistantReply;
-        suggestions = concept.suggestions;
+      if (!isProviderReplyUsable(reply)) {
+        // One repair retry with stricter instruction — still live provider
+        agent = await runStructuredAgent({
+          operation: "brainstorm",
+          memory,
+          userMessage: `${params.userMessage}
+
+STRICT: Answer this exact request with a concrete, specific reply. Do not ask which conflict type if the user already specified it. Do not use generic slow-burn templates.`,
+          recentMessages: params.recentMessages,
+        });
+        reply = agent.decision.assistantReply?.trim() || "";
       }
-    } catch {
-      fallbackReason = "provider_failed_concept_fallback";
-      assistantReply = concept.assistantReply;
-      suggestions = concept.suggestions;
-    }
 
-    const style = readStyleProfile({
-      emojiStyle: memory.userPreferences.emojiStyle,
-    });
-    if (!fallbackUsed) {
-      assistantReply = maybeDecorateChatReply(assistantReply, style.emojiStyle);
+      if (!isProviderReplyUsable(reply)) {
+        throw new StoryAgentError(
+          "AGENT_RESPONSE_INVALID",
+          PROVIDER_FAILURE_USER_MESSAGE,
+          { retryable: true, operation: "brainstorm" }
+        );
+      }
+
+      assistantReply = maybeDecorateChatReply(
+        reply,
+        readStyleProfile({
+          emojiStyle: memory.userPreferences.emojiStyle,
+        }).emojiStyle
+      );
+      suggestions = agent.decision.suggestions ?? [];
+      memory = mergeDecisionIntoMemory(memory, agent.decision);
+      if (!memory.storyMemory.concept) {
+        memory = {
+          ...memory,
+          storyMemory: {
+            ...memory.storyMemory,
+            concept: conceptMeta.topicLabel,
+          },
+        };
+      }
+      providerSuccess = true;
+      providerName = agent.provider;
+      modelName = agent.model;
+      durationMs = agent.durationMs;
+    } catch (error) {
+      fallbackUsed = true;
+      fallbackType = isStoryAgentError(error)
+        ? error.code
+        : "provider_failed";
+      const message = isStoryAgentError(error)
+        ? friendlyMessageForCode(error.code, "brainstorm")
+        : PROVIDER_FAILURE_USER_MESSAGE;
+
+      console.info(
+        JSON.stringify({
+          event: "story_operation.turn",
+          operation: "brainstorm",
+          detectedIntent: route.reason,
+          messageLength: params.userMessage.length,
+          messageFingerprint: conceptMeta.fingerprint,
+          providerCallMade,
+          providerSuccess: false,
+          fallbackUsed: true,
+          fallbackType,
+          providerResultValid: false,
+          durationMs: Date.now() - started,
+          conversationId: params.conversationId,
+          turnRequestId: params.turnRequestId,
+        })
+      );
+
+      return {
+        resultType: "error",
+        operation: "brainstorm",
+        assistantReply: message,
+        suggestions: [],
+        memory,
+        storyId: params.storyId,
+        draft: null,
+        showReview: false,
+        actionType: "none",
+        actionOk: false,
+        requiresConfirmation: false,
+        outputMode: "structured",
+        durationMs: Date.now() - started,
+        errorCode: isStoryAgentError(error)
+          ? error.code
+          : "AGENT_RESPONSE_INVALID",
+        retryable: true,
+      };
     }
 
     console.info(
@@ -465,13 +524,16 @@ export async function runStoryOperation(params: {
         operation: "brainstorm",
         detectedIntent: route.reason,
         messageLength: params.userMessage.length,
-        messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
-        outputMode: providerResultValid ? "structured" : "concept_fallback",
-        providerResultValid,
+        messageFingerprint: conceptMeta.fingerprint,
+        outputMode: "structured",
+        providerCallMade,
+        providerSuccess,
+        providerResultValid: true,
         fallbackUsed,
-        fallbackReason: fallbackReason || undefined,
+        fallbackType,
         provider: providerName ?? null,
         model: modelName ?? null,
+        responseFingerprint: responseFingerprint(assistantReply),
         durationMs,
         conversationId: params.conversationId,
         turnRequestId: params.turnRequestId,
@@ -835,20 +897,17 @@ export async function runStoryOperation(params: {
       recentMessages: params.recentMessages,
     });
   } catch (error) {
-    const style = readStyleProfile({
-      emojiStyle: memory.userPreferences.emojiStyle,
-    });
-    // NEVER use onboarding greeting for a real user message
-    const conceptFallback = buildConceptBrainstormReply(params.userMessage);
     const isGreetingOnly = /^(hey|hi|hello|hola|help|namaste)[.!?]*$/i.test(
       params.userMessage.trim()
     );
     const fallback = isGreetingOnly
       ? maybeDecorateChatReply(
           "Hey! 😊 Apna rough story idea batao—ek character, scene, ya sirf ek feeling bhi chalegi.",
-          style.emojiStyle
+          readStyleProfile({
+            emojiStyle: memory.userPreferences.emojiStyle,
+          }).emojiStyle
         )
-      : conceptFallback.assistantReply;
+      : PROVIDER_FAILURE_USER_MESSAGE;
 
     console.info(
       JSON.stringify({
@@ -858,11 +917,13 @@ export async function runStoryOperation(params: {
         messageLength: params.userMessage.length,
         messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
         outputMode: "fallback",
+        providerCallMade: true,
+        providerSuccess: false,
         providerResultValid: false,
         fallbackUsed: true,
-        fallbackReason: isGreetingOnly
-          ? "greeting_provider_failed"
-          : "chat_provider_failed_concept_fallback",
+        fallbackType: isGreetingOnly
+          ? "greeting_fixed"
+          : "provider_failure_error",
         code: isStoryAgentError(error)
           ? error.code
           : "AGENT_RESPONSE_INVALID",
@@ -872,7 +933,7 @@ export async function runStoryOperation(params: {
       })
     );
     return {
-      resultType: "conversation",
+      resultType: isGreetingOnly ? "conversation" : "error",
       operation: structuredOp,
       assistantReply: fallback,
       suggestions: isGreetingOnly
@@ -882,24 +943,22 @@ export async function runStoryOperation(params: {
               prompt: "Suggest three unique story concepts for me.",
             },
           ]
-        : conceptFallback.suggestions,
-      memory: isGreetingOnly
-        ? memory
-        : {
-            ...memory,
-            storyMemory: {
-              ...memory.storyMemory,
-              concept: memory.storyMemory.concept || conceptFallback.memoryConcept,
-            },
-          },
+        : [],
+      memory,
       storyId: params.storyId,
       draft: null,
       showReview: false,
       actionType: "none",
-      actionOk: true,
+      actionOk: isGreetingOnly,
       requiresConfirmation: false,
       outputMode: "structured",
       durationMs: Date.now() - started,
+      errorCode: isGreetingOnly
+        ? undefined
+        : isStoryAgentError(error)
+          ? error.code
+          : "AGENT_RESPONSE_INVALID",
+      retryable: !isGreetingOnly,
     };
   }
 
@@ -973,26 +1032,56 @@ export async function runStoryOperation(params: {
   const style = readStyleProfile({
     emojiStyle: memory.userPreferences.emojiStyle,
   });
-  let decoratedReply = maybeDecorateChatReply(
+  const decoratedReply = maybeDecorateChatReply(
     agent.decision.assistantReply,
     style.emojiStyle
   );
 
   // Relevance guard: never show onboarding greeting after a real message
-  let structuredSuggestions =
+  const structuredSuggestions =
     agent.decision.suggestions?.length > 0 ? agent.decision.suggestions : [];
-  let structuredFallbackUsed = false;
-  if (looksLikeOnboardingGreeting(decoratedReply)) {
-    const concept = buildConceptBrainstormReply(params.userMessage);
-    decoratedReply = concept.assistantReply;
-    structuredSuggestions = concept.suggestions;
-    structuredFallbackUsed = true;
-    memory = {
-      ...memory,
-      storyMemory: {
-        ...memory.storyMemory,
-        concept: memory.storyMemory.concept || concept.memoryConcept,
-      },
+
+  if (
+    looksLikeOnboardingGreeting(decoratedReply) ||
+    looksLikeHardcodedConceptTemplate(decoratedReply)
+  ) {
+    console.info(
+      JSON.stringify({
+        event: "story_operation.turn",
+        operation: structuredOp,
+        detectedIntent: route.reason,
+        messageLength: params.userMessage.length,
+        messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
+        providerCallMade: true,
+        providerSuccess: false,
+        providerResultValid: false,
+        fallbackUsed: true,
+        fallbackType: "rejected_fake_or_greeting_reply",
+        provider: agent.provider,
+        model: agent.model,
+        durationMs: agent.durationMs,
+        conversationId: params.conversationId,
+        turnRequestId: params.turnRequestId,
+      })
+    );
+    return {
+      resultType: "error",
+      operation: structuredOp,
+      assistantReply: PROVIDER_FAILURE_USER_MESSAGE,
+      suggestions: [],
+      memory,
+      storyId: params.storyId,
+      draft: null,
+      showReview: false,
+      actionType: "none",
+      actionOk: false,
+      requiresConfirmation: false,
+      provider: agent.provider,
+      model: agent.model,
+      outputMode: "structured",
+      durationMs: agent.durationMs,
+      errorCode: "AGENT_RESPONSE_INVALID",
+      retryable: true,
     };
   }
 
@@ -1026,11 +1115,11 @@ export async function runStoryOperation(params: {
       messageLength: params.userMessage.length,
       messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
       outputMode: "structured",
-      providerResultValid: !structuredFallbackUsed,
-      fallbackUsed: structuredFallbackUsed,
-      fallbackReason: structuredFallbackUsed
-        ? "rejected_onboarding_greeting"
-        : undefined,
+      providerCallMade: true,
+      providerSuccess: true,
+      providerResultValid: true,
+      fallbackUsed: false,
+      responseFingerprint: responseFingerprint(decoratedReply),
       provider: agent.provider,
       model: agent.model,
       durationMs: agent.durationMs,

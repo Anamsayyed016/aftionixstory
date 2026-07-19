@@ -42,4 +42,4 @@ export interface AIProvider {
   generateText(input: GenerateTextInput): Promise<GenerateTextResult>;
 }
 
-export type AIProviderName = "gemini" | "openai" | "mock" | "local";
+export type AIProviderName = "gemini" | "openai" | "mock";

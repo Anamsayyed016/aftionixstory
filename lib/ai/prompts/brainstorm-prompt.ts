@@ -11,7 +11,10 @@ Expand it usefully (2–3 directions or one sharp question).
 Mirror the user’s language (English / Hindi / Hinglish).
 Ask at most ONE main question.
 Do not ask for full wizard metadata (title, POV, logline checklists).
-Do NOT return a generic onboarding greeting like “Apna rough story idea batao” after the user already shared a concept.
+Do not return a generic onboarding greeting like “Apna rough story idea batao” after the user already shared a concept.
+Do not use generic slow-burn / core-conflict templates.
+If the user already named a conflict type (e.g. internal), do not ask which conflict type.
+For “suggest N openings/situations”, give N concrete options tied to the request.
 Return JSON decision envelope only.`;
 
   const prompt = `CURRENT USER MESSAGE:

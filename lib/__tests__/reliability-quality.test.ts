@@ -12,7 +12,6 @@ import {
   maybeDecorateChatReply,
   readStyleProfile,
 } from "@/lib/story-agent/style-profile";
-import { LocalAIProvider } from "@/lib/ai/providers/local";
 import { getAIProvider, setAIProviderOverride } from "@/lib/ai/registry";
 import { MockAIProvider } from "@/lib/ai/providers/mock";
 import { __resetEnvCacheForTests } from "@/lib/env";
@@ -98,11 +97,9 @@ describe("Style revise routing", () => {
   });
 });
 
-describe("Local provider registry", () => {
-  it("selects local provider when overridden / configured", () => {
+describe("Provider registry (no local runtime)", () => {
+  it("uses mock only via explicit override for tests", () => {
     __resetEnvCacheForTests();
-    setAIProviderOverride(new LocalAIProvider());
-    expect(getAIProvider().name).toBe("local");
     setAIProviderOverride(new MockAIProvider());
     expect(getAIProvider().name).toBe("mock");
     setAIProviderOverride(null);

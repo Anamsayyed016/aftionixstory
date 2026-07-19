@@ -13,6 +13,8 @@ import { logAiEvent } from "@/lib/ai/logger";
 import {
   getAiEnv,
   isActiveAiKeyPresent,
+  resolveAgentModel,
+  resolveCreativeModel,
   resolveStoryModel,
   resolveSummaryModel,
 } from "@/lib/env";
@@ -69,6 +71,9 @@ export function getAiConfigurationSnapshot() {
   const env = getAiEnv();
   return {
     provider: env.AI_PROVIDER,
+    resolvedProvider: env.AI_PROVIDER,
+    agentModel: resolveAgentModel(env),
+    creativeModel: resolveCreativeModel(env),
     storyModel: resolveStoryModel(env),
     summaryModel: resolveSummaryModel(env),
     keyPresent: isActiveAiKeyPresent(env),
@@ -80,6 +85,9 @@ export function logAiConfigurationAtStartup() {
   const snap = getAiConfigurationSnapshot();
   logAiEvent("info", "ai.configuration", {
     provider: snap.provider,
+    resolvedProvider: snap.resolvedProvider,
+    agentModel: snap.agentModel,
+    creativeModel: snap.creativeModel,
     model: snap.storyModel,
     summaryModel: snap.summaryModel,
     keyPresent: snap.keyPresent,

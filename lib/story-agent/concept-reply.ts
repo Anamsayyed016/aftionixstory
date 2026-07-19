@@ -1,12 +1,11 @@
 /**
- * Dynamic concept / brainstorm replies derived from the current user message.
- * No hardcoded single genre — works for romance, thriller, fantasy, etc.
+ * Concept / topic extraction for routing, memory seeding, and safe fingerprints.
+ * Does NOT invent user-facing story answers — those come from OpenAI/Gemini only.
  */
 
 export type ConceptExtraction = {
   topicLabel: string;
   genreHints: string[];
-  obstacleHints: string[];
   fingerprint: string;
 };
 
@@ -28,7 +27,7 @@ const GENRE_PATTERNS: Array<{ re: RegExp; label: string }> = [
 ];
 
 const CREATE_CONCEPT_SIGNAL =
-  /\b(help\s+me\s+create|create\s+a|i\s+want\s+a|make\s+a|suggest\s+a|story\s+about|concept|idea|brainstorm)\b/i;
+  /\b(help\s+me\s+create|create\s+a|i\s+want\s+a|make\s+a|suggest\s+a|suggest\s+three|story\s+about|concept|idea|brainstorm|opening\s+situations?)\b/i;
 
 export function isConceptCreateRequest(message: string): boolean {
   const text = message.trim();
@@ -52,63 +51,21 @@ export function extractStoryConcept(message: string): ConceptExtraction {
   const topicLabel =
     genreHints[0] ||
     text
-      .replace(/^(help\s+me\s+create|create\s+a|i\s+want\s+a|make\s+a|suggest\s+a)\s+/i, "")
+      .replace(
+        /^(help\s+me\s+create|create\s+a|i\s+want\s+a|make\s+a|suggest\s+a)\s+/i,
+        ""
+      )
       .replace(/\bstory\b/gi, "")
       .trim()
       .slice(0, 80) ||
     "your story idea";
 
-  const obstacleHints =
-    /romance|love|forbidden/i.test(topicLabel)
-      ? ["family opposition", "age gap", "social status", "hidden past"]
-      : /thriller|crime|mystery/i.test(topicLabel)
-        ? ["a ticking clock", "a betrayal", "a false lead"]
-        : /horror|supernatural/i.test(topicLabel)
-          ? ["an escalating threat", "a cursed place", "a secret the lead can’t admit"]
-          : /fantasy|sci-?fi/i.test(topicLabel)
-            ? ["a forbidden power", "a broken oath", "a world rule that traps them"]
-            : ["an internal conflict", "an external pressure", "a secret"];
-
   const fingerprint = `${text.length}:${text.slice(0, 24).toLowerCase()}`;
 
-  return { topicLabel, genreHints, obstacleHints, fingerprint };
+  return { topicLabel, genreHints, fingerprint };
 }
 
-export function buildConceptBrainstormReply(message: string): {
-  assistantReply: string;
-  suggestions: Array<{ label: string; prompt: string }>;
-  memoryConcept: string;
-} {
-  const { topicLabel, obstacleHints } = extractStoryConcept(message);
-  const o1 = obstacleHints[0];
-  const o2 = obstacleHints[1];
-  const o3 = obstacleHints[2];
-
-  const assistantReply = `Bilkul ❤️ “${topicLabel}” ko hum emotional, slow-burn, ya intense direction me build kar sakte hain. Aap kis type ka core conflict chahti ho—${o1}, ${o2}, ya ${o3}?`;
-
-  const suggestions = [
-    {
-      label: `Focus on ${o1}`,
-      prompt: `Build the ${topicLabel} around ${o1}.`,
-    },
-    {
-      label: `Focus on ${o2}`,
-      prompt: `Build the ${topicLabel} around ${o2}.`,
-    },
-    {
-      label: "Suggest 3 openings",
-      prompt: `Suggest three unique opening situations for a ${topicLabel} story.`,
-    },
-  ];
-
-  return {
-    assistantReply,
-    suggestions,
-    memoryConcept: topicLabel,
-  };
-}
-
-/** True if assistant reply is the generic onboarding greeting (should never answer a concept request). */
+/** True if assistant reply is the generic onboarding greeting. */
 export function looksLikeOnboardingGreeting(reply: string): boolean {
   const lower = reply.toLowerCase();
   return (
@@ -117,6 +74,21 @@ export function looksLikeOnboardingGreeting(reply: string): boolean {
     (lower.includes("hey!") &&
       lower.includes("rough") &&
       lower.includes("idea"))
+  );
+}
+
+/**
+ * Detect the obsolete hardcoded concept template (must never be shown as AI success).
+ */
+export function looksLikeHardcodedConceptTemplate(reply: string): boolean {
+  const lower = reply.toLowerCase();
+  return (
+    lower.includes("emotional, slow-burn") ||
+    lower.includes("intense direction me build") ||
+    lower.includes("kis type ka core conflict") ||
+    (lower.includes("bilkul") &&
+      lower.includes("slow-burn") &&
+      lower.includes("conflict"))
   );
 }
 
@@ -133,3 +105,12 @@ export function responseMentionsTopic(
   const hits = parts.filter((p) => r.includes(p)).length;
   return hits >= Math.min(1, parts.length);
 }
+
+export function responseFingerprint(reply: string): string {
+  const t = reply.trim();
+  return `${t.length}:${t.slice(0, 32).toLowerCase()}`;
+}
+
+/** User-facing retry copy when a live provider fails — never a fake story answer. */
+export const PROVIDER_FAILURE_USER_MESSAGE =
+  "Main is request ka proper response generate nahi kar paayi. Please retry once. Your story details are safe.";

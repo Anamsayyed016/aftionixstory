@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { CREATE_SUGGESTIONS } from "@/lib/chat/constants";
 import { buildBrainstormPrompt } from "@/lib/ai/prompts/brainstorm-prompt";
 import { buildConversationUserPrompt } from "@/lib/ai/prompts/conversation-prompt";
 import { buildStoryContext } from "@/lib/ai/context/story-context-builder";
+import { getAIProvider, setAIProviderOverride } from "@/lib/ai/registry";
+import { MockAIProvider } from "@/lib/ai/providers/mock";
 import {
-  buildConceptBrainstormReply,
+  extractStoryConcept,
   isConceptCreateRequest,
-  looksLikeOnboardingGreeting,
-  responseMentionsTopic,
+  looksLikeHardcodedConceptTemplate,
+  PROVIDER_FAILURE_USER_MESSAGE,
 } from "@/lib/story-agent/concept-reply";
 import { routeIntent } from "@/lib/story-agent/intent-router";
 import { emptyStoryMemory } from "@/lib/story-agent/memory-patch";
+import { __resetEnvCacheForTests, getAiEnv } from "@/lib/env";
+import { CREATE_SUGGESTIONS } from "@/lib/chat/constants";
 
 describe("Concept create routing", () => {
   it("routes forbidden romance help to brainstorm", () => {
@@ -48,30 +51,31 @@ describe("Concept create routing", () => {
   });
 });
 
-describe("Concept reply + relevance", () => {
-  it("builds topic-aware reply without hardcoding only romance", () => {
-    const romance = buildConceptBrainstormReply(
-      "Help me create a forbidden romance"
-    );
-    expect(romance.assistantReply.toLowerCase()).toContain("forbidden romance");
-    expect(looksLikeOnboardingGreeting(romance.assistantReply)).toBe(false);
-    expect(responseMentionsTopic(romance.assistantReply, "forbidden romance")).toBe(
-      true
-    );
+describe("No fake concept template in product path", () => {
+  it("detects the obsolete hardcoded template", () => {
+    expect(
+      looksLikeHardcodedConceptTemplate(
+        "Bilkul ❤️ “forbidden romance” ko hum emotional, slow-burn, ya intense direction me build kar sakte hain. Aap kis type ka core conflict chahti ho—family, age gap, ya secret?"
+      )
+    ).toBe(true);
+    expect(
+      looksLikeHardcodedConceptTemplate(
+        "Here are three unique openings for your two characters."
+      )
+    ).toBe(false);
+  });
 
-    const horror = buildConceptBrainstormReply("Help me create a horror story");
-    expect(horror.assistantReply.toLowerCase()).toContain("horror");
-    expect(horror.assistantReply.toLowerCase()).not.toContain(
-      "forbidden romance"
+  it("exposes a non-creative provider failure message", () => {
+    expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).toContain("retry");
+    expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).not.toContain(
+      "slow-burn"
     );
   });
 
-  it("detects onboarding greeting as low-relevance", () => {
-    expect(
-      looksLikeOnboardingGreeting(
-        "Hey! 😊 Apna rough story idea batao—ek character, scene, ya sirf ek feeling bhi chalegi."
-      )
-    ).toBe(true);
+  it("extracts topics without inventing user-facing answers", () => {
+    const horror = extractStoryConcept("Help me create a horror story");
+    expect(horror.genreHints).toContain("horror");
+    expect(horror.topicLabel.toLowerCase()).toContain("horror");
   });
 });
 
@@ -103,5 +107,30 @@ describe("Prompt source of truth", () => {
     const chat = buildConversationUserPrompt(ctx);
     expect(chat).toMatch(/^CURRENT USER MESSAGE:/);
     expect(chat).toContain("Help me create a forbidden romance");
+  });
+});
+
+describe("Provider registry runtime", () => {
+  it("supports openai and gemini; rejects local", () => {
+    __resetEnvCacheForTests();
+    process.env.AI_PROVIDER = "openai";
+    __resetEnvCacheForTests();
+    expect(getAiEnv().AI_PROVIDER).toBe("openai");
+    expect(getAIProvider().name).toBe("openai");
+
+    process.env.AI_PROVIDER = "gemini";
+    __resetEnvCacheForTests();
+    expect(getAIProvider().name).toBe("gemini");
+
+    process.env.AI_PROVIDER = "local";
+    __resetEnvCacheForTests();
+    expect(() => getAiEnv()).toThrow(/local is not supported/i);
+
+    process.env.AI_PROVIDER = "gemini";
+    __resetEnvCacheForTests();
+    setAIProviderOverride(new MockAIProvider());
+    expect(getAIProvider().name).toBe("mock");
+    setAIProviderOverride(null);
+    __resetEnvCacheForTests();
   });
 });
