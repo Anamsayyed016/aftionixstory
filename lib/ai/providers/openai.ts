@@ -32,6 +32,16 @@ function isOpenAIModelId(model: string): boolean {
   return /^(gpt-|o[0-9]|chatgpt-|text-embedding)/i.test(model);
 }
 
+/**
+ * GPT-5 / o-series currently reject non-default temperature on Chat Completions.
+ * Omit the field so the API uses its default (1).
+ */
+export function supportsCustomTemperature(model: string): boolean {
+  if (/^gpt-5/i.test(model)) return false;
+  if (/^o[0-9]/i.test(model)) return false;
+  return true;
+}
+
 export type OpenAIClientLike = {
   chat: {
     completions: {
@@ -150,18 +160,30 @@ export class OpenAIProvider implements AIProvider {
     const maxCompletionTokens = params.input.maxOutputTokens ?? 4096;
 
     try {
-      const response = await client.chat.completions.create({
+      const request: {
+        model: string;
+        messages: Array<{ role: string; content: string }>;
+        temperature?: number;
+        max_completion_tokens?: number;
+        response_format?: { type: "json_object" | "text" };
+      } = {
         model: params.model,
         messages: [
           { role: "system", content: params.input.systemInstruction },
           { role: "user", content: params.input.prompt },
         ],
-        temperature: params.input.temperature ?? 0.9,
         max_completion_tokens: maxCompletionTokens,
-        ...(params.asJson
-          ? { response_format: { type: "json_object" as const } }
-          : {}),
-      });
+      };
+
+      if (supportsCustomTemperature(params.model)) {
+        request.temperature = params.input.temperature ?? 0.9;
+      }
+
+      if (params.asJson) {
+        request.response_format = { type: "json_object" };
+      }
+
+      const response = await client.chat.completions.create(request);
 
       const choice = response.choices?.[0];
       const finishReason = choice?.finish_reason;

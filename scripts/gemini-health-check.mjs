@@ -90,7 +90,6 @@ async function probeOpenAI() {
       model,
       messages: [{ role: "user", content: "Reply with OK only." }],
       max_completion_tokens: 16,
-      temperature: 0,
     }),
   });
 }

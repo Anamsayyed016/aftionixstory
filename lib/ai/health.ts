@@ -111,7 +111,6 @@ async function probeOpenAI(params: {
   const response = await client.chat.completions.create({
     model: params.model,
     messages: [{ role: "user", content: "Reply with OK only." }],
-    temperature: 0,
     max_completion_tokens: 16,
   });
   const text = response.choices?.[0]?.message?.content;

@@ -89,9 +89,47 @@ describe("OpenAI provider", () => {
     expect(create).toHaveBeenCalledOnce();
     const args = create.mock.calls[0][0] as Record<string, unknown>;
     expect(args.model).toBe("gpt-5-mini");
-    expect(args.temperature).toBe(0.5);
+    expect(args.temperature).toBeUndefined();
     expect(args.max_completion_tokens).toBe(128);
     expect(args.response_format).toBeUndefined();
+  });
+
+  it("omits temperature for gpt-5 models", async () => {
+    const create = vi.fn(async () => ({
+      choices: [{ message: { content: "OK" }, finish_reason: "stop" }],
+    }));
+    const provider = new OpenAIProvider(() => ({
+      chat: { completions: { create } },
+    }));
+
+    await provider.generateText({
+      systemInstruction: "sys",
+      prompt: "hi",
+      temperature: 0.9,
+      model: "gpt-5-mini",
+    });
+
+    const args = create.mock.calls[0][0] as Record<string, unknown>;
+    expect(args).not.toHaveProperty("temperature");
+  });
+
+  it("passes temperature for models that support it", async () => {
+    const create = vi.fn(async () => ({
+      choices: [{ message: { content: "OK" }, finish_reason: "stop" }],
+    }));
+    const provider = new OpenAIProvider(() => ({
+      chat: { completions: { create } },
+    }));
+
+    await provider.generateText({
+      systemInstruction: "sys",
+      prompt: "hi",
+      temperature: 0.4,
+      model: "gpt-4o-mini",
+    });
+
+    const args = create.mock.calls[0][0] as Record<string, unknown>;
+    expect(args.temperature).toBe(0.4);
   });
 
   it("uses json_object response_format for structured JSON prompts", async () => {
