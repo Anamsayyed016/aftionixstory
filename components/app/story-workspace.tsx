@@ -18,10 +18,13 @@ import {
   regenerateEpisodeAction,
   saveEpisodeAction,
 } from "@/app/actions/episodes";
+import { ChatModeToggle } from "@/components/app/chat/chat-mode-toggle";
+import { ContinueStoryChat } from "@/components/app/chat/continue-story-chat";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
+import type { WorkspaceAssistantPanel } from "@/lib/chat/types";
 
 type EpisodeListItem = {
   id: string;
@@ -112,6 +115,8 @@ export function StoryWorkspaceClient({
   const [warning, setWarning] = React.useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = React.useState(false);
   const [replaceConfirmOpen, setReplaceConfirmOpen] = React.useState(false);
+  const [assistantPanel, setAssistantPanel] =
+    React.useState<WorkspaceAssistantPanel>("composer");
   const pendingGenerateRef = React.useRef<null | (() => Promise<void>)>(null);
 
   const archived = storyStatus === "ARCHIVED";
@@ -306,118 +311,146 @@ export function StoryWorkspaceClient({
           </div>
         </GlassCard>
 
-        <GlassCard className="space-y-4 p-5">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-lilac" />
-            <h3 className="font-display text-lg font-semibold text-ink">
-              Story composer
-            </h3>
-          </div>
+        <div className="space-y-3">
+          <ChatModeToggle
+            label="Story assistant panel"
+            value={assistantPanel}
+            options={
+              [
+                { id: "composer", label: "Episode Composer" },
+                { id: "chat", label: "Chat Assistant" },
+              ] as const
+            }
+            onChange={setAssistantPanel}
+          />
 
-          <label className="block space-y-1.5">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-              Instruction
-            </span>
-            <textarea
-              rows={4}
-              value={instruction}
-              disabled={loading || archived}
-              onChange={(e) => setInstruction(e.target.value)}
-              className="w-full rounded-md border border-border bg-charcoal/50 px-3 py-2 text-sm text-ink"
-              placeholder="Describe what should happen in the next episode..."
-              aria-label="Episode instruction"
+          {assistantPanel === "composer" ? (
+            <GlassCard className="space-y-4 p-5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-lilac" />
+                <h3 className="font-display text-lg font-semibold text-ink">
+                  Story composer
+                </h3>
+              </div>
+
+              <label className="block space-y-1.5">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                  Instruction
+                </span>
+                <textarea
+                  rows={4}
+                  value={instruction}
+                  disabled={loading || archived}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  className="w-full rounded-md border border-border bg-charcoal/50 px-3 py-2 text-sm text-ink"
+                  placeholder="Describe what should happen in the next episode..."
+                  aria-label="Episode instruction"
+                />
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block space-y-1.5 sm:col-span-1">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                    Action
+                  </span>
+                  <select
+                    value={action}
+                    disabled={loading || archived}
+                    onChange={(e) =>
+                      setAction(
+                        e.target.value as (typeof ACTIONS)[number]["value"]
+                      )
+                    }
+                    className="w-full rounded-md border border-border bg-charcoal/50 px-3 py-2 text-sm text-ink"
+                    aria-label="Generation action"
+                  >
+                    {ACTIONS.map((a) => (
+                      <option key={a.value} value={a.value}>
+                        {a.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                    Tone override
+                  </span>
+                  <input
+                    value={toneOverride}
+                    disabled={loading || archived}
+                    onChange={(e) => setToneOverride(e.target.value)}
+                    className="w-full rounded-md border border-border bg-charcoal/50 px-3 py-2 text-sm text-ink"
+                    maxLength={100}
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                    Length override
+                  </span>
+                  <input
+                    value={lengthOverride}
+                    disabled={loading || archived}
+                    onChange={(e) => setLengthOverride(e.target.value)}
+                    className="w-full rounded-md border border-border bg-charcoal/50 px-3 py-2 text-sm text-ink"
+                    maxLength={100}
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  loading={loading}
+                  disabled={archived || instruction.trim().length < 3}
+                  onClick={() => void runGenerate()}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {ACTIONS.find((a) => a.value === action)?.label || "Generate"}
+                </Button>
+                {selected && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={loading || archived}
+                    onClick={() => {
+                      setAction("REGENERATE");
+                      void runGenerate();
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Regenerate selected
+                  </Button>
+                )}
+              </div>
+
+              {error && (
+                <p
+                  className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+                  role="alert"
+                >
+                  {error}
+                </p>
+              )}
+              {warning && (
+                <p className="rounded-md border border-border bg-panel/60 px-3 py-2 text-sm text-ink-dim">
+                  {warning}
+                </p>
+              )}
+              {archived && (
+                <p className="text-sm text-ink-dim">
+                  This story is archived. Generation and edits are disabled.
+                </p>
+              )}
+            </GlassCard>
+          ) : (
+            <ContinueStoryChat
+              storyId={storyId}
+              storyTitle={storyTitle}
+              storyStatus={storyStatus}
+              latestEpisodeId={episodes[episodes.length - 1]?.id ?? null}
             />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="block space-y-1.5 sm:col-span-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-                Action
-              </span>
-              <select
-                value={action}
-                disabled={loading || archived}
-                onChange={(e) =>
-                  setAction(e.target.value as (typeof ACTIONS)[number]["value"])
-                }
-                className="w-full rounded-md border border-border bg-charcoal/50 px-3 py-2 text-sm text-ink"
-                aria-label="Generation action"
-              >
-                {ACTIONS.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block space-y-1.5">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-                Tone override
-              </span>
-              <input
-                value={toneOverride}
-                disabled={loading || archived}
-                onChange={(e) => setToneOverride(e.target.value)}
-                className="w-full rounded-md border border-border bg-charcoal/50 px-3 py-2 text-sm text-ink"
-                maxLength={100}
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-                Length override
-              </span>
-              <input
-                value={lengthOverride}
-                disabled={loading || archived}
-                onChange={(e) => setLengthOverride(e.target.value)}
-                className="w-full rounded-md border border-border bg-charcoal/50 px-3 py-2 text-sm text-ink"
-                maxLength={100}
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              loading={loading}
-              disabled={archived || instruction.trim().length < 3}
-              onClick={() => void runGenerate()}
-            >
-              <Sparkles className="h-4 w-4" />
-              {ACTIONS.find((a) => a.value === action)?.label || "Generate"}
-            </Button>
-            {selected && (
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={loading || archived}
-                onClick={() => {
-                  setAction("REGENERATE");
-                  void runGenerate();
-                }}
-              >
-                <RefreshCw className="h-4 w-4" />
-                Regenerate selected
-              </Button>
-            )}
-          </div>
-
-          {error && (
-            <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
-              {error}
-            </p>
           )}
-          {warning && (
-            <p className="rounded-md border border-border bg-panel/60 px-3 py-2 text-sm text-ink-dim">
-              {warning}
-            </p>
-          )}
-          {archived && (
-            <p className="text-sm text-ink-dim">
-              This story is archived. Generation and edits are disabled.
-            </p>
-          )}
-        </GlassCard>
+        </div>
 
         {draft && (
           <GlassCard className="space-y-4 p-5">

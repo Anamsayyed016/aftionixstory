@@ -1,4 +1,6 @@
-import { StoryWizard } from "@/components/app/story-wizard";
+import { Suspense } from "react";
+
+import { NewStoryEntry } from "@/components/app/new-story-entry";
 
 export default function NewStoryPage() {
   return (
@@ -11,11 +13,17 @@ export default function NewStoryPage() {
           New story
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-dim">
-          Define the world, cast, and rules. Episode generation is not connected
-          yet — this saves your foundation for Phase C.
+          Use the guided wizard, or try the Story Assistant chat shell. Episode
+          and AI wiring stay on the existing flows for later phases.
         </p>
       </div>
-      <StoryWizard mode="create" />
+      <Suspense
+        fallback={
+          <div className="h-40 animate-pulse rounded-2xl border border-border bg-panel/50" />
+        }
+      >
+        <NewStoryEntry />
+      </Suspense>
     </div>
   );
 }

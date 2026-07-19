@@ -46,6 +46,27 @@ enum GenerationStatus {
   FAILED
 }
 
+enum ConversationMode {
+  CREATE
+  CONTINUE
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ChatMessageStatus {
+  SENT
+  ERROR
+}
+
 model User {
   id                     String    @id @default(cuid())
   name                   String?
@@ -64,6 +85,7 @@ model User {
   sessions       Session[]
   stories        Story[]
   generationLogs GenerationLog[]
+  conversations  Conversation[]
 
   @@index([email])
   @@index([createdAt])
@@ -143,12 +165,50 @@ model Story {
   writingRules   WritingRule[]
   episodes       Episode[]
   generationLogs GenerationLog[]
+  conversations  Conversation[]
 
   @@unique([userId, slug])
   @@index([userId])
   @@index([status])
   @@index([updatedAt])
   @@index([visibility])
+}
+
+model Conversation {
+  id            String             @id @default(cuid())
+  userId        String
+  storyId       String?
+  mode          ConversationMode
+  title         String?
+  status        ConversationStatus @default(ACTIVE)
+  state         Json?
+  lastMessageAt DateTime           @default(now())
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story    Story?        @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId, mode, lastMessageAt])
+  @@index([storyId, lastMessageAt])
+  @@index([userId, status])
+}
+
+model ChatMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  role           ChatMessageRole
+  content        String            @db.Text
+  status         ChatMessageStatus @default(SENT)
+  metadata       Json?
+  requestId      String?
+  createdAt      DateTime          @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, requestId])
+  @@index([conversationId, createdAt])
 }
 
 model Character {
