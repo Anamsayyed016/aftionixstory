@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { History, PanelRightOpen, Plus, Sparkles } from "lucide-react";
 
 import { storyAgentTurnAction } from "@/app/actions/story-agent";
+import { submitChatFeedbackAction } from "@/app/actions/feedback";
 import {
   archiveConversationAction,
   createConversationAction,
@@ -106,6 +107,8 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
     wordCount: number;
     draftKind?: string;
   } | null>(null);
+  const [lastOperation, setLastOperation] = useState<string>("conversational_chat");
+  const [feedbackHint, setFeedbackHint] = useState<string | null>(null);
   const sendingLockRef = useRef(false);
   const createLockRef = useRef(false);
   const lastFailedPromptRef = useRef<string | null>(null);
@@ -341,6 +344,8 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         setStoryDraft(memoryToDraft(result.data.memory));
         setMemoryStatus(result.data.memoryStatus);
         setLinkedStoryId(result.data.storyId);
+        setLastOperation(result.data.operation);
+        setFeedbackHint(null);
         setSuggestions(
           result.data.suggestions.map((s, index) => ({
             id: `ctx-${index}-${s.label}`,
@@ -368,7 +373,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         );
       } catch {
         const errMsg =
-          "Something went wrong reaching the story assistant. Please try again.";
+          "I couldn’t finish that reply. Please try once more. 🙂";
         setMessages((prev) => [
           ...prev,
           buildChatMessage("assistant", errMsg, "error"),
@@ -628,6 +633,48 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
                     >
                       Use in story
                     </button>
+                  ) : null}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/40 pt-2">
+                  <span className="text-[10px] text-ink-faint">Feedback</span>
+                  {(
+                    [
+                      ["helpful", "Helpful"],
+                      ["not_helpful", "Not helpful"],
+                      ["too_formal", "Too formal"],
+                      ["not_natural_hinglish", "Not natural Hinglish"],
+                    ] as const
+                  ).map(([rating, label]) => (
+                    <button
+                      key={rating}
+                      type="button"
+                      disabled={!conversationId || busy}
+                      className="rounded-full border border-border/70 px-2 py-0.5 text-[10px] text-ink-faint hover:text-ink disabled:opacity-50"
+                      onClick={() => {
+                        if (!conversationId) return;
+                        void (async () => {
+                          const res = await submitChatFeedbackAction({
+                            conversationId,
+                            operation: lastOperation,
+                            rating,
+                            consentGranted: false,
+                            tags: [rating],
+                          });
+                          setFeedbackHint(
+                            res.success
+                              ? res.data.stored
+                                ? "Thanks — saved with consent."
+                                : "Thanks — noted (not exported without consent)."
+                              : "Could not save feedback."
+                          );
+                        })();
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  {feedbackHint ? (
+                    <span className="text-[10px] text-violet-soft">{feedbackHint}</span>
                   ) : null}
                 </div>
               </div>

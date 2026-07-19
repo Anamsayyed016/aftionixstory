@@ -2,6 +2,7 @@ import {
   detectLanguageInstruction,
   readLanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
+import { detectStyleFeedback, readStyleProfile } from "@/lib/story-agent/style-profile";
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 
@@ -215,6 +216,40 @@ export function routeIntent(
     };
   }
 
+  const style = detectStyleFeedback(
+    text,
+    readStyleProfile({
+      formality: memory?.userPreferences.formality,
+      emojiStyle: memory?.userPreferences.emojiStyle,
+      avoidFormalHindi: memory?.userPreferences.avoidFormalHindi,
+      preferShortDialogues: memory?.userPreferences.preferShortDialogues,
+      pacingHint: memory?.userPreferences.pacingHint,
+      avoid: memory?.userPreferences.avoid,
+      uppercaseForLoudDialogue:
+        memory?.userPreferences.uppercaseForLoudDialogue,
+      episodeLength: memory?.userPreferences.episodeLength,
+    })
+  );
+
+  if (hasDraft(memory) && style.matched && /shuddh|formal|simple\s+human|more\s+emotional|uppercase|fast\s+(chal|hai)/i.test(text)) {
+    return {
+      operation: "revise_draft",
+      confidence: "high",
+      skipClassifier: true,
+      reason: "style_revise_draft",
+    };
+  }
+
+  if (style.matched) {
+    return {
+      operation: "memory_update",
+      confidence: "high",
+      skipClassifier: true,
+      fixedReply: style.confirmReply,
+      reason: "style_preference_only",
+    };
+  }
+
   // 4. Creative writing commands
   if (anyMatch(WRITE_SCENE, text)) {
     return {
@@ -310,16 +345,40 @@ export function routeIntent(
     };
   }
 
-  if (/^(storytelling|story|idea|concept|help|hi|hello|hey)$/i.test(text)) {
+  if (
+    /^(storytelling|story|idea|concept|help|hi|hello|hey|hola)$/i.test(text) ||
+    /^(kaise\s+ho|kya\s+haal|namaste|good\s+morning|good\s+evening)[!?.]*$/i.test(
+      text
+    )
+  ) {
+    const lower = text.toLowerCase().replace(/[!?.]+$/, "").trim();
+    const greetingReplies: Record<string, string> = {
+      hey: "Hey! 😊 Apna rough story idea batao—ek character, scene, ya sirf ek feeling bhi chalegi.",
+      hi: "Hi! ✨ Kya likhna hai aaj—nayi story, scene, ya pehle se idea polish karna?",
+      hello: "Hello! 🤍 Story idea share karo, ya main 3 unique concepts suggest karun?",
+      help: "Bilkul! 😊 Aap idea bata sakte ho, characters add kar sakte ho, ya “write a scene” bol ke draft maang sakte ho.",
+      hola: "Hola! ✨ Apna story vibe batao—romance, thriller, fantasy, kuch bhi.",
+      namaste: "Namaste! 🤍 Aapki story ka rough idea sunna chahti hoon.",
+      "kaise ho": "Main theek hoon! 😊 Aap batao—aaj kya create karna hai?",
+      "kya haal": "Sab theek! ✨ Story pe kaam karein? Idea ya scene se start kar sakte hain.",
+      "good morning": "Good morning! ✨ Aaj kaunsi story pe focus karna hai?",
+      "good evening": "Good evening! 🤍 Idea, scene, ya revise—batao kya chahiye.",
+      storytelling:
+        "Sure. Aap apna rough idea bata sakti ho—even one character, one scene, or just a feeling. Ya main aapke liye 3 unique story concepts suggest karun? ✨",
+      story:
+        "Sure. Aap apna rough idea bata sakti ho—even one character, one scene, or just a feeling. Ya main aapke liye 3 unique story concepts suggest karun? ✨",
+      idea: "Nice—idea share karo, main usse expand karungi. 😊",
+      concept: "Concept sunao—main usko scenes aur characters me shape kar sakti hoon. ✨",
+    };
+
     return {
-      operation: "brainstorm",
+      operation: "conversational_chat",
       confidence: "high",
       skipClassifier: true,
       fixedReply:
-        text.toLowerCase() === "storytelling" || text.toLowerCase() === "story"
-          ? "Sure. Aap apna rough idea bata sakti ho—even one character, one scene, or just a feeling. Ya main aapke liye 3 unique story concepts suggest karun?"
-          : undefined,
-      reason: "ultra_short",
+        greetingReplies[lower] ||
+        "Hey! 😊 Apna rough story idea batao—ek character, scene, ya sirf ek feeling bhi chalegi.",
+      reason: "greeting_or_help",
     };
   }
 

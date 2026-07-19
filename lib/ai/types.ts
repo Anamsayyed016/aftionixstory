@@ -33,6 +33,8 @@ export type GenerateTextResult = {
   estimatedInputTokens?: number;
   estimatedOutputTokens?: number;
   requestId?: string;
+  /** Provider stop reason when available (stop | length | content_filter | …). */
+  finishReason?: string;
 };
 
 export interface AIProvider {
@@ -40,4 +42,4 @@ export interface AIProvider {
   generateText(input: GenerateTextInput): Promise<GenerateTextResult>;
 }
 
-export type AIProviderName = "gemini" | "openai" | "mock";
+export type AIProviderName = "gemini" | "openai" | "mock" | "local";

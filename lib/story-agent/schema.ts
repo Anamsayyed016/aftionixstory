@@ -116,6 +116,13 @@ export const userPreferencesSchema = z.object({
   uppercaseForLoudDialogue: z.boolean().optional().default(false),
   slowBurn: z.boolean().optional().default(false),
   doNotStartYet: z.boolean().optional().default(false),
+  formality: optionalString,
+  dialogueStyle: optionalString,
+  narrationStyle: optionalString,
+  emojiStyle: optionalString,
+  avoidFormalHindi: z.boolean().optional().default(true),
+  preferShortDialogues: z.boolean().optional().default(false),
+  pacingHint: optionalString,
   avoid: stringList,
 });
 
@@ -147,6 +154,8 @@ export const storyMemorySchema = z.object({
     slowBurn: false,
     doNotStartYet: false,
     mirrorUserLanguage: true,
+    avoidFormalHindi: true,
+    preferShortDialogues: false,
     avoid: [],
   }),
   latestDraft: latestDraftSchema.default(null),

@@ -39,6 +39,7 @@ export class MockAIProvider implements AIProvider {
       outputCharacters,
       estimatedInputTokens: estimateTokensFromCharacters(inputCharacters),
       estimatedOutputTokens: estimateTokensFromCharacters(outputCharacters),
+      finishReason: "stop",
     };
   }
 }

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { toFriendlyAiActionError } from "@/lib/ai/action-errors";
+import { isAIError } from "@/lib/ai/errors";
 import { readMemoryFromConversationState } from "@/lib/ai/services/story-agent";
 import {
   memoryStatusForOperation,
@@ -22,11 +23,17 @@ import {
   requireOwnedConversation,
   updateOwnedConversationState,
 } from "@/lib/chat/conversations";
+import {
+  friendlyMessageForCode,
+  isStoryAgentError,
+  type StoryAgentErrorCode,
+} from "@/lib/story-agent/errors";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import {
   assertGenerationRateLimit,
-  assertWithinGenerationLimit,
+  RateLimitError,
+  UsageLimitError,
 } from "@/lib/usage/generation";
 
 const storyAgentTurnInputSchema = z.object({
@@ -66,11 +73,43 @@ export type StoryAgentTurnActionData = {
   outputMode?: string;
   provider?: string;
   model?: string;
+  errorCode?: string;
+  retryable?: boolean;
 };
 
 function mapError(error: unknown): ActionResult<never> {
+  if (error instanceof UsageLimitError) {
+    return fail(
+      "GENERATION_LIMIT_REACHED",
+      friendlyMessageForCode("GENERATION_LIMIT_REACHED")
+    );
+  }
+  if (error instanceof RateLimitError) {
+    return fail(
+      "AI_RATE_LIMITED",
+      friendlyMessageForCode("PROVIDER_RATE_LIMITED")
+    );
+  }
+  if (isStoryAgentError(error)) {
+    return fail(
+      error.code,
+      friendlyMessageForCode(error.code, error.operation)
+    );
+  }
   const ai = toFriendlyAiActionError(error);
   if (ai) return ai;
+  if (isAIError(error)) {
+    const codeMap: Record<string, StoryAgentErrorCode> = {
+      AI_TIMEOUT: "PROVIDER_TIMEOUT",
+      AI_RATE_LIMITED: "PROVIDER_RATE_LIMITED",
+      AI_QUOTA_EXCEEDED: "PROVIDER_QUOTA_EXCEEDED",
+      AI_NOT_CONFIGURED: "PROVIDER_AUTH_FAILED",
+      AI_INVALID_MODEL: "MODEL_UNAVAILABLE",
+      AI_INVALID_RESPONSE: "AGENT_RESPONSE_INVALID",
+    };
+    const mapped = codeMap[error.code] || "UNKNOWN_AI_ERROR";
+    return fail(error.code, friendlyMessageForCode(mapped));
+  }
   if (error instanceof ConversationAccessError) {
     return fail("NOT_FOUND", error.message);
   }
@@ -81,12 +120,22 @@ function mapError(error: unknown): ActionResult<never> {
   if (error instanceof Error && error.message === "AI_NOT_CONFIGURED") {
     return fail(
       "AI_NOT_CONFIGURED",
-      "The AI provider is not configured on the server yet."
+      friendlyMessageForCode("PROVIDER_AUTH_FAILED")
     );
   }
+
+  console.error(
+    JSON.stringify({
+      event: "story_agent.unmapped_error",
+      name: error instanceof Error ? error.name : "unknown",
+      message:
+        error instanceof Error ? error.message.slice(0, 160) : "non_error",
+    })
+  );
+
   return fail(
-    "AI_REQUEST_FAILED",
-    "Something went wrong with the story assistant. Please try again."
+    "UNKNOWN_AI_ERROR",
+    friendlyMessageForCode("UNKNOWN_AI_ERROR")
   );
 }
 
@@ -128,7 +177,6 @@ export async function storyAgentTurnAction(
     const userRequestId = `t_${turnRequestId}_u`;
     const assistantRequestId = `t_${turnRequestId}_a`;
 
-    await assertWithinGenerationLimit(user.id);
     await assertGenerationRateLimit(user.id);
 
     const conversation = await requireOwnedConversation(

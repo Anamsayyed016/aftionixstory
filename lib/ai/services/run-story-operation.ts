@@ -26,6 +26,16 @@ import {
   languagePrefsToStoryLanguageLabel,
   readLanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
+import {
+  detectStyleFeedback,
+  maybeDecorateChatReply,
+  mergeStyleProfile,
+  readStyleProfile,
+} from "@/lib/story-agent/style-profile";
+import {
+  friendlyMessageForCode,
+  isStoryAgentError,
+} from "@/lib/story-agent/errors";
 import { describeMemoryStatus } from "@/lib/story-agent/memory-patch";
 import type { NormalizedTurnResult } from "@/lib/story-agent/operation-result";
 import {
@@ -37,6 +47,59 @@ import {
   type StoryAgentTurnResult,
   type StoryMemory,
 } from "@/lib/story-agent/schema";
+
+function applyStyleFeedbackToMemory(
+  memory: StoryMemory,
+  userMessage: string
+): { memory: StoryMemory; styleLabel?: string; confirmReply?: string } {
+  const current = readStyleProfile({
+    formality: memory.userPreferences.formality,
+    dialogueStyle: memory.userPreferences.dialogueStyle,
+    narrationStyle: memory.userPreferences.narrationStyle,
+    emojiStyle: memory.userPreferences.emojiStyle,
+    uppercaseForLoudDialogue:
+      memory.userPreferences.uppercaseForLoudDialogue,
+    episodeLength: memory.userPreferences.episodeLength,
+    avoidFormalHindi: memory.userPreferences.avoidFormalHindi,
+    preferShortDialogues: memory.userPreferences.preferShortDialogues,
+    pacingHint: memory.userPreferences.pacingHint,
+    avoid: memory.userPreferences.avoid,
+  });
+  const detected = detectStyleFeedback(userMessage, current);
+  if (!detected.matched) return { memory };
+
+  const merged = mergeStyleProfile(current, detected.patch);
+  const writingRules = [...memory.writingRules];
+  for (const rule of detected.writingRules) {
+    if (!writingRules.some((r) => r.rule === rule)) {
+      writingRules.push({ rule, priority: "important" });
+    }
+  }
+
+  return {
+    memory: {
+      ...memory,
+      writingRules,
+      userPreferences: {
+        ...memory.userPreferences,
+        formality: merged.formality,
+        dialogueStyle: merged.dialogueStyle,
+        narrationStyle: merged.narrationStyle,
+        emojiStyle: merged.emojiStyle,
+        uppercaseForLoudDialogue: merged.uppercaseForLoudDialogue,
+        episodeLength: merged.episodeLength,
+        avoidFormalHindi: merged.avoidFormalHindi,
+        preferShortDialogues: merged.preferShortDialogues,
+        pacingHint: merged.pacingHint,
+        avoid: merged.avoid,
+        slowBurn: merged.pacingHint === "slow" ? true : memory.userPreferences.slowBurn,
+      },
+      updatedAt: new Date().toISOString(),
+    },
+    styleLabel: detected.label,
+    confirmReply: detected.confirmReply,
+  };
+}
 
 function applyLanguagePrefsToMemory(
   memory: StoryMemory,
@@ -197,6 +260,8 @@ export async function runStoryOperation(params: {
   let memory = seedMemoryFromMessage(params.memory, params.userMessage);
   const langApplied = applyLanguagePrefsToMemory(memory, params.userMessage);
   memory = langApplied.memory;
+  const styleApplied = applyStyleFeedbackToMemory(memory, params.userMessage);
+  memory = styleApplied.memory;
   const route = routeIntent(params.userMessage, memory);
   const operation = route.operation;
 
@@ -223,6 +288,15 @@ export async function runStoryOperation(params: {
 
   // ---- Fixed reply path (no model) ----
   if (route.fixedReply && route.skipClassifier) {
+    const style = readStyleProfile({
+      emojiStyle: memory.userPreferences.emojiStyle,
+    });
+    let assistantReply = route.fixedReply;
+    if (styleApplied.confirmReply && styleApplied.styleLabel) {
+      assistantReply = styleApplied.confirmReply;
+    } else {
+      assistantReply = maybeDecorateChatReply(assistantReply, style.emojiStyle);
+    }
     const suggestions =
       operation === "brainstorm"
         ? [
@@ -259,7 +333,7 @@ export async function runStoryOperation(params: {
     return {
       resultType: "conversation",
       operation,
-      assistantReply: route.fixedReply,
+      assistantReply,
       suggestions,
       memory,
       storyId: params.storyId,
@@ -362,10 +436,23 @@ export async function runStoryOperation(params: {
         retryCount: scene.retryCount,
       };
     } catch (error) {
-      const message =
-        error instanceof Error
+      const preservedDraft = memory.latestDraft?.content
+        ? {
+            title: memory.latestDraft.title || "Draft",
+            content: memory.latestDraft.content,
+            wordCount: memory.latestDraft.wordCount || 0,
+            draftKind: "scene" as const,
+            saved: false as const,
+            clientRequestId: memory.latestDraft.clientRequestId || "",
+          }
+        : null;
+      const message = isStoryAgentError(error)
+        ? friendlyMessageForCode(error.code, operation)
+        : error instanceof Error
           ? error.message
-          : "I couldn’t generate that scene correctly. Please retry.";
+          : operation === "revise_draft"
+            ? "I couldn’t apply that change, so I kept the earlier draft unchanged."
+            : "I couldn’t generate that scene correctly. Your previous draft is safe—please retry.";
       console.info(
         JSON.stringify({
           event: "story_operation.turn",
@@ -373,6 +460,7 @@ export async function runStoryOperation(params: {
           detectedIntent: route.reason,
           outputMode: "text",
           validation: "failed",
+          code: isStoryAgentError(error) ? error.code : "UNKNOWN_AI_ERROR",
           durationMs: Date.now() - started,
           conversationId: params.conversationId,
           turnRequestId: params.turnRequestId,
@@ -381,18 +469,18 @@ export async function runStoryOperation(params: {
       return {
         resultType: "error",
         operation,
-        assistantReply: message.includes("scene")
-          ? message
-          : "I couldn’t generate that scene correctly. Please retry.",
+        assistantReply: message,
         suggestions: [],
-        memory,
+        memory, // previous draft untouched
         storyId: params.storyId,
-        draft: null,
+        draft: preservedDraft,
         showReview: false,
         actionType: operation,
         actionOk: false,
         requiresConfirmation: false,
         durationMs: Date.now() - started,
+        errorCode: isStoryAgentError(error) ? error.code : "UNKNOWN_AI_ERROR",
+        retryable: true,
       };
     }
   }
@@ -584,12 +672,66 @@ export async function runStoryOperation(params: {
       ? operation
       : "conversational_chat";
 
-  const agent = await runStructuredAgent({
-    operation: structuredOp,
-    memory,
-    userMessage: params.userMessage,
-    recentMessages: params.recentMessages,
-  });
+  let agent;
+  try {
+    agent = await runStructuredAgent({
+      operation: structuredOp,
+      memory,
+      userMessage: params.userMessage,
+      recentMessages: params.recentMessages,
+    });
+  } catch (error) {
+    const style = readStyleProfile({
+      emojiStyle: memory.userPreferences.emojiStyle,
+    });
+    const fallback = maybeDecorateChatReply(
+      "Hey! 😊 Apna rough story idea batao—ek character, scene, ya sirf ek feeling bhi chalegi.",
+      style.emojiStyle
+    );
+    console.info(
+      JSON.stringify({
+        event: "story_operation.turn",
+        operation: structuredOp,
+        detectedIntent: route.reason,
+        outputMode: "fallback",
+        code: isStoryAgentError(error)
+          ? error.code
+          : "AGENT_RESPONSE_INVALID",
+        durationMs: Date.now() - started,
+        conversationId: params.conversationId,
+        turnRequestId: params.turnRequestId,
+      })
+    );
+    return {
+      resultType: "conversation",
+      operation: structuredOp,
+      assistantReply: fallback,
+      suggestions: [
+        {
+          label: "Suggest 3 concepts",
+          prompt: "Suggest three unique story concepts for me.",
+        },
+      ],
+      memory,
+      storyId: params.storyId,
+      draft: memory.latestDraft?.content
+        ? {
+            title: memory.latestDraft.title || "Draft",
+            content: memory.latestDraft.content,
+            wordCount: memory.latestDraft.wordCount || 0,
+            draftKind: "scene",
+            saved: false,
+            clientRequestId: memory.latestDraft.clientRequestId || "",
+          }
+        : null,
+      showReview: false,
+      actionType: "none",
+      actionOk: true,
+      requiresConfirmation: false,
+      outputMode: "structured",
+      durationMs: Date.now() - started,
+    };
+  }
 
   // If classifier unexpectedly asks to generate, honor creative path
   if (
@@ -654,6 +796,14 @@ export async function runStoryOperation(params: {
 
   memory = mergeDecisionIntoMemory(memory, agent.decision);
 
+  const style = readStyleProfile({
+    emojiStyle: memory.userPreferences.emojiStyle,
+  });
+  const decoratedReply = maybeDecorateChatReply(
+    agent.decision.assistantReply,
+    style.emojiStyle
+  );
+
   const routed = await routeStoryAgentAction({
     userId: params.userId,
     conversationId: params.conversationId,
@@ -661,6 +811,7 @@ export async function runStoryOperation(params: {
     memory,
     decision: {
       ...agent.decision,
+      assistantReply: decoratedReply,
       // Never let structured chat call generation after we already tried
       action:
         agent.decision.action.type === "generate_episode" ||
@@ -691,7 +842,7 @@ export async function runStoryOperation(params: {
   return {
     resultType: "conversation",
     operation: structuredOp,
-    assistantReply: agent.decision.assistantReply,
+    assistantReply: decoratedReply,
     suggestions:
       routed.result.suggestions ?? agent.decision.suggestions ?? [],
     memory,

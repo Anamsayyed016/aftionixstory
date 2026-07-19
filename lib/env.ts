@@ -20,7 +20,7 @@ const baseSchema = z.object({
 
 const aiSchema = z
   .object({
-    AI_PROVIDER: z.enum(["gemini", "openai", "mock"]).default("gemini"),
+    AI_PROVIDER: z.enum(["gemini", "openai", "mock", "local"]).default("gemini"),
     GEMINI_API_KEY: z.string().optional().default(""),
     // Verified against production Gemini listModels + generateContent probe (2026-07).
     GEMINI_STORY_MODEL: z.string().default("gemini-3.1-flash-lite"),
@@ -32,6 +32,11 @@ const aiSchema = z
     OPENAI_SUMMARY_MODEL: z.string().default("gpt-5-nano"),
     OPENAI_AGENT_MODEL: z.string().default("gpt-5-mini"),
     GEMINI_CREATIVE_MODEL: z.string().optional().default(""),
+    LOCAL_AI_BASE_URL: z.string().optional().default(""),
+    LOCAL_AI_API_KEY: z.string().optional().default(""),
+    LOCAL_AI_AGENT_MODEL: z.string().optional().default("local-agent"),
+    LOCAL_AI_CREATIVE_MODEL: z.string().optional().default("local-creative"),
+    LOCAL_AI_SUMMARY_MODEL: z.string().optional().default("local-summary"),
     AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
@@ -94,6 +99,13 @@ function readRawAiEnv() {
       process.env.OPENAI_AGENT_MODEL ||
       process.env.OPENAI_STORY_MODEL ||
       "gpt-5-mini",
+    LOCAL_AI_BASE_URL: process.env.LOCAL_AI_BASE_URL || "",
+    LOCAL_AI_API_KEY: process.env.LOCAL_AI_API_KEY || "",
+    LOCAL_AI_AGENT_MODEL: process.env.LOCAL_AI_AGENT_MODEL || "local-agent",
+    LOCAL_AI_CREATIVE_MODEL:
+      process.env.LOCAL_AI_CREATIVE_MODEL || "local-creative",
+    LOCAL_AI_SUMMARY_MODEL:
+      process.env.LOCAL_AI_SUMMARY_MODEL || "local-summary",
     AI_REQUEST_TIMEOUT_MS: process.env.AI_REQUEST_TIMEOUT_MS || "60000",
     AI_MAX_RETRIES: process.env.AI_MAX_RETRIES || "2",
     AI_RATE_LIMIT_WINDOW_MS: process.env.AI_RATE_LIMIT_WINDOW_MS || "60000",
@@ -135,6 +147,9 @@ export function getAiEnv(): AiEnv {
 /** Active story model for the configured AI_PROVIDER. */
 export function resolveStoryModel(env: AiEnv = getAiEnv()): string {
   if (env.AI_PROVIDER === "openai") return env.OPENAI_STORY_MODEL;
+  if (env.AI_PROVIDER === "local") {
+    return env.LOCAL_AI_CREATIVE_MODEL || env.LOCAL_AI_AGENT_MODEL || "local-model";
+  }
   return env.GEMINI_STORY_MODEL;
 }
 
@@ -145,18 +160,27 @@ export function resolveCreativeModel(env: AiEnv = getAiEnv()): string {
   if (env.AI_PROVIDER === "openai") {
     return env.OPENAI_CREATIVE_MODEL?.trim() || env.OPENAI_STORY_MODEL;
   }
+  if (env.AI_PROVIDER === "local") {
+    return env.LOCAL_AI_CREATIVE_MODEL || env.LOCAL_AI_AGENT_MODEL || "local-creative";
+  }
   return env.GEMINI_CREATIVE_MODEL?.trim() || env.GEMINI_STORY_MODEL;
 }
 
 /** Fast conversational / intent model. */
 export function resolveAgentModel(env: AiEnv = getAiEnv()): string {
   if (env.AI_PROVIDER === "openai") return env.OPENAI_AGENT_MODEL;
+  if (env.AI_PROVIDER === "local") {
+    return env.LOCAL_AI_AGENT_MODEL || "local-agent";
+  }
   return env.GEMINI_AGENT_MODEL;
 }
 
 /** Active summary model for the configured AI_PROVIDER. */
 export function resolveSummaryModel(env: AiEnv = getAiEnv()): string {
   if (env.AI_PROVIDER === "openai") return env.OPENAI_SUMMARY_MODEL;
+  if (env.AI_PROVIDER === "local") {
+    return env.LOCAL_AI_SUMMARY_MODEL || env.LOCAL_AI_AGENT_MODEL || "local-summary";
+  }
   return env.GEMINI_SUMMARY_MODEL;
 }
 
@@ -164,6 +188,7 @@ export function resolveSummaryModel(env: AiEnv = getAiEnv()): string {
 export function isActiveAiKeyPresent(env: AiEnv = getAiEnv()): boolean {
   if (env.AI_PROVIDER === "openai") return Boolean(env.OPENAI_API_KEY.trim());
   if (env.AI_PROVIDER === "gemini") return Boolean(env.GEMINI_API_KEY.trim());
+  if (env.AI_PROVIDER === "local") return Boolean(env.LOCAL_AI_BASE_URL.trim());
   return true;
 }
 
@@ -174,6 +199,9 @@ export function assertAiProviderConfigured(): AiEnv {
     throw new Error("AI_NOT_CONFIGURED");
   }
   if (env.AI_PROVIDER === "openai" && !env.OPENAI_API_KEY.trim()) {
+    throw new Error("AI_NOT_CONFIGURED");
+  }
+  if (env.AI_PROVIDER === "local" && !env.LOCAL_AI_BASE_URL.trim()) {
     throw new Error("AI_NOT_CONFIGURED");
   }
   return env;

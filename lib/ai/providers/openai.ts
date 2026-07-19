@@ -97,7 +97,7 @@ export class OpenAIProvider implements AIProvider {
     const asJson = wantsJsonOutput(input);
 
     try {
-      const text = await withRetry(
+      const raw = await withRetry(
         async () => {
           attempts += 1;
           return withTimeout(
@@ -114,7 +114,7 @@ export class OpenAIProvider implements AIProvider {
         { maxRetries: env.AI_MAX_RETRIES }
       );
 
-      const trimmed = cleanProviderText(text, asJson);
+      const trimmed = cleanProviderText(raw.text, asJson);
       if (!trimmed) {
         throw new AIError(
           "AI_INVALID_RESPONSE",
@@ -136,6 +136,7 @@ export class OpenAIProvider implements AIProvider {
         estimatedInputTokens: estimateTokensFromCharacters(inputCharacters),
         estimatedOutputTokens: estimateTokensFromCharacters(outputCharacters),
         requestId,
+        finishReason: raw.finishReason,
       };
     } catch (error) {
       const normalized = isAIError(error) ? error : normalizeProviderError(error);
@@ -158,7 +159,7 @@ export class OpenAIProvider implements AIProvider {
     model: string;
     input: GenerateTextInput;
     asJson: boolean;
-  }): Promise<string> {
+  }): Promise<{ text: string; finishReason: string }> {
     const client = this.createClient(params.apiKey);
     const maxCompletionTokens = params.input.maxOutputTokens ?? 4096;
 
@@ -211,7 +212,10 @@ export class OpenAIProvider implements AIProvider {
           ? choice.message.content
           : "";
 
-      return text;
+      return {
+        text,
+        finishReason: finishReason ? String(finishReason) : "stop",
+      };
     } catch (error) {
       throw normalizeProviderError(error);
     }

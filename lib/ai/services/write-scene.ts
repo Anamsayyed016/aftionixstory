@@ -6,6 +6,7 @@ import { buildWriteScenePrompt } from "@/lib/ai/prompts/write-scene-prompt";
 import { generateCreativeText } from "@/lib/ai/services/creative-text";
 import type { AIProvider } from "@/lib/ai/types";
 import type { StoryMemory } from "@/lib/story-agent/schema";
+import { readStyleProfile } from "@/lib/story-agent/style-profile";
 import {
   assertGenerationRateLimit,
   assertWithinGenerationLimit,
@@ -44,10 +45,24 @@ export async function generateWriteScene(params: {
     userMessage: params.userMessage,
   });
 
+  const style = readStyleProfile({
+    formality: params.memory.userPreferences.formality,
+    dialogueStyle: params.memory.userPreferences.dialogueStyle,
+    narrationStyle: params.memory.userPreferences.narrationStyle,
+    emojiStyle: params.memory.userPreferences.emojiStyle,
+    uppercaseForLoudDialogue:
+      params.memory.userPreferences.uppercaseForLoudDialogue,
+    episodeLength: params.memory.userPreferences.episodeLength,
+    avoidFormalHindi: params.memory.userPreferences.avoidFormalHindi,
+    preferShortDialogues: params.memory.userPreferences.preferShortDialogues,
+    pacingHint: params.memory.userPreferences.pacingHint,
+    avoid: params.memory.userPreferences.avoid,
+  });
+
   const { system, prompt } =
     params.mode === "revise"
-      ? buildReviseDraftPrompt(ctx, ctx.languagePrefs)
-      : buildWriteScenePrompt(ctx);
+      ? buildReviseDraftPrompt(ctx, ctx.languagePrefs, style)
+      : buildWriteScenePrompt(ctx, style);
 
   const result = await generateCreativeText({
     systemInstruction: system,
@@ -57,7 +72,7 @@ export async function generateWriteScene(params: {
         ? "story_agent_revise_draft"
         : "story_agent_write_scene",
     temperature: 0.85,
-    maxOutputTokens: 4096,
+    maxOutputTokens: 8192,
     provider: params.provider,
     languagePrefs: ctx.languagePrefs,
   });

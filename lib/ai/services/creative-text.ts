@@ -3,6 +3,12 @@ import "server-only";
 import { AIError } from "@/lib/ai/errors";
 import { logAiEvent } from "@/lib/ai/logger";
 import { getAIProvider } from "@/lib/ai/registry";
+import { assessHinglishQuality } from "@/lib/ai/quality/hinglish-quality";
+import { NATURAL_HINGLISH_PROMPT } from "@/lib/ai/quality/hinglish-quality";
+import {
+  assessOutputIntegrity,
+  mergePartialCreative,
+} from "@/lib/ai/quality/output-integrity";
 import { countWords } from "@/lib/ai/token-estimator";
 import type { AIProvider } from "@/lib/ai/types";
 import { getAiEnv, resolveCreativeModel } from "@/lib/env";
@@ -11,6 +17,7 @@ import {
   formatLanguagePromptBlock,
   type LanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
+import { StoryAgentError } from "@/lib/story-agent/errors";
 
 export type CreativeTextResult = {
   text: string;
@@ -22,6 +29,8 @@ export type CreativeTextResult = {
   durationMs: number;
   retryCount: number;
   languageComplianceRetry?: boolean;
+  integrityRetry?: boolean;
+  finishReason?: string;
 };
 
 /** True if the model dumped a JSON tool envelope instead of prose. */
@@ -170,7 +179,7 @@ export async function generateCreativeText(params: {
       systemInstruction: system,
       prompt,
       temperature: params.temperature ?? 0.85,
-      maxOutputTokens: params.maxOutputTokens ?? 4096,
+      maxOutputTokens: params.maxOutputTokens ?? 8192,
       model,
       operation: params.operation,
       outputMode: "text",
@@ -181,6 +190,56 @@ export async function generateCreativeText(params: {
     retryCount = 1;
     result = await call(params.systemInstruction, params.prompt);
   }
+  if (!result.text.trim()) {
+    throw new StoryAgentError(
+      "CREATIVE_RESPONSE_EMPTY",
+      "I couldn’t complete that scene correctly. Your previous draft is safe—please retry.",
+      { retryable: true, operation: params.operation }
+    );
+  }
+
+  let integrityRetry = false;
+  let integrity = assessOutputIntegrity({
+    text: result.text,
+    finishReason: result.finishReason,
+  });
+  if (!integrity.ok && integrity.truncated) {
+    integrityRetry = true;
+    retryCount += 1;
+    const partial = result.text;
+    const cont = await call(
+      params.systemInstruction,
+      `${params.prompt}
+
+The previous draft was truncated mid-output. Continue ONLY from where it stopped. Do not repeat earlier paragraphs.
+
+PARTIAL DRAFT:
+${partial.slice(-2500)}
+
+Continue seamlessly:`
+    );
+    result = {
+      ...cont,
+      text: mergePartialCreative(partial, cont.text),
+    };
+    integrity = assessOutputIntegrity({
+      text: result.text,
+      finishReason: cont.finishReason,
+    });
+    logAiEvent("info", "ai.creative_text.integrity_retry", {
+      operation: params.operation,
+      integrityRetry: true,
+      reason: integrity.reason,
+      finishReason: result.finishReason,
+    });
+    if (!integrity.ok && integrity.truncated) {
+      throw new StoryAgentError(
+        "CREATIVE_RESPONSE_TRUNCATED",
+        "I couldn’t complete that scene correctly. Your previous draft is safe—please retry.",
+        { retryable: true, operation: params.operation }
+      );
+    }
+  }
 
   let validated = validateCreativeProse(result.text);
 
@@ -189,14 +248,22 @@ export async function generateCreativeText(params: {
       validated.content,
       params.languagePrefs
     );
-    if (!compliance.ok) {
+    const needsHinglish =
+      params.languagePrefs.narrationLanguage === "hinglish" ||
+      params.languagePrefs.dialogueLanguage === "hinglish";
+    const hinglishQ = needsHinglish
+      ? assessHinglishQuality(validated.content)
+      : { ok: true, reason: "skip", formalHits: 0 };
+
+    if (!compliance.ok || !hinglishQ.ok) {
       languageComplianceRetry = true;
       retryCount += 1;
       const reminder = `
 
-STRICT LANGUAGE REMINDER (previous output ignored language):
+STRICT LANGUAGE / STYLE REMINDER:
 ${formatLanguagePromptBlock(params.languagePrefs)}
-Rewrite the entire scene again in the required language. Prose only.`;
+${needsHinglish ? NATURAL_HINGLISH_PROMPT : ""}
+Avoid overly formal/shuddh Hindi. Rewrite the entire scene naturally. Prose only.`;
       result = await call(
         params.systemInstruction,
         `${params.prompt}${reminder}`
@@ -205,7 +272,7 @@ Rewrite the entire scene again in the required language. Prose only.`;
       logAiEvent("info", "ai.creative_text.language_retry", {
         operation: params.operation,
         languageComplianceRetry: true,
-        reason: compliance.reason,
+        reason: !compliance.ok ? compliance.reason : hinglishQ.reason,
         narrationLanguage: params.languagePrefs.narrationLanguage,
         dialogueLanguage: params.languagePrefs.dialogueLanguage,
       });
@@ -221,6 +288,8 @@ Rewrite the entire scene again in the required language. Prose only.`;
     responseLength: result.text.length,
     retryCount,
     languageComplianceRetry,
+    integrityRetry,
+    finishReason: result.finishReason,
     validation: "ok",
   });
 
@@ -234,5 +303,7 @@ Rewrite the entire scene again in the required language. Prose only.`;
     durationMs: result.durationMs,
     retryCount,
     languageComplianceRetry,
+    integrityRetry,
+    finishReason: result.finishReason,
   };
 }
