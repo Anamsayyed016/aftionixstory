@@ -28,8 +28,10 @@ const aiSchema = z
     GEMINI_AGENT_MODEL: z.string().default("gemini-3.1-flash-lite"),
     OPENAI_API_KEY: z.string().optional().default(""),
     OPENAI_STORY_MODEL: z.string().default("gpt-5-mini"),
+    OPENAI_CREATIVE_MODEL: z.string().optional().default(""),
     OPENAI_SUMMARY_MODEL: z.string().default("gpt-5-nano"),
     OPENAI_AGENT_MODEL: z.string().default("gpt-5-mini"),
+    GEMINI_CREATIVE_MODEL: z.string().optional().default(""),
     AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
@@ -66,6 +68,10 @@ function readRawAiEnv() {
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
     GEMINI_STORY_MODEL:
       process.env.GEMINI_STORY_MODEL || "gemini-3.1-flash-lite",
+    GEMINI_CREATIVE_MODEL:
+      process.env.GEMINI_CREATIVE_MODEL ||
+      process.env.GEMINI_STORY_MODEL ||
+      "gemini-3.1-flash-lite",
     GEMINI_SUMMARY_MODEL:
       process.env.GEMINI_SUMMARY_MODEL ||
       process.env.GEMINI_STORY_MODEL ||
@@ -76,6 +82,10 @@ function readRawAiEnv() {
       "gemini-3.1-flash-lite",
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
     OPENAI_STORY_MODEL: process.env.OPENAI_STORY_MODEL || "gpt-5-mini",
+    OPENAI_CREATIVE_MODEL:
+      process.env.OPENAI_CREATIVE_MODEL ||
+      process.env.OPENAI_STORY_MODEL ||
+      "gpt-5-mini",
     OPENAI_SUMMARY_MODEL:
       process.env.OPENAI_SUMMARY_MODEL ||
       process.env.OPENAI_STORY_MODEL ||
@@ -126,6 +136,16 @@ export function getAiEnv(): AiEnv {
 export function resolveStoryModel(env: AiEnv = getAiEnv()): string {
   if (env.AI_PROVIDER === "openai") return env.OPENAI_STORY_MODEL;
   return env.GEMINI_STORY_MODEL;
+}
+
+/**
+ * Creative prose model (scenes/episodes). Prefers *_CREATIVE_MODEL, else story model.
+ */
+export function resolveCreativeModel(env: AiEnv = getAiEnv()): string {
+  if (env.AI_PROVIDER === "openai") {
+    return env.OPENAI_CREATIVE_MODEL?.trim() || env.OPENAI_STORY_MODEL;
+  }
+  return env.GEMINI_CREATIVE_MODEL?.trim() || env.GEMINI_STORY_MODEL;
 }
 
 /** Fast conversational / intent model. */

@@ -104,6 +104,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
     title: string;
     content: string;
     wordCount: number;
+    draftKind?: string;
   } | null>(null);
   const sendingLockRef = useRef(false);
   const createLockRef = useRef(false);
@@ -327,9 +328,14 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         }
 
         lastFailedPromptRef.current = null;
+        const isError = result.data.resultType === "error";
         setMessages((prev) => [
           ...prev,
-          buildChatMessage("assistant", result.data.assistantReply, "sent"),
+          buildChatMessage(
+            "assistant",
+            result.data.assistantReply,
+            isError ? "error" : "sent"
+          ),
         ]);
         setMemory(result.data.memory);
         setStoryDraft(memoryToDraft(result.data.memory));
@@ -348,6 +354,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
                 title: result.data.draft.title,
                 content: result.data.draft.content,
                 wordCount: result.data.draft.wordCount,
+                draftKind: result.data.draft.draftKind,
               }
             : null
         );
@@ -356,7 +363,9 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           setReviewOpen(false);
         }
         await refreshHistory();
-        setPersistHint("Saved");
+        setPersistHint(
+          result.data.resultType === "creative_draft" ? "Draft ready" : "Saved"
+        );
       } catch {
         const errMsg =
           "Something went wrong reaching the story assistant. Please try again.";
@@ -549,14 +558,71 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         ) : null}
 
         {episodePreview ? (
-          <div className="border-t border-border/60 bg-charcoal/40 px-3 py-2 sm:px-4">
-            <p className="text-xs text-violet-soft">Unsaved episode draft</p>
+          <div className="border-t border-border/60 bg-charcoal/40 px-3 py-3 sm:px-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-violet-soft">
+                Unsaved {episodePreview.draftKind === "scene" ? "scene" : "draft"}
+              </p>
+              <p className="text-[11px] text-ink-faint">
+                {episodePreview.wordCount} words
+              </p>
+            </div>
             <p className="mt-0.5 truncate text-sm font-medium text-ink">
               {episodePreview.title}
             </p>
-            <p className="mt-1 line-clamp-3 text-xs text-ink-dim">
+            <p className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-ink-dim">
               {episodePreview.content}
             </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy || creating || archivedConversation}
+                className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                onClick={() => void sendPrompt("Rewrite the previous scene.")}
+              >
+                Rewrite
+              </button>
+              <button
+                type="button"
+                disabled={busy || creating || archivedConversation}
+                className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                onClick={() =>
+                  void sendPrompt(
+                    "Make the previous scene slower and more emotional."
+                  )
+                }
+              >
+                More emotional
+              </button>
+              <button
+                type="button"
+                disabled={busy || creating || archivedConversation}
+                className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                onClick={() => void sendPrompt("Continue from here.")}
+              >
+                Continue
+              </button>
+              <button
+                type="button"
+                disabled={busy || creating || archivedConversation}
+                className="rounded-full border border-border px-3 py-1 text-[11px] text-ink-dim hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(episodePreview.content);
+                }}
+              >
+                Copy
+              </button>
+              {storyDraft && !linkedStoryId ? (
+                <button
+                  type="button"
+                  disabled={busy || creating || archivedConversation}
+                  className="rounded-full border border-violet-soft/40 px-3 py-1 text-[11px] text-violet-soft hover:bg-violet/10 disabled:opacity-50"
+                  onClick={() => setReviewOpen(true)}
+                >
+                  Use in story
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 

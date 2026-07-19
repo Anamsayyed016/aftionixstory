@@ -26,7 +26,7 @@ export function parseStoryAgentTurnResult(raw: string): StoryAgentTurnResult {
   if (!parsed.success) {
     throw new AIError(
       "AI_INVALID_RESPONSE",
-      "The story assistant returned an unreadable response. Please try again.",
+      "I couldn’t understand the assistant’s reply format. Please try again.",
       true
     );
   }
@@ -65,6 +65,7 @@ export async function runStoryAgentDecision(params: {
     model,
     operation: "story_agent_turn",
     reasoningEffort: "minimal",
+    outputMode: "json",
   });
 
   let decision: StoryAgentTurnResult;
@@ -74,7 +75,7 @@ export async function runStoryAgentDecision(params: {
     if (isAIError(error)) throw error;
     throw new AIError(
       "AI_INVALID_RESPONSE",
-      "The story assistant returned an unreadable response. Please try again.",
+      "I couldn’t understand the assistant’s reply format. Please try again.",
       true
     );
   }

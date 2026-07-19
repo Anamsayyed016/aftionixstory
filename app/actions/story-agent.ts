@@ -4,11 +4,11 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { toFriendlyAiActionError } from "@/lib/ai/action-errors";
+import { readMemoryFromConversationState } from "@/lib/ai/services/story-agent";
 import {
-  mergeDecisionIntoMemory,
-  readMemoryFromConversationState,
-  runStoryAgentDecision,
-} from "@/lib/ai/services/story-agent";
+  memoryStatusForOperation,
+  runStoryOperation,
+} from "@/lib/ai/services/run-story-operation";
 import { fail, ok, type ActionResult } from "@/lib/actions/result";
 import {
   AuthzError,
@@ -22,10 +22,8 @@ import {
   requireOwnedConversation,
   updateOwnedConversationState,
 } from "@/lib/chat/conversations";
-import { routeStoryAgentAction } from "@/lib/story-agent/action-router";
-import { shouldBlockGeneration } from "@/lib/story-agent/intent";
-import { describeMemoryStatus } from "@/lib/story-agent/memory-patch";
-import type { StoryAgentTurnResult, StoryMemory } from "@/lib/story-agent/schema";
+import type { StoryMemory } from "@/lib/story-agent/schema";
+import type { StoryOperation } from "@/lib/story-agent/operations";
 import {
   assertGenerationRateLimit,
   assertWithinGenerationLimit,
@@ -45,7 +43,9 @@ const storyAgentTurnInputSchema = z.object({
 export type StoryAgentTurnActionData = {
   conversationId: string;
   assistantReply: string;
-  intent: StoryAgentTurnResult["intent"];
+  resultType: "conversation" | "creative_draft" | "structured_action" | "error";
+  operation: StoryOperation;
+  intent: string;
   suggestions: Array<{ label: string; prompt: string }>;
   memoryStatus: string;
   showReview: boolean;
@@ -56,11 +56,16 @@ export type StoryAgentTurnActionData = {
     content: string;
     wordCount: number;
     clientRequestId: string;
+    draftKind?: "scene" | "episode" | "rewrite";
+    saved?: false;
   } | null;
   actionType: string;
   actionOk: boolean;
   requiresConfirmation: boolean;
   duplicated: boolean;
+  outputMode?: string;
+  provider?: string;
+  model?: string;
 };
 
 function mapError(error: unknown): ActionResult<never> {
@@ -99,16 +104,15 @@ function buildPersistedState(params: {
     ...previous,
     ...params.memory,
     storyId: params.storyId ?? previous.storyId,
-    agentVersion: "1",
-    // Keep legacy keys lightly synced for older UI paths
+    agentVersion: "2",
     draftForm: previous.draftForm,
     extraction: previous.extraction,
   };
 }
 
 /**
- * Server-orchestrated Story Agent turn.
- * Persists user message → provider decision → memory/action → assistant message.
+ * Canonical Story Agent turn — operation-routed orchestration.
+ * Persists user message → route → provider → memory/draft → assistant message.
  */
 export async function storyAgentTurnAction(
   input: unknown
@@ -132,7 +136,6 @@ export async function storyAgentTurnAction(
       conversationId
     );
 
-    // Idempotency: if assistant for this turn already exists, return it
     const { messages: existingMessages } = await loadOwnedConversationMessages({
       userId: user.id,
       conversationId,
@@ -146,9 +149,17 @@ export async function storyAgentTurnAction(
       return ok({
         conversationId,
         assistantReply: existingAssistant.content,
+        resultType: memory.latestDraft?.content
+          ? "creative_draft"
+          : "conversation",
+        operation: "conversational_chat",
         intent: "chat",
         suggestions: [],
-        memoryStatus: describeMemoryStatus(memory),
+        memoryStatus: memoryStatusForOperation(
+          memory,
+          "conversational_chat",
+          Boolean(memory.latestDraft?.content)
+        ),
         showReview: false,
         storyId: conversation.storyId,
         memory,
@@ -158,6 +169,8 @@ export async function storyAgentTurnAction(
               content: memory.latestDraft.content,
               wordCount: memory.latestDraft.wordCount || 0,
               clientRequestId: memory.latestDraft.clientRequestId || "",
+              draftKind: "scene",
+              saved: false,
             }
           : null,
         actionType: "none",
@@ -190,74 +203,42 @@ export async function storyAgentTurnAction(
         content: m.content,
       }));
 
-    // If user message was duplicate but no assistant yet, still proceed once
-    let decisionResult;
+    let turn;
     try {
-      decisionResult = await runStoryAgentDecision({
-        userMessage: message,
-        memory,
-        recentMessages: recent,
+      turn = await runStoryOperation({
+        userId: user.id,
+        conversationId,
         storyId: conversation.storyId,
+        memory,
+        userMessage: message,
+        recentMessages: recent,
+        turnRequestId,
       });
     } catch (error) {
       const errMsg =
         error instanceof Error
           ? error.message
           : "Something went wrong reaching the story assistant. Please try again.";
+      // Avoid legacy “unreadable response” for creative failures
+      const friendly =
+        /unreadable/i.test(errMsg)
+          ? "I couldn’t complete that request. Please try again."
+          : errMsg;
       await appendOwnedChatMessage({
         userId: user.id,
         conversationId,
         role: "ASSISTANT",
-        content: errMsg,
+        content: friendly,
         status: "ERROR",
         requestId: assistantRequestId,
       });
       throw error;
     }
 
-    let nextMemory = mergeDecisionIntoMemory(memory, decisionResult.decision);
-    const generationBlocked = shouldBlockGeneration({
-      intent: decisionResult.decision.intent,
-      doNotStartYet: nextMemory.userPreferences.doNotStartYet,
-      userMessage: message,
-    });
-
-    const routed = await routeStoryAgentAction({
-      userId: user.id,
-      conversationId,
-      storyId: conversation.storyId,
-      memory: nextMemory,
-      decision: decisionResult.decision,
-      userMessage: message,
-      turnRequestId,
-      generationBlocked,
-    });
-    nextMemory = routed.memory;
-
-    let assistantReply = decisionResult.decision.assistantReply;
-    if (routed.result.clarificationOnly && routed.result.message) {
-      assistantReply = routed.result.message;
-    } else if (routed.result.ok && routed.result.draft) {
-      const preview = routed.result.draft.content.slice(0, 480);
-      assistantReply = `${assistantReply}\n\n——\nDraft ready: ${routed.result.draft.title}\n\n${preview}${
-        routed.result.draft.content.length > 480 ? "…" : ""
-      }`;
-    } else if (!routed.result.ok && routed.result.message) {
-      if (
-        decisionResult.decision.action.type !== "none" &&
-        !assistantReply.toLowerCase().includes("won’t start") &&
-        !assistantReply.toLowerCase().includes("won't start")
-      ) {
-        assistantReply = `${assistantReply}\n\n${routed.result.message}`;
-      } else if (decisionResult.decision.action.type !== "none") {
-        assistantReply = routed.result.message;
-      }
-    }
-
-    const nextStoryId = routed.result.storyId ?? conversation.storyId;
+    const nextStoryId = turn.storyId ?? conversation.storyId;
     const statePayload = buildPersistedState({
       previous: conversation.state,
-      memory: nextMemory,
+      memory: turn.memory,
       storyId: nextStoryId,
     });
 
@@ -265,8 +246,8 @@ export async function storyAgentTurnAction(
       userId: user.id,
       conversationId,
       state: statePayload as Prisma.InputJsonValue,
-      storyId: routed.result.storyId ?? undefined,
-      title: nextMemory.storyMemory.title || undefined,
+      storyId: turn.storyId ?? undefined,
+      title: turn.memory.storyMemory.title || undefined,
     });
 
     const buildId =
@@ -274,22 +255,29 @@ export async function storyAgentTurnAction(
       process.env.VERCEL_GIT_COMMIT_SHA ||
       "local-dev";
 
+    const assistantStatus =
+      turn.resultType === "error" ? ("ERROR" as const) : undefined;
+
     await appendOwnedChatMessage({
       userId: user.id,
       conversationId,
       role: "ASSISTANT",
-      content: assistantReply,
+      content: turn.assistantReply,
+      status: assistantStatus,
       requestId: assistantRequestId,
       metadata: {
         flow: "story_agent",
+        agentVersion: "2",
         buildId,
-        intent: decisionResult.decision.intent,
-        actionType: routed.result.type,
-        actionOk: routed.result.ok,
-        provider: decisionResult.provider,
-        model: decisionResult.model,
-        agentProfile: "agent",
-        durationMs: decisionResult.durationMs,
+        resultType: turn.resultType,
+        operation: turn.operation,
+        actionType: turn.actionType,
+        actionOk: turn.actionOk,
+        provider: turn.provider,
+        model: turn.model,
+        outputMode: turn.outputMode,
+        durationMs: turn.durationMs,
+        retryCount: turn.retryCount ?? 0,
       } as Prisma.InputJsonValue,
     });
 
@@ -298,48 +286,53 @@ export async function storyAgentTurnAction(
         event: "story_agent.turn",
         buildId,
         flow: "story_agent",
-        intent: decisionResult.decision.intent,
-        actionType: routed.result.type,
-        actionOk: routed.result.ok,
-        provider: decisionResult.provider,
-        model: decisionResult.model,
-        hasDraft: Boolean(routed.result.draft),
+        agentVersion: "2",
+        resultType: turn.resultType,
+        operation: turn.operation,
+        actionType: turn.actionType,
+        actionOk: turn.actionOk,
+        provider: turn.provider,
+        model: turn.model,
+        outputMode: turn.outputMode,
+        hasDraft: Boolean(turn.draft),
         conversationId,
+        turnRequestId,
         timestamp: new Date().toISOString(),
       })
     );
 
     return ok({
       conversationId,
-      assistantReply,
-      intent: decisionResult.decision.intent,
-      suggestions:
-        routed.result.suggestions ??
-        decisionResult.decision.suggestions ??
-        [],
-      memoryStatus: describeMemoryStatus(nextMemory),
-      showReview: Boolean(routed.result.showReview),
+      assistantReply: turn.assistantReply,
+      resultType: turn.resultType,
+      operation: turn.operation,
+      intent: turn.operation,
+      suggestions: turn.suggestions,
+      memoryStatus: memoryStatusForOperation(
+        turn.memory,
+        turn.operation,
+        Boolean(turn.draft?.content)
+      ),
+      showReview: turn.showReview,
       storyId: nextStoryId,
-      memory: nextMemory,
-      draft: routed.result.draft
+      memory: turn.memory,
+      draft: turn.draft
         ? {
-            title: routed.result.draft.title,
-            content: routed.result.draft.content,
-            wordCount: routed.result.draft.wordCount,
-            clientRequestId: routed.result.draft.clientRequestId,
+            title: turn.draft.title || "Draft",
+            content: turn.draft.content,
+            wordCount: turn.draft.wordCount,
+            clientRequestId: turn.draft.clientRequestId,
+            draftKind: turn.draft.draftKind,
+            saved: false,
           }
-        : nextMemory.latestDraft?.content
-          ? {
-              title: nextMemory.latestDraft.title || "Draft",
-              content: nextMemory.latestDraft.content,
-              wordCount: nextMemory.latestDraft.wordCount || 0,
-              clientRequestId: nextMemory.latestDraft.clientRequestId || "",
-            }
-          : null,
-      actionType: routed.result.type,
-      actionOk: routed.result.ok,
-      requiresConfirmation: decisionResult.decision.requiresConfirmation,
+        : null,
+      actionType: turn.actionType,
+      actionOk: turn.actionOk,
+      requiresConfirmation: turn.requiresConfirmation,
       duplicated: false,
+      outputMode: turn.outputMode,
+      provider: turn.provider,
+      model: turn.model,
     });
   } catch (error) {
     return mapError(error);

@@ -11,6 +11,12 @@ export type GenerateTextInput = {
   /** Safe operation label for structured logs (never user content). */
   operation?: string;
   /**
+   * Explicit output mode. When "text", providers must not force JSON.
+   * When "json", providers should request structured JSON when supported.
+   * When omitted, providers may infer from prompt content (legacy).
+   */
+  outputMode?: "text" | "json";
+  /**
    * OpenAI reasoning models only. Pass from extraction callers — never from
    * episode/summary writing unless explicitly intended.
    */

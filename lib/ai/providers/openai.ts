@@ -16,6 +16,8 @@ function newRequestId() {
 
 /** True when the caller expects a JSON object (e.g. Phase 2 chat extraction). */
 export function wantsJsonOutput(input: GenerateTextInput): boolean {
+  if (input.outputMode === "text") return false;
+  if (input.outputMode === "json") return true;
   const haystack = `${input.systemInstruction}\n${input.prompt}`;
   return /\bjson\b/i.test(haystack);
 }
