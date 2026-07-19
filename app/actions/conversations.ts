@@ -252,6 +252,24 @@ export async function ensureConversationAction(
 
     const created = await createConversationAction(parsed.data);
     if (!created.success) return created;
+
+    // Race: parallel ensure calls may both create — prefer latest active
+    const after = await findLatestActiveConversation({
+      userId: user.id,
+      mode: parsed.data.mode,
+      storyId: parsed.data.storyId ?? null,
+    });
+    if (after && after.id !== created.data.conversationId) {
+      return ok({
+        conversationId: after.id,
+        mode: after.mode,
+        title: after.title,
+        status: after.status,
+        state: after.state,
+        created: false,
+      });
+    }
+
     return ok({ ...created.data, created: true });
   } catch (error) {
     return mapError(error);

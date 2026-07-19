@@ -63,6 +63,10 @@ describe("Create Story chat UX helpers", () => {
       "I only have two characters",
       "Suggest something unique",
     ]);
+    const forbidden = CREATE_SUGGESTIONS.find(
+      (s) => s.id === "create-forbidden-romance"
+    );
+    expect(forbidden?.prompt).toBe("Help me create a forbidden romance");
   });
 
   it("summarizes compact story progress without requiring a permanent form", () => {

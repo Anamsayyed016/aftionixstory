@@ -22,6 +22,12 @@ import { getAiEnv, resolveAgentModel } from "@/lib/env";
 import { routeStoryAgentAction } from "@/lib/story-agent/action-router";
 import { routeIntent } from "@/lib/story-agent/intent-router";
 import {
+  buildConceptBrainstormReply,
+  extractStoryConcept,
+  looksLikeOnboardingGreeting,
+  responseMentionsTopic,
+} from "@/lib/story-agent/concept-reply";
+import {
   detectLanguageInstruction,
   languagePrefsToStoryLanguageLabel,
   readLanguagePreferences,
@@ -316,10 +322,14 @@ export async function runStoryOperation(params: {
         event: "story_operation.turn",
         operation,
         detectedIntent: route.reason,
+        messageLength: params.userMessage.length,
+        messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
         languageLabel: route.languageLabel ?? langApplied.languageLabel,
         narrationLanguage: memory.userPreferences.narrationLanguage,
         dialogueLanguage: memory.userPreferences.dialogueLanguage,
         outputMode: "none",
+        providerResultValid: false,
+        fallbackUsed: false,
         provider: null,
         model: null,
         durationMs: Date.now() - started,
@@ -354,6 +364,141 @@ export async function runStoryOperation(params: {
       outputMode: "structured",
       durationMs: Date.now() - started,
       retryCount: 0,
+    };
+  }
+
+  // ---- Concept / brainstorm without fixed reply: answer the current message ----
+  if (
+    operation === "brainstorm" ||
+    operation === "suggest_options" ||
+    route.reason === "concept_create_request"
+  ) {
+    const concept = buildConceptBrainstormReply(params.userMessage);
+    memory = {
+      ...memory,
+      storyMemory: {
+        ...memory.storyMemory,
+        concept: memory.storyMemory.concept || concept.memoryConcept,
+        genre:
+          memory.storyMemory.genre.length > 0
+            ? memory.storyMemory.genre
+            : extractStoryConcept(params.userMessage).genreHints.slice(0, 2),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Prefer LLM when available; fall back to topic-aware reply (never onboarding greeting)
+    let assistantReply = concept.assistantReply;
+    let suggestions = concept.suggestions;
+    let providerResultValid = false;
+    let fallbackUsed = true;
+    let fallbackReason = "concept_deterministic";
+    let providerName: string | undefined;
+    let modelName: string | undefined;
+    let durationMs = Date.now() - started;
+
+    try {
+      const agent = await runStructuredAgent({
+        operation: "brainstorm",
+        memory,
+        userMessage: params.userMessage,
+        recentMessages: params.recentMessages,
+      });
+      const reply = agent.decision.assistantReply?.trim() || "";
+      const topic = extractStoryConcept(params.userMessage).topicLabel;
+      const relevant =
+        reply.length > 0 &&
+        !looksLikeOnboardingGreeting(reply) &&
+        (responseMentionsTopic(reply, topic) ||
+          /obstacle|conflict|direction|build|concept|opening/i.test(reply));
+
+      if (relevant) {
+        assistantReply = reply;
+        suggestions =
+          agent.decision.suggestions?.length > 0
+            ? agent.decision.suggestions
+            : concept.suggestions;
+        memory = mergeDecisionIntoMemory(memory, agent.decision);
+        if (!memory.storyMemory.concept) {
+          memory = {
+            ...memory,
+            storyMemory: {
+              ...memory.storyMemory,
+              concept: concept.memoryConcept,
+            },
+          };
+        }
+        providerResultValid = true;
+        fallbackUsed = false;
+        fallbackReason = "";
+        providerName = agent.provider;
+        modelName = agent.model;
+        durationMs = agent.durationMs;
+      } else {
+        fallbackReason = looksLikeOnboardingGreeting(reply)
+          ? "rejected_onboarding_greeting"
+          : "low_relevance_retry";
+        // one stricter deterministic path — do not show greeting
+        assistantReply = concept.assistantReply;
+        suggestions = concept.suggestions;
+      }
+    } catch {
+      fallbackReason = "provider_failed_concept_fallback";
+      assistantReply = concept.assistantReply;
+      suggestions = concept.suggestions;
+    }
+
+    const style = readStyleProfile({
+      emojiStyle: memory.userPreferences.emojiStyle,
+    });
+    if (!fallbackUsed) {
+      assistantReply = maybeDecorateChatReply(assistantReply, style.emojiStyle);
+    }
+
+    console.info(
+      JSON.stringify({
+        event: "story_operation.turn",
+        operation: "brainstorm",
+        detectedIntent: route.reason,
+        messageLength: params.userMessage.length,
+        messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
+        outputMode: providerResultValid ? "structured" : "concept_fallback",
+        providerResultValid,
+        fallbackUsed,
+        fallbackReason: fallbackReason || undefined,
+        provider: providerName ?? null,
+        model: modelName ?? null,
+        durationMs,
+        conversationId: params.conversationId,
+        turnRequestId: params.turnRequestId,
+      })
+    );
+
+    return {
+      resultType: "conversation",
+      operation: "brainstorm",
+      assistantReply,
+      suggestions,
+      memory,
+      storyId: params.storyId,
+      draft: memory.latestDraft?.content
+        ? {
+            title: memory.latestDraft.title || "Draft",
+            content: memory.latestDraft.content,
+            wordCount: memory.latestDraft.wordCount || 0,
+            draftKind: "scene",
+            saved: false,
+            clientRequestId: memory.latestDraft.clientRequestId || "",
+          }
+        : null,
+      showReview: false,
+      actionType: "suggest_options",
+      actionOk: true,
+      requiresConfirmation: false,
+      provider: providerName,
+      model: modelName,
+      outputMode: "structured",
+      durationMs,
     };
   }
 
@@ -663,11 +808,9 @@ export async function runStoryOperation(params: {
     };
   }
 
-  // ---- Structured conversational / memory / brainstorm ----
+  // ---- Structured conversational / memory (brainstorm handled above) ----
   const structuredOp: StoryOperation =
-    operation === "brainstorm" ||
     operation === "memory_update" ||
-    operation === "suggest_options" ||
     operation === "inspect_memory"
       ? operation
       : "conversational_chat";
@@ -684,16 +827,31 @@ export async function runStoryOperation(params: {
     const style = readStyleProfile({
       emojiStyle: memory.userPreferences.emojiStyle,
     });
-    const fallback = maybeDecorateChatReply(
-      "Hey! 😊 Apna rough story idea batao—ek character, scene, ya sirf ek feeling bhi chalegi.",
-      style.emojiStyle
+    // NEVER use onboarding greeting for a real user message
+    const conceptFallback = buildConceptBrainstormReply(params.userMessage);
+    const isGreetingOnly = /^(hey|hi|hello|hola|help|namaste)[.!?]*$/i.test(
+      params.userMessage.trim()
     );
+    const fallback = isGreetingOnly
+      ? maybeDecorateChatReply(
+          "Hey! 😊 Apna rough story idea batao—ek character, scene, ya sirf ek feeling bhi chalegi.",
+          style.emojiStyle
+        )
+      : conceptFallback.assistantReply;
+
     console.info(
       JSON.stringify({
         event: "story_operation.turn",
         operation: structuredOp,
         detectedIntent: route.reason,
+        messageLength: params.userMessage.length,
+        messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
         outputMode: "fallback",
+        providerResultValid: false,
+        fallbackUsed: true,
+        fallbackReason: isGreetingOnly
+          ? "greeting_provider_failed"
+          : "chat_provider_failed_concept_fallback",
         code: isStoryAgentError(error)
           ? error.code
           : "AGENT_RESPONSE_INVALID",
@@ -706,13 +864,23 @@ export async function runStoryOperation(params: {
       resultType: "conversation",
       operation: structuredOp,
       assistantReply: fallback,
-      suggestions: [
-        {
-          label: "Suggest 3 concepts",
-          prompt: "Suggest three unique story concepts for me.",
-        },
-      ],
-      memory,
+      suggestions: isGreetingOnly
+        ? [
+            {
+              label: "Suggest 3 concepts",
+              prompt: "Suggest three unique story concepts for me.",
+            },
+          ]
+        : conceptFallback.suggestions,
+      memory: isGreetingOnly
+        ? memory
+        : {
+            ...memory,
+            storyMemory: {
+              ...memory.storyMemory,
+              concept: memory.storyMemory.concept || conceptFallback.memoryConcept,
+            },
+          },
       storyId: params.storyId,
       draft: memory.latestDraft?.content
         ? {
@@ -799,10 +967,28 @@ export async function runStoryOperation(params: {
   const style = readStyleProfile({
     emojiStyle: memory.userPreferences.emojiStyle,
   });
-  const decoratedReply = maybeDecorateChatReply(
+  let decoratedReply = maybeDecorateChatReply(
     agent.decision.assistantReply,
     style.emojiStyle
   );
+
+  // Relevance guard: never show onboarding greeting after a real message
+  let structuredSuggestions =
+    agent.decision.suggestions?.length > 0 ? agent.decision.suggestions : [];
+  let structuredFallbackUsed = false;
+  if (looksLikeOnboardingGreeting(decoratedReply)) {
+    const concept = buildConceptBrainstormReply(params.userMessage);
+    decoratedReply = concept.assistantReply;
+    structuredSuggestions = concept.suggestions;
+    structuredFallbackUsed = true;
+    memory = {
+      ...memory,
+      storyMemory: {
+        ...memory.storyMemory,
+        concept: memory.storyMemory.concept || concept.memoryConcept,
+      },
+    };
+  }
 
   const routed = await routeStoryAgentAction({
     userId: params.userId,
@@ -812,6 +998,7 @@ export async function runStoryOperation(params: {
     decision: {
       ...agent.decision,
       assistantReply: decoratedReply,
+      suggestions: structuredSuggestions,
       // Never let structured chat call generation after we already tried
       action:
         agent.decision.action.type === "generate_episode" ||
@@ -830,7 +1017,14 @@ export async function runStoryOperation(params: {
       event: "story_operation.turn",
       operation: structuredOp,
       detectedIntent: route.reason,
+      messageLength: params.userMessage.length,
+      messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
       outputMode: "structured",
+      providerResultValid: !structuredFallbackUsed,
+      fallbackUsed: structuredFallbackUsed,
+      fallbackReason: structuredFallbackUsed
+        ? "rejected_onboarding_greeting"
+        : undefined,
       provider: agent.provider,
       model: agent.model,
       durationMs: agent.durationMs,
@@ -844,7 +1038,9 @@ export async function runStoryOperation(params: {
     operation: structuredOp,
     assistantReply: decoratedReply,
     suggestions:
-      routed.result.suggestions ?? agent.decision.suggestions ?? [],
+      structuredSuggestions.length > 0
+        ? structuredSuggestions
+        : (routed.result.suggestions ?? []),
     memory,
     storyId: routed.result.storyId ?? params.storyId,
     draft: memory.latestDraft?.content

@@ -2,6 +2,7 @@ import {
   detectLanguageInstruction,
   readLanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
+import { isConceptCreateRequest } from "@/lib/story-agent/concept-reply";
 import { detectStyleFeedback, readStyleProfile } from "@/lib/story-agent/style-profile";
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import type { StoryMemory } from "@/lib/story-agent/schema";
@@ -114,6 +115,12 @@ const BRAINSTORM = [
   /\bbrainstorm\b/i,
   /\b3\s+(unique\s+)?(story\s+)?concepts?\b/i,
   /\bsirf\s+options\s+do\b/i,
+  /\bhelp\s+me\s+create\b/i,
+  /\bcreate\s+a\b/i,
+  /\bi\s+want\s+a\b/i,
+  /\bmake\s+a\b.+\b(story|romance|thriller|horror|fantasy|drama)\b/i,
+  /\bstory\s+about\b/i,
+  /\bi\s+have\s+a\b.+\b(idea|concept|romance|thriller)\b/i,
 ];
 
 const INSPECT = [
@@ -327,12 +334,14 @@ export function routeIntent(
     };
   }
 
-  if (anyMatch(BRAINSTORM, text)) {
+  if (anyMatch(BRAINSTORM, text) || isConceptCreateRequest(text)) {
     return {
       operation: "brainstorm",
       confidence: "high",
       skipClassifier: true,
-      reason: "brainstorm",
+      reason: isConceptCreateRequest(text)
+        ? "concept_create_request"
+        : "brainstorm",
     };
   }
 

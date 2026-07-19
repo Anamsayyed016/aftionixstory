@@ -80,6 +80,12 @@ describe("Deterministic intent pre-router", () => {
       routeIntent("Fantasy story start karo, heroine ka naam Zara hai.").operation
     ).toBe("start_story");
   });
+
+  it("routes concept create requests to brainstorm, not greeting", () => {
+    const route = routeIntent("Help me create a forbidden romance");
+    expect(route.operation).toBe("brainstorm");
+    expect(route.fixedReply).toBeUndefined();
+  });
 });
 
 describe("Operation profiles", () => {

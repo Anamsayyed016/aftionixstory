@@ -39,6 +39,9 @@ import type { ChatMessage, ChatSuggestion } from "@/lib/chat/types";
 import { buildChatMessage, canSendMessage } from "@/lib/chat/utils";
 import { cn } from "@/lib/utils";
 
+/** Dedupes Strict Mode double-mount boot so we don't create two empty chats. */
+let createStoryBootPromise: Promise<string | null> | null = null;
+
 function newRequestId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID().replace(/-/g, "");
@@ -112,6 +115,11 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   const sendingLockRef = useRef(false);
   const createLockRef = useRef(false);
   const lastFailedPromptRef = useRef<string | null>(null);
+  /** Monotonic: bumps on each send; stale restores must not overwrite. */
+  const turnSeqRef = useRef(0);
+  /** Monotonic: bumps on each restore/open/boot; stale loads discarded. */
+  const restoreSeqRef = useRef(0);
+  const activeConversationIdRef = useRef<string | null>(null);
 
   const completeness = storyDraft
     ? evaluateStoryCompleteness(storyDraft)
@@ -145,19 +153,31 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   }, []);
 
   const applyLoadedConversation = useCallback(
-    (data: {
-      conversationId: string;
-      status: "ACTIVE" | "ARCHIVED";
-      storyId?: string | null;
-      messages: Array<{
-        id: string;
-        role: "user" | "assistant";
-        content: string;
-        status: "sent" | "error";
-        createdAt: string;
-      }>;
-      state: unknown;
-    }) => {
+    (
+      data: {
+        conversationId: string;
+        status: "ACTIVE" | "ARCHIVED";
+        storyId?: string | null;
+        messages: Array<{
+          id: string;
+          role: "user" | "assistant";
+          content: string;
+          status: "sent" | "error";
+          createdAt: string;
+        }>;
+        state: unknown;
+      },
+      opts?: { restoreVersion: number; turnAtStart: number }
+    ) => {
+      // Ignore stale async restores after a newer restore or completed turn
+      if (
+        opts &&
+        (opts.restoreVersion !== restoreSeqRef.current ||
+          opts.turnAtStart !== turnSeqRef.current)
+      ) {
+        return false;
+      }
+      activeConversationIdRef.current = data.conversationId;
       setConversationId(data.conversationId);
       setConversationStatus(data.status);
       setLinkedStoryId(data.storyId ?? null);
@@ -196,6 +216,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
       setPersistHint(hasMemory ? "Restored" : "Ready");
       setCreateError(null);
       lastFailedPromptRef.current = null;
+      return true;
     },
     []
   );
@@ -203,16 +224,35 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   useEffect(() => {
     let cancelled = false;
     async function boot() {
+      const restoreVersion = ++restoreSeqRef.current;
+      const turnAtStart = turnSeqRef.current;
       setRestoring(true);
       try {
-        await refreshHistory();
-        const ensured = await ensureConversationAction({ mode: "CREATE" });
-        if (!ensured.success || cancelled) return;
+        if (!createStoryBootPromise) {
+          createStoryBootPromise = (async () => {
+            await refreshHistory();
+            const listed = await listConversationsAction({
+              mode: "CREATE",
+              limit: 1,
+            });
+            if (listed.success && listed.data.conversations.length > 0) {
+              return listed.data.conversations[0].id;
+            }
+            const ensured = await ensureConversationAction({ mode: "CREATE" });
+            if (!ensured.success) return null;
+            return ensured.data.conversationId;
+          })();
+        }
+
+        const conversationIdToLoad = await createStoryBootPromise;
+        if (!conversationIdToLoad || cancelled) return;
+
         const loaded = await loadConversationAction({
-          conversationId: ensured.data.conversationId,
+          conversationId: conversationIdToLoad,
         });
         if (!loaded.success || cancelled) return;
-        applyLoadedConversation(loaded.data);
+        applyLoadedConversation(loaded.data, { restoreVersion, turnAtStart });
+        await refreshHistory();
       } finally {
         if (!cancelled) setRestoring(false);
       }
@@ -225,6 +265,8 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
 
   const openConversation = useCallback(
     async (id: string) => {
+      const restoreVersion = ++restoreSeqRef.current;
+      const turnAtStart = turnSeqRef.current;
       setRestoring(true);
       setBusy(true);
       try {
@@ -236,7 +278,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           ]);
           return;
         }
-        applyLoadedConversation(loaded.data);
+        applyLoadedConversation(loaded.data, { restoreVersion, turnAtStart });
         setReviewOpen(false);
       } finally {
         setBusy(false);
@@ -247,6 +289,8 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   );
 
   async function startNewConversation() {
+    const restoreVersion = ++restoreSeqRef.current;
+    turnSeqRef.current += 1; // invalidate in-flight restores
     setRestoring(true);
     setBusy(true);
     try {
@@ -262,7 +306,12 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
       const loaded = await loadConversationAction({
         conversationId: created.data.conversationId,
       });
-      if (loaded.success) applyLoadedConversation(loaded.data);
+      if (loaded.success) {
+        applyLoadedConversation(loaded.data, {
+          restoreVersion,
+          turnAtStart: turnSeqRef.current,
+        });
+      }
       setMemory(emptyStoryMemory());
       setStoryDraft(null);
       setMessages([]);
@@ -305,6 +354,9 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
       }
 
       sendingLockRef.current = true;
+      const myTurn = ++turnSeqRef.current;
+      const conversationAtSend = conversationId;
+      activeConversationIdRef.current = conversationId;
       setBusy(true);
       setDraft("");
       setPersistHint("Thinking…");
@@ -316,10 +368,18 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
 
       try {
         const result = await storyAgentTurnAction({
-          conversationId,
+          conversationId: conversationAtSend,
           message: content,
           turnRequestId,
         });
+
+        // Stale turn or user switched conversation — do not clobber UI
+        if (
+          myTurn !== turnSeqRef.current ||
+          activeConversationIdRef.current !== conversationAtSend
+        ) {
+          return;
+        }
 
         if (!result.success) {
           const errMsg = result.error.message;
@@ -368,10 +428,22 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           setReviewOpen(false);
         }
         await refreshHistory();
+        if (
+          myTurn !== turnSeqRef.current ||
+          activeConversationIdRef.current !== conversationAtSend
+        ) {
+          return;
+        }
         setPersistHint(
           result.data.resultType === "creative_draft" ? "Draft ready" : "Saved"
         );
       } catch {
+        if (
+          myTurn !== turnSeqRef.current ||
+          activeConversationIdRef.current !== conversationAtSend
+        ) {
+          return;
+        }
         const errMsg =
           "I couldn’t finish that reply. Please try once more. 🙂";
         setMessages((prev) => [
@@ -379,8 +451,10 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           buildChatMessage("assistant", errMsg, "error"),
         ]);
       } finally {
-        setBusy(false);
-        sendingLockRef.current = false;
+        if (myTurn === turnSeqRef.current) {
+          setBusy(false);
+          sendingLockRef.current = false;
+        }
       }
     },
     [archivedConversation, conversationId, refreshHistory]

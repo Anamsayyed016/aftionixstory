@@ -81,14 +81,24 @@ export function buildStoryAgentUserPrompt(params: {
     .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
     .join("\n\n");
 
-  return `Current story memory (canonical):
-${memoryJson}
+  return `CURRENT USER MESSAGE:
+${params.userMessage}
 
-Recent conversation:
+RECENT CONTEXT:
 ${history || "(no prior messages)"}
 
-Latest user message:
-${params.userMessage}
+STORY MEMORY:
+${memoryJson}
+
+Rules:
+- Answer the current user message first.
+- Never ignore the latest message.
+- Do not repeat onboarding text after the user has spoken.
+- Do not act like a form.
+- Ask at most one main question.
+- Match the user’s language.
+- Provide relevant suggestions only.
+- Never return a generic greeting unless the user only greeted you.
 
 Respond with the JSON decision envelope only.
 Remember: assistantReply must be conversational — never a field checklist.`;

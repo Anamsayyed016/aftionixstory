@@ -23,6 +23,7 @@ import {
   requireOwnedConversation,
   updateOwnedConversationState,
 } from "@/lib/chat/conversations";
+import { extractStoryConcept } from "@/lib/story-agent/concept-reply";
 import {
   friendlyMessageForCode,
   isStoryAgentError,
@@ -174,8 +175,21 @@ export async function storyAgentTurnAction(
     }
 
     const { conversationId, message, turnRequestId } = parsed.data;
+    const messageFingerprint = extractStoryConcept(message).fingerprint;
     const userRequestId = `t_${turnRequestId}_u`;
     const assistantRequestId = `t_${turnRequestId}_a`;
+    const turnStartedAt = Date.now();
+
+    console.info(
+      JSON.stringify({
+        event: "story_agent.turn_start",
+        conversationId,
+        turnRequestId,
+        messageFingerprint,
+        messageLength: message.length,
+        messagePreview: message.slice(0, 48),
+      })
+    );
 
     await assertGenerationRateLimit(user.id);
 
@@ -306,7 +320,7 @@ export async function storyAgentTurnAction(
     const assistantStatus =
       turn.resultType === "error" ? ("ERROR" as const) : undefined;
 
-    await appendOwnedChatMessage({
+    const appendedAssistant = await appendOwnedChatMessage({
       userId: user.id,
       conversationId,
       role: "ASSISTANT",
@@ -337,14 +351,22 @@ export async function storyAgentTurnAction(
         agentVersion: "2",
         resultType: turn.resultType,
         operation: turn.operation,
+        detectedIntent: turn.operation,
+        selectedOperation: turn.operation,
         actionType: turn.actionType,
         actionOk: turn.actionOk,
         provider: turn.provider,
         model: turn.model,
         outputMode: turn.outputMode,
+        providerResultValid: turn.resultType !== "error",
         hasDraft: Boolean(turn.draft),
         conversationId,
         turnRequestId,
+        messageFingerprint,
+        messageLength: message.length,
+        persistedUserMessageId: appendedUser.message.id,
+        persistedAssistantMessageId: appendedAssistant.message.id,
+        durationMs: Date.now() - turnStartedAt,
         timestamp: new Date().toISOString(),
       })
     );
