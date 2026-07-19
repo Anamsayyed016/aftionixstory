@@ -7,6 +7,7 @@ import {
   extractJsonObject,
   normalizeChatStoryDraft,
   parseChatCreateExtraction,
+  sanitizeExtractionPlaceholders,
 } from "@/lib/chat/create-story-extraction";
 
 const completePayload = {
@@ -70,6 +71,61 @@ const incompletePayload = {
   },
 };
 
+const placeholderPayload = {
+  status: "needs_more_info",
+  missing: ["title", "language", ""],
+  assistantReply: "Tell me more about the world and who leads it.",
+  story: {
+    title: "",
+    genre: "Fantasy",
+    themes: ["", "curse", "  "],
+    genres: ["Fantasy", "", "  "],
+    characters: [
+      {
+        clientId: "c1",
+        name: "",
+        role: "",
+        personality: "",
+      },
+      {
+        clientId: "c2",
+        name: "Kael",
+        role: "Protagonist",
+        personality: "Stoic and cursed",
+      },
+    ],
+    relationships: [
+      {
+        sourceClientId: "c1",
+        targetClientId: "c2",
+        relationshipType: "",
+        description: "",
+      },
+      {
+        sourceClientId: "",
+        targetClientId: "",
+        relationshipType: "rivals",
+        description: "empty refs",
+      },
+      {
+        sourceClientId: "c2",
+        targetClientId: "c3",
+        relationshipType: "mentor",
+        description: "valid",
+      },
+    ],
+    writingRules: [
+      { rule: "", category: "style", priority: 5, isActive: true },
+      {
+        rule: "Keep magic costly",
+        category: "world",
+        priority: 7,
+        isActive: true,
+      },
+    ],
+  },
+};
+
 describe("Phase 2 chat — JSON extraction", () => {
   it("parses fenced JSON", () => {
     const raw = `\`\`\`json\n${JSON.stringify(completePayload)}\n\`\`\``;
@@ -84,6 +140,54 @@ describe("Phase 2 chat — JSON extraction", () => {
 
   it("rejects invalid JSON", () => {
     expect(() => extractJsonObject("not json")).toThrow();
+  });
+});
+
+describe("Phase 2 chat — placeholder normalization", () => {
+  it("removes placeholder characters with empty names", () => {
+    const cleaned = sanitizeExtractionPlaceholders(placeholderPayload) as {
+      story: { characters: Array<{ name: string }> };
+    };
+    expect(cleaned.story.characters).toHaveLength(1);
+    expect(cleaned.story.characters[0].name).toBe("Kael");
+  });
+
+  it("removes placeholder relationships", () => {
+    const cleaned = sanitizeExtractionPlaceholders(placeholderPayload) as {
+      story: { relationships: Array<{ relationshipType: string }> };
+    };
+    expect(cleaned.story.relationships).toHaveLength(1);
+    expect(cleaned.story.relationships[0].relationshipType).toBe("mentor");
+  });
+
+  it("removes placeholder writing rules", () => {
+    const cleaned = sanitizeExtractionPlaceholders(placeholderPayload) as {
+      story: { writingRules: Array<{ rule: string }> };
+    };
+    expect(cleaned.story.writingRules).toHaveLength(1);
+    expect(cleaned.story.writingRules[0].rule).toBe("Keep magic costly");
+  });
+
+  it("removes placeholder themes and genres", () => {
+    const cleaned = sanitizeExtractionPlaceholders(placeholderPayload) as {
+      story: { themes: string[]; genres: string[] };
+    };
+    expect(cleaned.story.themes).toEqual(["curse"]);
+    expect(cleaned.story.genres).toEqual(["Fantasy"]);
+  });
+
+  it("still parses valid extractions after normalization", () => {
+    const parsed = parseChatCreateExtraction(JSON.stringify(completePayload));
+    expect(parsed.status).toBe("complete");
+    expect(parsed.story?.characters).toHaveLength(2);
+  });
+
+  it("parses placeholder-heavy JSON without INVALID_EXTRACTION", () => {
+    const parsed = parseChatCreateExtraction(JSON.stringify(placeholderPayload));
+    expect(parsed.status).toBe("needs_more_info");
+    expect(parsed.story?.characters).toHaveLength(1);
+    expect(parsed.story?.relationships).toHaveLength(1);
+    expect(parsed.story?.writingRules).toHaveLength(1);
   });
 });
 
@@ -156,6 +260,23 @@ describe("Phase 2 chat — conversation turn with mock provider", () => {
     expect(result.wizardInput?.genre).toBe("Dark Romance");
   });
 
+  it("does not trigger repair after placeholder normalization", async () => {
+    let calls = 0;
+    const provider = new MockAIProvider((input) => {
+      calls += 1;
+      expect(input.reasoningEffort).toBe("minimal");
+      return JSON.stringify(placeholderPayload);
+    });
+    const result = await runChatCreateStoryTurn({
+      messages: [{ role: "user", content: "hi" }],
+      provider,
+    });
+    expect(calls).toBe(1);
+    expect(result.status).toBe("needs_more_info");
+    expect(result.story.characters).toHaveLength(1);
+    expect(result.story.characters[0].name).toBe("Kael");
+  });
+
   it("retries once when first response is invalid JSON", async () => {
     let calls = 0;
     const provider = new MockAIProvider(() => {
@@ -169,6 +290,27 @@ describe("Phase 2 chat — conversation turn with mock provider", () => {
     });
     expect(calls).toBe(2);
     expect(result.status).toBe("complete");
+  });
+
+  it("triggers repair only when genuinely required", async () => {
+    let calls = 0;
+    const provider = new MockAIProvider(() => {
+      calls += 1;
+      if (calls === 1) {
+        return JSON.stringify({
+          status: "needs_more_info",
+          // missing assistantReply — genuinely invalid after sanitize
+          story: { title: "X" },
+        });
+      }
+      return JSON.stringify(incompletePayload);
+    });
+    const result = await runChatCreateStoryTurn({
+      messages: [{ role: "user", content: "Hello" }],
+      provider,
+    });
+    expect(calls).toBe(2);
+    expect(result.assistantReply).toContain("characters");
   });
 
   it("fails with friendly invalid response after retry", async () => {

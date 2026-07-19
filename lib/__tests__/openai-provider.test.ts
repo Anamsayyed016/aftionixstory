@@ -162,6 +162,34 @@ describe("OpenAI provider", () => {
     expect(args.response_format).toEqual({ type: "json_object" });
   });
 
+  it("passes reasoning_effort only when requested by the caller", async () => {
+    const create = vi.fn(async () => ({
+      choices: [{ message: { content: "OK" }, finish_reason: "stop" }],
+    }));
+    const provider = new OpenAIProvider(() => ({
+      chat: { completions: { create } },
+    }));
+
+    await provider.generateText({
+      systemInstruction: "sys",
+      prompt: "hi",
+      model: "gpt-5-mini",
+      reasoningEffort: "minimal",
+    });
+
+    const withEffort = create.mock.calls[0][0] as Record<string, unknown>;
+    expect(withEffort.reasoning_effort).toBe("minimal");
+
+    await provider.generateText({
+      systemInstruction: "sys",
+      prompt: "write episode",
+      model: "gpt-5-mini",
+    });
+
+    const withoutEffort = create.mock.calls[1][0] as Record<string, unknown>;
+    expect(withoutEffort).not.toHaveProperty("reasoning_effort");
+  });
+
   it("strips markdown fences from JSON responses", () => {
     expect(cleanProviderText('```json\n{"a":1}\n```', true)).toBe('{"a":1}');
   });

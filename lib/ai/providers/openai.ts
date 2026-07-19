@@ -50,6 +50,7 @@ export type OpenAIClientLike = {
         messages: Array<{ role: string; content: string }>;
         temperature?: number;
         max_completion_tokens?: number;
+        reasoning_effort?: "minimal" | "low" | "medium" | "high";
         response_format?: { type: "json_object" | "text" };
       }) => Promise<{
         choices?: Array<{
@@ -165,6 +166,7 @@ export class OpenAIProvider implements AIProvider {
         messages: Array<{ role: string; content: string }>;
         temperature?: number;
         max_completion_tokens?: number;
+        reasoning_effort?: "minimal" | "low" | "medium" | "high";
         response_format?: { type: "json_object" | "text" };
       } = {
         model: params.model,
@@ -177,6 +179,10 @@ export class OpenAIProvider implements AIProvider {
 
       if (supportsCustomTemperature(params.model)) {
         request.temperature = params.input.temperature ?? 0.9;
+      }
+
+      if (params.input.reasoningEffort) {
+        request.reasoning_effort = params.input.reasoningEffort;
       }
 
       if (params.asJson) {

@@ -5,6 +5,7 @@ import {
   type NormalizedChatStoryDraft,
 } from "@/lib/chat/create-story-extraction";
 import { AIError, isAIError } from "@/lib/ai/errors";
+import { logAiEvent } from "@/lib/ai/logger";
 import type { AIProvider } from "@/lib/ai/types";
 import { getAiEnv, resolveStoryModel } from "@/lib/env";
 import type { CreateStoryWizardInput } from "@/lib/validations/story";
@@ -33,6 +34,15 @@ Rules:
 - Never invent critical facts the writer has not provided (names, major plot twists, relationships).
 - You may propose light options, but clearly mark them as suggestions the writer can reject.
 - Always respond with JSON only. No markdown outside JSON. No commentary outside JSON.
+
+Placeholder rules (critical):
+- Never return placeholder objects.
+- If a character has no name, omit it entirely from the characters array.
+- If a relationship has no valid type, omit it entirely.
+- If a writing rule is unknown, omit it entirely.
+- Never return empty strings just to satisfy JSON structure.
+- The JSON must contain only meaningful values the writer actually provided or clearly accepted.
+- Prefer empty arrays over arrays filled with blank template objects.
 
 Collect when possible:
 title, synopsis/description, genre, language, tone, setting, target audience, POV, writing style, pacing, themes, plot, characters, relationships, writing rules.
@@ -84,6 +94,7 @@ Return exactly this JSON shape:
   }
 }
 
+The shape above is a schema reference only — do not copy blank template entries into your response.
 Status "complete" only when title, genre, language, and at least one character (name, role, personality) are confidently known from the writer.
 Keep assistantReply concise and collaborative.`;
 
@@ -154,6 +165,8 @@ async function generateExtractionText(
     maxOutputTokens: 4096,
     model: resolveStoryModel(env),
     operation: "chat_create_story",
+    // Extraction only — keep episode/summary writing on default reasoning.
+    reasoningEffort: "minimal",
   });
 }
 
@@ -175,6 +188,10 @@ export async function runChatCreateStoryTurn(params: {
   let rawText = "";
   let providerName = provider.name;
   let model = "";
+  let providerDuration = 0;
+  let repairTriggered = false;
+  let repairSucceeded = false;
+  let repairSkipped = false;
 
   try {
     const first = await generateExtractionText(
@@ -185,6 +202,7 @@ export async function runChatCreateStoryTurn(params: {
     rawText = first.text;
     providerName = first.provider;
     model = first.model;
+    providerDuration += first.durationMs;
   } catch (error) {
     if (isAIError(error)) throw error;
     throw new AIError(
@@ -194,10 +212,20 @@ export async function runChatCreateStoryTurn(params: {
     );
   }
 
+  const normalizeStarted = Date.now();
   let extraction;
+  let normalizationDuration = 0;
+  let validationDuration = 0;
+
   try {
+    const validationStarted = Date.now();
     extraction = parseChatCreateExtraction(rawText);
+    validationDuration = Date.now() - validationStarted;
+    normalizationDuration = Date.now() - normalizeStarted;
+    repairSkipped = true;
   } catch {
+    repairTriggered = true;
+    repairSkipped = false;
     try {
       const retry = await generateExtractionText(
         provider,
@@ -208,8 +236,25 @@ export async function runChatCreateStoryTurn(params: {
       rawText = retry.text;
       providerName = retry.provider;
       model = retry.model;
+      providerDuration += retry.durationMs;
+
+      const validationStarted = Date.now();
       extraction = parseChatCreateExtraction(rawText);
+      validationDuration += Date.now() - validationStarted;
+      normalizationDuration = Date.now() - normalizeStarted;
+      repairSucceeded = true;
     } catch {
+      logAiEvent("warn", "ai.chat_create_story.timing", {
+        provider: providerName,
+        model,
+        operation: "chat_create_story",
+        providerDuration,
+        normalizationDuration: Date.now() - normalizeStarted,
+        validationDuration,
+        repairTriggered: true,
+        repairSucceeded: false,
+        repairSkipped: false,
+      });
       throw new AIError(
         "AI_INVALID_RESPONSE",
         "The assistant returned an unreadable response. Please try again.",
@@ -225,6 +270,18 @@ export async function runChatCreateStoryTurn(params: {
   const missing = Array.from(
     new Set([...(extraction.missing ?? []), ...evaluated.missing])
   );
+
+  logAiEvent("info", "ai.chat_create_story.timing", {
+    provider: providerName,
+    model,
+    operation: "chat_create_story",
+    providerDuration,
+    normalizationDuration,
+    validationDuration,
+    repairTriggered,
+    repairSucceeded,
+    repairSkipped,
+  });
 
   return {
     assistantReply: extraction.assistantReply,

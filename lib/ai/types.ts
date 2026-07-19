@@ -1,3 +1,5 @@
+export type ReasoningEffort = "minimal" | "low" | "medium" | "high";
+
 export type GenerateTextInput = {
   systemInstruction: string;
   prompt: string;
@@ -8,6 +10,11 @@ export type GenerateTextInput = {
   model?: string;
   /** Safe operation label for structured logs (never user content). */
   operation?: string;
+  /**
+   * OpenAI reasoning models only. Pass from extraction callers — never from
+   * episode/summary writing unless explicitly intended.
+   */
+  reasoningEffort?: ReasoningEffort;
 };
 
 export type GenerateTextResult = {

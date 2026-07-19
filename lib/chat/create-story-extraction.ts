@@ -321,9 +321,92 @@ export function extractJsonObject(raw: string): unknown {
   }
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function textOrEmpty(value: unknown): string {
+  if (value == null) return "";
+  return String(value).trim();
+}
+
+function hasAnyCharacterRef(item: Record<string, unknown>): boolean {
+  return (
+    textOrEmpty(item.sourceClientId).length > 0 ||
+    textOrEmpty(item.targetClientId).length > 0 ||
+    textOrEmpty(item.sourceId).length > 0 ||
+    textOrEmpty(item.targetId).length > 0 ||
+    textOrEmpty(item.sourceName).length > 0 ||
+    textOrEmpty(item.targetName).length > 0
+  );
+}
+
+/**
+ * Drop empty placeholder array items the model may echo from the schema
+ * template. Does not invent values — only removes empties before Zod.
+ */
+export function sanitizeExtractionPlaceholders(json: unknown): unknown {
+  if (!isPlainObject(json)) return json;
+
+  const next: Record<string, unknown> = { ...json };
+
+  if (Array.isArray(next.missing)) {
+    next.missing = next.missing
+      .map((item) => textOrEmpty(item))
+      .filter((item) => item.length > 0);
+  }
+
+  if (!isPlainObject(next.story)) return next;
+
+  const story: Record<string, unknown> = { ...next.story };
+
+  if (Array.isArray(story.characters)) {
+    story.characters = story.characters.filter((item) => {
+      if (!isPlainObject(item)) return false;
+      return textOrEmpty(item.name).length > 0;
+    });
+  }
+
+  if (Array.isArray(story.relationships)) {
+    story.relationships = story.relationships.filter((item) => {
+      if (!isPlainObject(item)) return false;
+      if (textOrEmpty(item.relationshipType).length === 0) return false;
+      if (!hasAnyCharacterRef(item)) return false;
+      return true;
+    });
+  }
+
+  if (Array.isArray(story.writingRules)) {
+    story.writingRules = story.writingRules.filter((item) => {
+      if (!isPlainObject(item)) return false;
+      return textOrEmpty(item.rule).length > 0;
+    });
+  }
+
+  if (Array.isArray(story.themes)) {
+    story.themes = story.themes
+      .map((item) => textOrEmpty(item))
+      .filter((item) => item.length > 0);
+  }
+
+  if (Array.isArray(story.genres)) {
+    story.genres = story.genres
+      .map((item) => textOrEmpty(item))
+      .filter((item) => item.length > 0);
+  }
+
+  if (typeof story.genre === "string" && story.genre.trim().length === 0) {
+    delete story.genre;
+  }
+
+  next.story = story;
+  return next;
+}
+
 export function parseChatCreateExtraction(raw: string): ChatCreateExtraction {
   const json = extractJsonObject(raw);
-  const parsed = chatCreateExtractionSchema.safeParse(json);
+  const cleaned = sanitizeExtractionPlaceholders(json);
+  const parsed = chatCreateExtractionSchema.safeParse(cleaned);
   if (!parsed.success) {
     throw new Error("INVALID_EXTRACTION");
   }
