@@ -11,24 +11,24 @@ export const DEMO_ASSISTANT_REPLIES: Record<ChatMode, string> = {
 
 export const CREATE_SUGGESTIONS: ChatSuggestion[] = [
   {
-    id: "create-ceo-romance",
-    label: "A forbidden romance with a powerful CEO",
-    prompt: "A forbidden romance with a powerful CEO",
+    id: "create-college-romance",
+    label: "A forbidden romance set in college",
+    prompt: "A forbidden romance set in college",
   },
   {
     id: "create-dark-fantasy",
-    label: "A dark fantasy about a cursed kingdom",
-    prompt: "A dark fantasy about a cursed kingdom",
+    label: "A dark fantasy about a cursed prince",
+    prompt: "A dark fantasy about a cursed prince",
   },
   {
-    id: "create-college-romance",
-    label: "A college romance with mystery and comedy",
-    prompt: "A college romance with mystery and comedy",
+    id: "create-family-drama",
+    label: "A family drama with secrets and betrayal",
+    prompt: "A family drama with secrets and betrayal",
   },
   {
     id: "create-from-scratch",
-    label: "Help me create a story from scratch",
-    prompt: "Help me create a story from scratch",
+    label: "Help me build a story from scratch",
+    prompt: "Help me build a story from scratch",
   },
 ];
 
@@ -60,10 +60,9 @@ export const CHAT_SHELL_COPY: Record<
   { title: string; emptyTitle: string; emptyDescription: string; placeholder: string }
 > = {
   create: {
-    title: "Create with Story Assistant",
-    emptyTitle: "Let’s build your story together",
-    emptyDescription:
-      "Describe your idea naturally. The assistant will later help shape the title, genre, characters, world, tone, and plot.",
+    title: "Story Assistant",
+    emptyTitle: "Let’s create your story",
+    emptyDescription: "Tell me your idea, even if it is only one line.",
     placeholder: "Describe the story you want to create…",
   },
   continue: {

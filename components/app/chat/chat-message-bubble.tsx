@@ -3,16 +3,19 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Bot, UserRound } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/chat/types";
 
 type ChatMessageBubbleProps = {
   message: ChatMessage;
+  onRetry?: () => void;
 };
 
-export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, onRetry }: ChatMessageBubbleProps) {
   const reduceMotion = useReducedMotion();
   const isUser = message.role === "user";
+  const isError = message.status === "error";
 
   return (
     <motion.div
@@ -37,22 +40,33 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
 
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-[0_10px_28px_-22px_rgba(0,0,0,0.8)]",
+          "max-w-[min(36rem,85%)] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-[0_10px_28px_-22px_rgba(0,0,0,0.8)]",
           isUser
             ? "rounded-br-md bg-gradient-to-br from-violet/90 to-lilac/80 text-white"
-            : "rounded-bl-md border border-border bg-panel-raised/90 text-ink"
+            : isError
+              ? "rounded-bl-md border border-danger/35 bg-danger/10 text-ink"
+              : "rounded-bl-md border border-border bg-panel-raised/90 text-ink"
         )}
       >
         <p className="whitespace-pre-wrap">{message.content}</p>
         {message.status === "sending" ? (
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-            Sending…
-          </p>
+          <p className="mt-1 text-[11px] text-ink-faint">Sending…</p>
         ) : null}
-        {message.status === "error" ? (
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-danger">
-            Failed
-          </p>
+        {isError ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p className="text-[11px] text-danger">Couldn’t finish that reply</p>
+            {onRetry ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-7 rounded-lg px-2.5 text-xs"
+                onClick={onRetry}
+              >
+                Retry
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
 

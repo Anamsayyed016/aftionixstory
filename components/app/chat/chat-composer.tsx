@@ -100,8 +100,8 @@ export function ChatComposer({
           </Button>
         </div>
       </div>
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-        Enter to send · Shift+Enter for new line · Demo UI
+      <p className="mt-2 text-[11px] text-ink-faint">
+        Enter to send · Shift+Enter for a new line
       </p>
     </div>
   );

@@ -119,6 +119,7 @@ export function ChatShell({
           suggestions={suggestions}
           onSelectSuggestion={onSelectSuggestion}
           disabled={disabled || busy}
+          busy={busy}
         />
       </div>
 

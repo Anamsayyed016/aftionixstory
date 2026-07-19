@@ -8,6 +8,7 @@ import { CreateStoryChat } from "@/components/app/chat/create-story-chat";
 import { StoryWizard } from "@/components/app/story-wizard";
 import type { NewStoryEntryMode } from "@/lib/chat/types";
 import { parseNewStoryEntryMode } from "@/lib/chat/utils";
+import { cn } from "@/lib/utils";
 
 const ENTRY_OPTIONS = [
   { id: "wizard" as const, label: "Guided Wizard" },
@@ -20,7 +21,7 @@ export function NewStoryEntry() {
   const [entryMode, setEntryMode] = useState<NewStoryEntryMode>(initialMode);
 
   return (
-    <div className="space-y-5">
+    <div className={cn("space-y-4", entryMode === "chat" && "space-y-3")}>
       <ChatModeToggle
         label="Story creation method"
         value={entryMode}
@@ -31,7 +32,9 @@ export function NewStoryEntry() {
       {entryMode === "wizard" ? (
         <StoryWizard mode="create" />
       ) : (
-        <CreateStoryChat />
+        <div className="h-[calc(100dvh-11.5rem)] min-h-[520px] md:h-[calc(100dvh-10rem)]">
+          <CreateStoryChat className="h-full" />
+        </div>
       )}
     </div>
   );

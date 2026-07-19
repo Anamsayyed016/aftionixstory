@@ -12,7 +12,9 @@ type StoryCreationPreviewProps = {
   createEnabled: boolean;
   onChange: (next: NormalizedChatStoryDraft) => void;
   onCreate: () => void;
+  onContinueChatting?: () => void;
   error?: string | null;
+  variant?: "panel" | "embedded";
 };
 
 function Field({
@@ -43,7 +45,9 @@ export function StoryCreationPreview({
   createEnabled,
   onChange,
   onCreate,
+  onContinueChatting,
   error,
+  variant = "panel",
 }: StoryCreationPreviewProps) {
   function patch(partial: Partial<NormalizedChatStoryDraft>) {
     onChange({ ...story, ...partial });
@@ -59,40 +63,65 @@ export function StoryCreationPreview({
     patch({ characters });
   }
 
+  const friendlyMissing = missing
+    .map((item) => {
+      if (item === "characters") return "main character";
+      if (item.includes(".")) return item.split(".").pop() ?? item;
+      return item;
+    })
+    .slice(0, 6);
+
   return (
     <section
       aria-label="Story preview"
-      className="space-y-4 rounded-2xl border border-border bg-panel/75 p-4 shadow-[0_20px_50px_-36px_rgba(0,0,0,0.85)] backdrop-blur-md sm:p-5"
+      className={cn(
+        "space-y-4",
+        variant === "panel" &&
+          "rounded-2xl border border-border bg-panel/75 p-4 shadow-[0_20px_50px_-36px_rgba(0,0,0,0.85)] backdrop-blur-md sm:p-5"
+      )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-violet-soft">
-            Preview
-          </p>
-          <h3 className="mt-1 font-display text-xl font-semibold text-ink">
-            Review before creating
-          </h3>
-          <p className="mt-1 text-sm text-ink-dim">
-            Edit any field. Create Story unlocks when required details are
-            complete.
-          </p>
+      {variant === "panel" ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-violet-soft">Preview</p>
+            <h3 className="mt-1 font-display text-xl font-semibold text-ink">
+              Review before creating
+            </h3>
+            <p className="mt-1 text-sm text-ink-dim">
+              Edit any field. Create Story unlocks when required details are
+              complete.
+            </p>
+          </div>
+          <span
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-[11px]",
+              status === "complete"
+                ? "border-success/40 bg-success/10 text-success"
+                : "border-border bg-charcoal/70 text-ink-faint"
+            )}
+          >
+            {status === "complete" ? "Ready" : "Needs more info"}
+          </span>
         </div>
-        <span
-          className={cn(
-            "rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider",
-            status === "complete"
-              ? "border-success/40 bg-success/10 text-success"
-              : "border-border bg-charcoal/70 text-ink-faint"
-          )}
-        >
-          {status === "complete" ? "Ready" : "Needs more info"}
-        </span>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-[11px]",
+              status === "complete"
+                ? "border-success/40 bg-success/10 text-success"
+                : "border-border bg-charcoal/70 text-ink-faint"
+            )}
+          >
+            {status === "complete" ? "Ready to create" : "Still collecting details"}
+          </span>
+        </div>
+      )}
 
-      {missing.length > 0 ? (
+      {friendlyMissing.length > 0 ? (
         <p className="rounded-xl border border-border bg-charcoal/50 px-3 py-2 text-xs text-ink-dim">
-          Still needed: {missing.slice(0, 8).join(", ")}
-          {missing.length > 8 ? "…" : ""}
+          Still helpful to add: {friendlyMissing.join(", ")}
+          {missing.length > 6 ? "…" : ""}
         </p>
       ) : null}
 
@@ -251,15 +280,33 @@ export function StoryCreationPreview({
         </p>
       ) : null}
 
-      <Button
-        type="button"
-        className="h-12 w-full rounded-xl"
-        disabled={!createEnabled || creating}
-        loading={creating}
-        onClick={onCreate}
+      <div
+        className={cn(
+          "flex flex-col gap-2",
+          onContinueChatting && "sm:flex-row-reverse"
+        )}
       >
-        Create Story
-      </Button>
+        <Button
+          type="button"
+          className="h-11 w-full rounded-xl sm:flex-1"
+          disabled={!createEnabled || creating}
+          loading={creating}
+          onClick={onCreate}
+        >
+          Create Story
+        </Button>
+        {onContinueChatting ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-11 w-full rounded-xl sm:flex-1"
+            disabled={creating}
+            onClick={onContinueChatting}
+          >
+            Continue Chatting
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 }
