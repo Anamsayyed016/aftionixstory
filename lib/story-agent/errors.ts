@@ -14,6 +14,8 @@ export type StoryAgentErrorCode =
   | "MESSAGE_PERSISTENCE_FAILED"
   | "CONVERSATION_STATE_FAILED"
   | "GENERATION_LIMIT_REACHED"
+  | "CONTEXT_MISMATCH"
+  | "CONTEXT_ISOLATION_ERROR"
   | "UNKNOWN_AI_ERROR";
 
 export class StoryAgentError extends Error {
@@ -72,6 +74,10 @@ export function friendlyMessageForCode(
     case "MESSAGE_PERSISTENCE_FAILED":
     case "CONVERSATION_STATE_FAILED":
       return "Reply generate hua, lekin save nahi ho paya. Please retry.";
+    case "CONTEXT_MISMATCH":
+      return "Generated scene didn’t match your requested characters. Previous draft is unchanged—please retry.";
+    case "CONTEXT_ISOLATION_ERROR":
+      return "That draft belonged to another chat. Please retry in this conversation.";
     default:
       return creative
         ? operation === "revise_draft"

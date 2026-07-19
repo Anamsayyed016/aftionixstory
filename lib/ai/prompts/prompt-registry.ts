@@ -93,11 +93,22 @@ export function assemblePromptSections(params: {
   ) {
     sections.push(buildContinuitySection(ctx));
     sections.push(buildCharacterSection(ctx));
+    if (ctx.relationships.length) {
+      sections.push(
+        `RELATIONSHIPS:\n${ctx.relationships
+          .map((r) => `- ${r.from} → ${r.to}: ${r.type}`)
+          .join("\n")}`
+      );
+    }
     sections.push(buildLanguageSection(ctx));
     sections.push(buildStyleSection(style));
     sections.push(buildConstraintsSection(ctx));
-    if (operation === "revise_draft" && ctx.latestDraftPreview) {
-      sections.push(`PREVIOUS DRAFT:\n${ctx.latestDraftPreview}`);
+    if (
+      (operation === "revise_draft" || operation === "continue_episode") &&
+      ctx.includeLatestDraft &&
+      ctx.latestDraftPreview
+    ) {
+      sections.push(`LATEST DRAFT (relevant to this operation):\n${ctx.latestDraftPreview}`);
     }
   } else if (
     operation === "conversational_chat" ||

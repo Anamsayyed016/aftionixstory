@@ -3,6 +3,7 @@ import {
   readLanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
 import { isConceptCreateRequest } from "@/lib/story-agent/concept-reply";
+import { looksLikeFreshSceneRequest } from "@/lib/story-agent/entity-resolver";
 import { detectStyleFeedback, readStyleProfile } from "@/lib/story-agent/style-profile";
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import type { StoryMemory } from "@/lib/story-agent/schema";
@@ -55,6 +56,11 @@ const WRITE_SCENE = [
   /\b\d{3,4}\s*[-–—]\s*\d{3,4}\s*words?\b/i,
   /\bscene\s+between\b/i,
   /\blikho\s+.*(scene|dialogue)\b/i,
+  /\bbuild\s+(the\s+)?.+\b(kiss|scene|moment|argument|opening)\b/i,
+  /\b(create|make)\s+(a\s+|an\s+)?(kiss|argument|opening)\s+scene\b/i,
+  /\b(kiss|argument|fight|confession)\s+scene\b/i,
+  /\baround\s+an?\s+(internal\s+)?conflict\b/i,
+  /\bmake\s+their\s+\w+\s+emotionally\b/i,
 ];
 
 const START_STORY = [
@@ -212,8 +218,16 @@ export function routeIntent(
   });
   const lang = detectLanguageInstruction(text, existingLang);
 
+  const freshSceneRequest =
+    looksLikeFreshSceneRequest(text) || anyMatch(WRITE_SCENE, text);
+
   // 3. Language / style revision when an unsaved draft exists
-  if (hasDraft(memory) && (lang.matched || anyMatch(REVISE, text))) {
+  // Fresh scene requests must NOT become revise_draft just because a draft exists
+  if (
+    !freshSceneRequest &&
+    hasDraft(memory) &&
+    (lang.matched || anyMatch(REVISE, text))
+  ) {
     return {
       operation: "revise_draft",
       confidence: "high",
@@ -258,13 +272,15 @@ export function routeIntent(
   }
 
   // 4. Creative writing commands
-  if (anyMatch(WRITE_SCENE, text)) {
+  if (freshSceneRequest) {
     return {
       operation: "write_scene",
       confidence: "high",
       skipClassifier: true,
       clearGenerationBlock: true,
-      reason: "write_scene_pattern",
+      reason: looksLikeFreshSceneRequest(text)
+        ? "fresh_scene_request"
+        : "write_scene_pattern",
       languageLabel: lang.matched ? lang.detectedLabel : undefined,
     };
   }

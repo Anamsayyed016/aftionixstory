@@ -27,6 +27,7 @@ import {
   looksLikeOnboardingGreeting,
   responseMentionsTopic,
 } from "@/lib/story-agent/concept-reply";
+import { resolveSceneRequest } from "@/lib/story-agent/entity-resolver";
 import {
   detectLanguageInstruction,
   languagePrefsToStoryLanguageLabel,
@@ -182,6 +183,18 @@ function creativeSuggestions(): Array<{ label: string; prompt: string }> {
       prompt: "Revise the previous scene and add UPPERCASE for loud dialogues.",
     },
   ];
+}
+
+function buildWriteSceneAck(userMessage: string): string {
+  const resolved = resolveSceneRequest(userMessage);
+  const names = resolved.characterNames;
+  const pair =
+    names.length >= 2
+      ? `${names[0]} aur ${names[1]}`
+      : names[0] || "characters";
+  const conflict = resolved.conflictHints[0] || "emotional tension";
+  const action = resolved.actionHints[0] || "scene";
+  return `Bilkul ❤️ Main ${pair} ki ${action} ko ${conflict} ke around build karti hoon—slow, emotional, aur natural. Scene draft niche ready hai.`;
 }
 
 async function runStructuredAgent(params: {
@@ -347,16 +360,7 @@ export async function runStoryOperation(params: {
       suggestions,
       memory,
       storyId: params.storyId,
-      draft: memory.latestDraft?.content
-        ? {
-            title: memory.latestDraft.title || "Draft",
-            content: memory.latestDraft.content,
-            wordCount: memory.latestDraft.wordCount || 0,
-            draftKind: "scene",
-            saved: false,
-            clientRequestId: memory.latestDraft.clientRequestId || "",
-          }
-        : null,
+      draft: null,
       showReview: false,
       actionType: "none",
       actionOk: true,
@@ -481,16 +485,7 @@ export async function runStoryOperation(params: {
       suggestions,
       memory,
       storyId: params.storyId,
-      draft: memory.latestDraft?.content
-        ? {
-            title: memory.latestDraft.title || "Draft",
-            content: memory.latestDraft.content,
-            wordCount: memory.latestDraft.wordCount || 0,
-            draftKind: "scene",
-            saved: false,
-            clientRequestId: memory.latestDraft.clientRequestId || "",
-          }
-        : null,
+      draft: null,
       showReview: false,
       actionType: "suggest_options",
       actionOk: true,
@@ -508,11 +503,16 @@ export async function runStoryOperation(params: {
     (operation === "revise_draft" && route.skipClassifier)
   ) {
     try {
+      memory = seedMemoryFromMessage(memory, params.userMessage);
+      const previousDraft = memory.latestDraft;
       const scene = await generateWriteScene({
         userId: params.userId,
         memory,
         userMessage: params.userMessage,
         mode: operation === "revise_draft" ? "revise" : "scene",
+        conversationId: params.conversationId,
+        storyId: params.storyId,
+        recentMessages: params.recentMessages,
       });
 
       const clientRequestId = `ep_${params.turnRequestId}`;
@@ -524,6 +524,7 @@ export async function runStoryOperation(params: {
           wordCount: scene.wordCount,
           clientRequestId,
           action: operation === "revise_draft" ? "REGENERATE" : "NEW_EPISODE",
+          sourceConversationId: params.conversationId,
         },
         updatedAt: new Date().toISOString(),
       };
@@ -531,8 +532,9 @@ export async function runStoryOperation(params: {
       const assistantReply =
         operation === "revise_draft"
           ? `Here’s a revised draft (${scene.wordCount} words). It’s unsaved — rewrite, continue, or use it in your story when you’re ready.`
-          : `Here’s a scene draft (${scene.wordCount} words). It’s unsaved — you can rewrite, make it more emotional, continue, or save it into a story later.`;
+          : buildWriteSceneAck(params.userMessage);
 
+      const resolved = resolveSceneRequest(params.userMessage, memory);
       console.info(
         JSON.stringify({
           event: "story_operation.turn",
@@ -549,6 +551,11 @@ export async function runStoryOperation(params: {
           responseLength: scene.content.length,
           retryCount: scene.retryCount,
           languageComplianceRetry: scene.languageComplianceRetry ?? false,
+          relevanceRetry: scene.relevanceRetry ?? false,
+          contextMismatch: scene.contextMismatch ?? false,
+          requestedEntityFingerprints: resolved.fingerprints,
+          latestDraftSourceConversationId: params.conversationId,
+          previousDraftPresent: Boolean(previousDraft?.content),
           validation: "ok",
           conversationId: params.conversationId,
           turnRequestId: params.turnRequestId,
@@ -697,6 +704,9 @@ export async function runStoryOperation(params: {
           memory,
           userMessage: params.userMessage,
           mode: "scene",
+          conversationId: params.conversationId,
+          storyId: params.storyId,
+          recentMessages: params.recentMessages,
         });
         const clientRequestId = `ep_${params.turnRequestId}`;
         memory = {
@@ -707,12 +717,13 @@ export async function runStoryOperation(params: {
             wordCount: scene.wordCount,
             clientRequestId,
             action: "NEW_EPISODE",
+            sourceConversationId: params.conversationId,
           },
         };
         return {
           resultType: "creative_draft",
           operation: "write_scene",
-          assistantReply: `Here’s a draft (${scene.wordCount} words). Unsaved — rewrite or continue anytime.`,
+          assistantReply: buildWriteSceneAck(params.userMessage),
           suggestions: creativeSuggestions(),
           memory,
           storyId: params.storyId,
@@ -882,16 +893,7 @@ export async function runStoryOperation(params: {
             },
           },
       storyId: params.storyId,
-      draft: memory.latestDraft?.content
-        ? {
-            title: memory.latestDraft.title || "Draft",
-            content: memory.latestDraft.content,
-            wordCount: memory.latestDraft.wordCount || 0,
-            draftKind: "scene",
-            saved: false,
-            clientRequestId: memory.latestDraft.clientRequestId || "",
-          }
-        : null,
+      draft: null,
       showReview: false,
       actionType: "none",
       actionOk: true,
@@ -919,6 +921,9 @@ export async function runStoryOperation(params: {
           memory: mergeDecisionIntoMemory(memory, agent.decision),
           userMessage: params.userMessage,
           mode: creativeOp === "revise_draft" ? "revise" : "scene",
+          conversationId: params.conversationId,
+          storyId: params.storyId,
+          recentMessages: params.recentMessages,
         });
         memory = mergeDecisionIntoMemory(memory, agent.decision);
         const clientRequestId = `ep_${params.turnRequestId}`;
@@ -930,6 +935,7 @@ export async function runStoryOperation(params: {
             wordCount: scene.wordCount,
             clientRequestId,
             action: creativeOp === "revise_draft" ? "REGENERATE" : "NEW_EPISODE",
+            sourceConversationId: params.conversationId,
           },
         };
         return {
@@ -1043,16 +1049,7 @@ export async function runStoryOperation(params: {
         : (routed.result.suggestions ?? []),
     memory,
     storyId: routed.result.storyId ?? params.storyId,
-    draft: memory.latestDraft?.content
-      ? {
-          title: memory.latestDraft.title || "Draft",
-          content: memory.latestDraft.content,
-          wordCount: memory.latestDraft.wordCount || 0,
-          draftKind: "scene",
-          saved: false,
-          clientRequestId: memory.latestDraft.clientRequestId || "",
-        }
-      : null,
+    draft: null,
     showReview: Boolean(routed.result.showReview),
     actionType: routed.result.type,
     actionOk: routed.result.ok,

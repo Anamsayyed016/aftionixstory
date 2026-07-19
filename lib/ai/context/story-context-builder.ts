@@ -1,14 +1,22 @@
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import {
+  extractMentionedCharacters,
+  resolveSceneRequest,
+} from "@/lib/story-agent/entity-resolver";
+import {
   detectLanguageInstruction,
   languagePrefsToStoryLanguageLabel,
   readLanguagePreferences,
   type LanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
 
+export { extractMentionedCharacters } from "@/lib/story-agent/entity-resolver";
+
 export type CompactStoryContext = {
   operation: StoryOperation;
+  conversationId?: string;
+  storyId?: string | null;
   userInstruction: string;
   languageHint: string;
   languagePrefs: LanguagePreferences;
@@ -43,9 +51,15 @@ export type CompactStoryContext = {
     avoid: string[];
   };
   latestDraftPreview?: string;
+  includeLatestDraft: boolean;
   recentMessages: Array<{ role: string; content: string }>;
   wordTarget?: { min?: number; max?: number };
   namedInRequest: string[];
+  actionHints: string[];
+  conflictHints: string[];
+  settingOverride?: string;
+  /** Safe section labels for diagnostics (no content). */
+  promptSectionNames: string[];
 };
 
 /** Pull length hints like 300–500 words from the user message. */
@@ -64,35 +78,6 @@ export function extractWordTarget(
     return { min: Math.floor(n * 0.85), max: Math.ceil(n * 1.15) };
   }
   return undefined;
-}
-
-/**
- * Lightweight character mentions from free text, e.g.
- * "between Azar (college owner) and Anaya (student)"
- */
-export function extractMentionedCharacters(
-  message: string
-): Array<{ name: string; role?: string }> {
-  const found: Array<{ name: string; role?: string }> = [];
-  const withRole =
-    /\b([A-Z][a-zA-Z]{1,30})\s*\(([^)]{1,80})\)/g;
-  let m: RegExpExecArray | null;
-  while ((m = withRole.exec(message)) !== null) {
-    found.push({ name: m[1], role: m[2].trim() });
-  }
-
-  const between = message.match(
-    /\bbetween\s+([A-Z][a-zA-Z]{1,30})(?:\s*\([^)]*\))?\s+and\s+([A-Z][a-zA-Z]{1,30})/i
-  );
-  if (between) {
-    for (const name of [between[1], between[2]]) {
-      if (!found.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
-        found.push({ name });
-      }
-    }
-  }
-
-  return found;
 }
 
 function detectLanguageHint(message: string, memory: StoryMemory): string {
@@ -127,16 +112,36 @@ function detectLanguageHint(message: string, memory: StoryMemory): string {
 
 /**
  * Builds a compact, operation-scoped context — never the entire DB.
+ * Only uses the active conversation's memory + recent messages.
  */
 export function buildStoryContext(params: {
   operation: StoryOperation;
   memory: StoryMemory;
   userMessage: string;
   recentMessages?: Array<{ role: string; content: string }>;
+  conversationId?: string;
+  storyId?: string | null;
 }): CompactStoryContext {
   const { operation, memory, userMessage } = params;
+
+  // Isolation: refuse mismatched draft source when tagged
+  const draftSource = (
+    memory.latestDraft as { sourceConversationId?: string } | null | undefined
+  )?.sourceConversationId;
+  if (
+    params.conversationId &&
+    draftSource &&
+    draftSource !== params.conversationId
+  ) {
+    throw new Error("CONTEXT_ISOLATION_ERROR");
+  }
+
+  const resolved = resolveSceneRequest(userMessage, memory);
   const mentioned = extractMentionedCharacters(userMessage);
-  const namedInRequest = mentioned.map((c) => c.name);
+  const namedInRequest =
+    resolved.characterNames.length > 0
+      ? resolved.characterNames
+      : mentioned.map((c) => c.name);
 
   // Merge mentioned roles into character list for creative ops
   const charMap = new Map(
@@ -160,6 +165,20 @@ export function buildStoryContext(params: {
       charMap.set(key, { ...existing, role: m.role });
     }
   }
+  // Ensure resolved names exist even if extractor casing differed
+  for (const name of namedInRequest) {
+    const key = name.toLowerCase();
+    if (!charMap.has(key)) {
+      charMap.set(key, {
+        name,
+        personality: [],
+        goals: [],
+        conflicts: [],
+        notes: [],
+        avoid: [],
+      });
+    }
+  }
 
   let characters = Array.from(charMap.values()).map((c) => ({
     name: c.name,
@@ -169,15 +188,35 @@ export function buildStoryContext(params: {
     notes: c.notes ?? [],
   }));
 
-  // For write_scene: prefer characters named in the request when present
-  if (
-    (operation === "write_scene" || operation === "revise_draft") &&
-    namedInRequest.length > 0
-  ) {
+  // Fresh write_scene: current request characters win — drop unrelated cast
+  const isCreativeWrite =
+    operation === "write_scene" ||
+    operation === "start_story" ||
+    operation === "generate_episode";
+  if (isCreativeWrite && namedInRequest.length > 0) {
     const preferred = characters.filter((c) =>
       namedInRequest.some((n) => n.toLowerCase() === c.name.toLowerCase())
     );
     if (preferred.length > 0) characters = preferred;
+  } else if (operation === "revise_draft" && namedInRequest.length > 0) {
+    const preferred = characters.filter((c) =>
+      namedInRequest.some((n) => n.toLowerCase() === c.name.toLowerCase())
+    );
+    if (preferred.length > 0) characters = preferred;
+  }
+
+  const nameSet = new Set(characters.map((c) => c.name.toLowerCase()));
+  let relationships = memory.relationships.map((r) => ({
+    from: r.from,
+    to: r.to,
+    type: r.type,
+    notes: r.notes ?? undefined,
+  }));
+  if (isCreativeWrite && namedInRequest.length > 0) {
+    relationships = relationships.filter(
+      (r) =>
+        nameSet.has(r.from.toLowerCase()) || nameSet.has(r.to.toLowerCase())
+    );
   }
 
   // Casual chat: compact memory only
@@ -194,17 +233,16 @@ export function buildStoryContext(params: {
         m.content.length > 600 ? `${m.content.slice(0, 600)}…` : m.content,
     }));
 
+  // Only include previous draft for revise/continue — never for fresh write_scene
+  const includeLatestDraft =
+    Boolean(memory.latestDraft?.content) &&
+    (operation === "revise_draft" || operation === "continue_episode");
+
   const draftContent = memory.latestDraft?.content;
   const latestDraftPreview =
-    operation === "revise_draft" ||
-    operation === "continue_episode" ||
-    operation === "write_scene"
-      ? draftContent
-        ? draftContent.slice(0, operation === "revise_draft" ? 12000 : 1200)
-        : undefined
-      : draftContent
-        ? draftContent.slice(0, 400)
-        : undefined;
+    includeLatestDraft && draftContent
+      ? draftContent.slice(0, operation === "revise_draft" ? 12000 : 2000)
+      : undefined;
 
   const basePrefs = readLanguagePreferences({
     narrationLanguage: memory.userPreferences.narrationLanguage,
@@ -216,27 +254,49 @@ export function buildStoryContext(params: {
   const langDetect = detectLanguageInstruction(userMessage, basePrefs);
   const languagePrefs = langDetect.matched ? langDetect.resolved : basePrefs;
 
+  // When request names different leads, do not let an old title/concept dominate
+  const memoryCast = memory.characters.map((c) => c.name.toLowerCase());
+  const requestCast = namedInRequest.map((n) => n.toLowerCase());
+  const castConflict =
+    requestCast.length > 0 &&
+    memoryCast.length > 0 &&
+    !requestCast.some((n) => memoryCast.includes(n));
+
+  const setting =
+    resolved.settingOverride ||
+    (castConflict && isCreativeWrite
+      ? undefined
+      : memory.storyMemory.setting);
+
+  const promptSectionNames = [
+    "CURRENT_REQUEST",
+    "REQUESTED_CHARACTERS",
+    "ACTIVE_STORY_MEMORY",
+    "RELATIONSHIPS",
+    "STYLE_PREFERENCES",
+    "CONSTRAINTS",
+    "OUTPUT_REQUIREMENTS",
+  ];
+  if (includeLatestDraft) promptSectionNames.push("LATEST_DRAFT");
+
   return {
     operation,
+    conversationId: params.conversationId,
+    storyId: params.storyId ?? null,
     userInstruction: userMessage,
     languageHint: detectLanguageHint(userMessage, memory),
     languagePrefs,
-    concept: memory.storyMemory.concept,
-    title: memory.storyMemory.title,
+    concept: castConflict && isCreativeWrite ? undefined : memory.storyMemory.concept,
+    title: castConflict && isCreativeWrite ? undefined : memory.storyMemory.title,
     genre: memory.storyMemory.genre ?? [],
     tone: memory.storyMemory.tone ?? [],
-    setting: memory.storyMemory.setting,
-    plot: memory.storyMemory.plot,
+    setting,
+    plot: castConflict && isCreativeWrite ? undefined : memory.storyMemory.plot,
     pov: memory.storyMemory.pov,
     pacing: memory.storyMemory.pacing,
     writingStyle: memory.storyMemory.writingStyle,
     characters,
-    relationships: memory.relationships.map((r) => ({
-      from: r.from,
-      to: r.to,
-      type: r.type,
-      notes: r.notes ?? undefined,
-    })),
+    relationships,
     writingRules: memory.writingRules.map((r) => r.rule),
     preferences: {
       dialogueLanguage:
@@ -251,9 +311,14 @@ export function buildStoryContext(params: {
       avoid: memory.userPreferences.avoid ?? [],
     },
     latestDraftPreview,
+    includeLatestDraft,
     recentMessages,
     wordTarget: extractWordTarget(userMessage),
     namedInRequest,
+    actionHints: resolved.actionHints,
+    conflictHints: resolved.conflictHints,
+    settingOverride: resolved.settingOverride,
+    promptSectionNames,
   };
 }
 

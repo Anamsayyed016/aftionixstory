@@ -135,6 +135,8 @@ export const latestDraftSchema = z
     clientRequestId: z.string().optional(),
     action: z.string().optional(),
     replaceEpisodeId: z.string().optional(),
+    /** Conversation that owns this draft — isolation guard. */
+    sourceConversationId: z.string().optional(),
   })
   .nullable()
   .optional();

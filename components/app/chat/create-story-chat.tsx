@@ -112,6 +112,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   } | null>(null);
   const [lastOperation, setLastOperation] = useState<string>("conversational_chat");
   const [feedbackHint, setFeedbackHint] = useState<string | null>(null);
+  const [contextHint, setContextHint] = useState<string | null>(null);
   const sendingLockRef = useRef(false);
   const createLockRef = useRef(false);
   const lastFailedPromptRef = useRef<string | null>(null);
@@ -317,6 +318,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
       setMessages([]);
       setReviewOpen(false);
       setEpisodePreview(null);
+      setContextHint(null);
       setSuggestions([]);
       setMemoryStatus("Building your story world");
       setPersistHint("New chat");
@@ -413,16 +415,37 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
             prompt: s.prompt,
           }))
         );
-        setEpisodePreview(
-          result.data.draft
-            ? {
-                title: result.data.draft.title,
-                content: result.data.draft.content,
-                wordCount: result.data.draft.wordCount,
-                draftKind: result.data.draft.draftKind,
-              }
-            : null
-        );
+        // Only replace draft panel when this turn produced a creative draft
+        if (result.data.resultType === "creative_draft" && result.data.draft) {
+          setEpisodePreview({
+            title: result.data.draft.title,
+            content: result.data.draft.content,
+            wordCount: result.data.draft.wordCount,
+            draftKind: result.data.draft.draftKind,
+          });
+          const names = (result.data.memory.characters ?? [])
+            .map((c) => c.name)
+            .filter(Boolean)
+            .slice(0, 4);
+          const lang =
+            result.data.memory.userPreferences.dialogueLanguage ||
+            result.data.memory.storyMemory.language ||
+            "";
+          setContextHint(
+            [
+              names.length ? names.join(", ") : null,
+              result.data.operation === "write_scene"
+                ? "Scene request"
+                : null,
+              lang || null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || null
+          );
+        } else if (result.data.resultType === "error") {
+          // Keep prior draft visible; do not paint unrelated draft from chat turns
+        }
+        // conversational turns: do not echo stale latestDraft into the preview
         if (result.data.showReview) setReviewOpen(true);
         if (result.data.actionType === "create_story" && result.data.actionOk) {
           setReviewOpen(false);
@@ -653,6 +676,13 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
                     {episodePreview.wordCount} words
                   </p>
                 </div>
+                {contextHint ? (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-[11px] text-ink-faint hover:text-ink-dim">
+                      Using: {contextHint}
+                    </summary>
+                  </details>
+                ) : null}
                 <p className="mt-0.5 truncate text-sm font-medium text-ink">
                   {episodePreview.title}
                 </p>
