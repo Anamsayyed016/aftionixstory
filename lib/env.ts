@@ -20,21 +20,23 @@ const baseSchema = z.object({
 
 const aiSchema = z
   .object({
-    AI_PROVIDER: z.enum(["gemini", "mock"]).default("gemini"),
+    AI_PROVIDER: z.enum(["gemini", "openai", "mock"]).default("gemini"),
     GEMINI_API_KEY: z.string().optional().default(""),
-    GEMINI_STORY_MODEL: z.string().default("gemini-2.0-flash"),
-    GEMINI_SUMMARY_MODEL: z.string().default("gemini-2.0-flash"),
+    // Verified against production Gemini listModels + generateContent probe (2026-07).
+    GEMINI_STORY_MODEL: z.string().default("gemini-3.1-flash-lite"),
+    GEMINI_SUMMARY_MODEL: z.string().default("gemini-3.1-flash-lite"),
+    OPENAI_API_KEY: z.string().optional().default(""),
+    OPENAI_STORY_MODEL: z.string().default("gpt-5-mini"),
+    OPENAI_SUMMARY_MODEL: z.string().default("gpt-5-nano"),
     AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
     AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
     AI_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     AI_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   })
   .superRefine((data, ctx) => {
-    if (data.AI_PROVIDER === "gemini" && !data.GEMINI_API_KEY.trim()) {
-      // Soft: validated at request time via getAiEnvStrict / provider.
-      // Build-time may not have keys; keep optional at parse.
-      void ctx;
-    }
+    // Soft: keys validated at request time / provider. Build may lack secrets.
+    void ctx;
+    void data;
   });
 
 export type ServerEnv = z.infer<typeof baseSchema>;
@@ -61,11 +63,17 @@ function readRawAiEnv() {
     AI_PROVIDER: process.env.AI_PROVIDER || "gemini",
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
     GEMINI_STORY_MODEL:
-      process.env.GEMINI_STORY_MODEL || "gemini-2.0-flash",
+      process.env.GEMINI_STORY_MODEL || "gemini-3.1-flash-lite",
     GEMINI_SUMMARY_MODEL:
       process.env.GEMINI_SUMMARY_MODEL ||
       process.env.GEMINI_STORY_MODEL ||
-      "gemini-2.0-flash",
+      "gemini-3.1-flash-lite",
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+    OPENAI_STORY_MODEL: process.env.OPENAI_STORY_MODEL || "gpt-5-mini",
+    OPENAI_SUMMARY_MODEL:
+      process.env.OPENAI_SUMMARY_MODEL ||
+      process.env.OPENAI_STORY_MODEL ||
+      "gpt-5-nano",
     AI_REQUEST_TIMEOUT_MS: process.env.AI_REQUEST_TIMEOUT_MS || "60000",
     AI_MAX_RETRIES: process.env.AI_MAX_RETRIES || "2",
     AI_RATE_LIMIT_WINDOW_MS: process.env.AI_RATE_LIMIT_WINDOW_MS || "60000",
@@ -104,13 +112,40 @@ export function getAiEnv(): AiEnv {
   return cachedAi;
 }
 
-/** Require Gemini key when provider is gemini (call before generation). */
-export function assertGeminiConfigured(): AiEnv {
+/** Active story model for the configured AI_PROVIDER. */
+export function resolveStoryModel(env: AiEnv = getAiEnv()): string {
+  if (env.AI_PROVIDER === "openai") return env.OPENAI_STORY_MODEL;
+  return env.GEMINI_STORY_MODEL;
+}
+
+/** Active summary model for the configured AI_PROVIDER. */
+export function resolveSummaryModel(env: AiEnv = getAiEnv()): string {
+  if (env.AI_PROVIDER === "openai") return env.OPENAI_SUMMARY_MODEL;
+  return env.GEMINI_SUMMARY_MODEL;
+}
+
+/** Whether the active provider's API key is present (never returns the key). */
+export function isActiveAiKeyPresent(env: AiEnv = getAiEnv()): boolean {
+  if (env.AI_PROVIDER === "openai") return Boolean(env.OPENAI_API_KEY.trim());
+  if (env.AI_PROVIDER === "gemini") return Boolean(env.GEMINI_API_KEY.trim());
+  return true;
+}
+
+/** Require provider key when using a live AI provider. */
+export function assertAiProviderConfigured(): AiEnv {
   const env = getAiEnv();
   if (env.AI_PROVIDER === "gemini" && !env.GEMINI_API_KEY.trim()) {
     throw new Error("AI_NOT_CONFIGURED");
   }
+  if (env.AI_PROVIDER === "openai" && !env.OPENAI_API_KEY.trim()) {
+    throw new Error("AI_NOT_CONFIGURED");
+  }
   return env;
+}
+
+/** @deprecated Prefer assertAiProviderConfigured */
+export function assertGeminiConfigured(): AiEnv {
+  return assertAiProviderConfigured();
 }
 
 export function isGoogleOAuthConfigured(): boolean {

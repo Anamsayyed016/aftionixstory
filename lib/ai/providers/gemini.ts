@@ -2,12 +2,17 @@ import "server-only";
 
 import { GoogleGenAI } from "@google/genai";
 
-import { AIError, normalizeProviderError } from "@/lib/ai/errors";
+import { AIError, isAIError, normalizeProviderError } from "@/lib/ai/errors";
+import { logAiProviderFailure } from "@/lib/ai/logger";
 import { withRetry } from "@/lib/ai/retry";
 import { withTimeout } from "@/lib/ai/timeout";
 import { estimateTokensFromCharacters } from "@/lib/ai/token-estimator";
 import type { AIProvider, GenerateTextInput, GenerateTextResult } from "@/lib/ai/types";
 import { getAiEnv } from "@/lib/env";
+
+function newRequestId() {
+  return `ai_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
@@ -20,13 +25,17 @@ export class GeminiProvider implements AIProvider {
 
     const model = input.model || env.GEMINI_STORY_MODEL;
     const started = Date.now();
+    const requestId = newRequestId();
+    const operation = input.operation || "generate_text";
+    let attempts = 0;
     const inputCharacters =
       input.systemInstruction.length + input.prompt.length;
 
     try {
       const text = await withRetry(
-        () =>
-          withTimeout(
+        async () => {
+          attempts += 1;
+          return withTimeout(
             this.callGemini({
               apiKey: env.GEMINI_API_KEY,
               model,
@@ -34,7 +43,8 @@ export class GeminiProvider implements AIProvider {
             }),
             env.AI_REQUEST_TIMEOUT_MS,
             input.signal
-          ),
+          );
+        },
         { maxRetries: env.AI_MAX_RETRIES }
       );
 
@@ -61,7 +71,18 @@ export class GeminiProvider implements AIProvider {
         estimatedOutputTokens: estimateTokensFromCharacters(outputCharacters),
       };
     } catch (error) {
-      throw normalizeProviderError(error);
+      const normalized = isAIError(error) ? error : normalizeProviderError(error);
+      logAiProviderFailure({
+        requestId,
+        provider: this.name,
+        model,
+        code: normalized.code,
+        httpStatus: normalized.status,
+        retryCount: Math.max(0, attempts - 1),
+        durationMs: Date.now() - started,
+        operation,
+      });
+      throw normalized;
     }
   }
 

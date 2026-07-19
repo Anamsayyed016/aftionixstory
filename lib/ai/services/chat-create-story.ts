@@ -6,7 +6,7 @@ import {
 } from "@/lib/chat/create-story-extraction";
 import { AIError, isAIError } from "@/lib/ai/errors";
 import type { AIProvider } from "@/lib/ai/types";
-import { getAiEnv } from "@/lib/env";
+import { getAiEnv, resolveStoryModel } from "@/lib/env";
 import type { CreateStoryWizardInput } from "@/lib/validations/story";
 
 export type ChatTurn = {
@@ -152,7 +152,8 @@ async function generateExtractionText(
     prompt,
     temperature: 0.4,
     maxOutputTokens: 4096,
-    model: env.GEMINI_STORY_MODEL,
+    model: resolveStoryModel(env),
+    operation: "chat_create_story",
   });
 }
 

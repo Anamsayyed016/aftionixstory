@@ -3,7 +3,7 @@
 import { z } from "zod";
 
 import { runChatCreateStoryTurn } from "@/lib/ai/services/chat-create-story";
-import { isAIError } from "@/lib/ai/errors";
+import { toFriendlyAiActionError } from "@/lib/ai/action-errors";
 import { requireAuthenticatedUser } from "@/lib/auth/authorization";
 import { fail, ok, type ActionResult } from "@/lib/actions/result";
 import {
@@ -36,9 +36,8 @@ export type ChatCreateStoryActionData = {
 };
 
 function toFriendlyAiError(error: unknown): ActionResult<never> {
-  if (isAIError(error)) {
-    return fail(error.code, error.message);
-  }
+  const mapped = toFriendlyAiActionError(error);
+  if (mapped) return mapped;
   if (error instanceof Error && error.message === "AI_NOT_CONFIGURED") {
     return fail(
       "AI_NOT_CONFIGURED",

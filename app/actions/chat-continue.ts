@@ -3,7 +3,7 @@
 import { z } from "zod";
 
 import { runContinueStoryChatTurn } from "@/lib/ai/services/chat-continue-story";
-import { isAIError } from "@/lib/ai/errors";
+import { toFriendlyAiActionError } from "@/lib/ai/action-errors";
 import { DuplicateGenerationError } from "@/lib/ai/services/generate-episode";
 import {
   AuthzError,
@@ -63,9 +63,8 @@ function mapError(error: unknown): ActionResult<never> {
   if (error instanceof DuplicateGenerationError) {
     return fail(error.code, error.message);
   }
-  if (isAIError(error)) {
-    return fail(error.code, error.message);
-  }
+  const aiMapped = toFriendlyAiActionError(error);
+  if (aiMapped) return aiMapped;
   if (error instanceof AuthzError) {
     const mapped = authzToActionError(error);
     return fail(mapped.code, mapped.message);

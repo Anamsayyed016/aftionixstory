@@ -10,7 +10,7 @@ import { parseEpisodeOutput } from "@/lib/ai/response-parser";
 import { countWords } from "@/lib/ai/token-estimator";
 import { prisma } from "@/lib/db";
 import { loadGenerationContext } from "@/lib/data/episodes";
-import { getAiEnv } from "@/lib/env";
+import { getAiEnv, resolveStoryModel } from "@/lib/env";
 import {
   assertGenerationRateLimit,
   assertWithinGenerationLimit,
@@ -160,7 +160,8 @@ export async function generateEpisodeDraft(params: {
       prompt: built.prompt,
       temperature: 0.9,
       maxOutputTokens: 4096,
-      model: env.GEMINI_STORY_MODEL,
+      model: resolveStoryModel(env),
+      operation: "generate_episode",
     });
 
     const parsed = parseEpisodeOutput(
@@ -207,7 +208,7 @@ export async function generateEpisodeDraft(params: {
           userId: params.userId,
           storyId: params.storyId,
           provider: provider.name,
-          model: env.GEMINI_STORY_MODEL,
+          model: resolveStoryModel(env),
           action: params.action,
           durationMs: Date.now() - started,
           success: false,

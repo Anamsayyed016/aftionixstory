@@ -6,7 +6,7 @@ import { isAIError } from "@/lib/ai/errors";
 import { buildSummaryPrompt } from "@/lib/ai/prompt-builder";
 import { getAIProvider } from "@/lib/ai/registry";
 import { parseSummaryOutput } from "@/lib/ai/response-parser";
-import { getAiEnv } from "@/lib/env";
+import { getAiEnv, resolveSummaryModel } from "@/lib/env";
 
 export async function generateEpisodeSummaryText(params: {
   storyTitle: string;
@@ -31,7 +31,8 @@ export async function generateEpisodeSummaryText(params: {
       prompt: built.prompt,
       temperature: 0.4,
       maxOutputTokens: 800,
-      model: env.GEMINI_SUMMARY_MODEL,
+      model: resolveSummaryModel(env),
+      operation: "generate_episode_summary",
     });
     return { summary: parseSummaryOutput(result.text) };
   } catch (error) {
@@ -68,7 +69,8 @@ export async function generateRollingStorySummaryText(params: {
       prompt: built.prompt,
       temperature: 0.3,
       maxOutputTokens: 900,
-      model: env.GEMINI_SUMMARY_MODEL,
+      model: resolveSummaryModel(env),
+      operation: "generate_rolling_summary",
     });
     return { summary: parseSummaryOutput(result.text) };
   } catch (error) {

@@ -1,9 +1,26 @@
-import "server-only";
-
 import { AIError, isAIError, normalizeProviderError } from "@/lib/ai/errors";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Transient failures eligible for retry. Permanent failures never retry. */
+export function shouldRetryAIError(error: AIError): boolean {
+  switch (error.code) {
+    case "AI_QUOTA_EXCEEDED":
+    case "AI_NOT_CONFIGURED":
+    case "AI_INVALID_MODEL":
+    case "AI_CONTENT_BLOCKED":
+    case "AI_INVALID_RESPONSE":
+      return false;
+    case "AI_RATE_LIMITED":
+    case "AI_TIMEOUT":
+    case "AI_PROVIDER_UNAVAILABLE":
+    case "AI_REQUEST_FAILED":
+      return error.retryable;
+    default:
+      return false;
+  }
 }
 
 export async function withRetry<T>(
@@ -20,7 +37,8 @@ export async function withRetry<T>(
     } catch (error) {
       const normalized = isAIError(error) ? error : normalizeProviderError(error);
       lastError = normalized;
-      const canRetry = normalized.retryable && attempt < maxRetries;
+      const canRetry =
+        shouldRetryAIError(normalized) && attempt < maxRetries;
       if (!canRetry) throw normalized;
       const delay = baseDelayMs * Math.pow(2, attempt);
       await sleep(delay);

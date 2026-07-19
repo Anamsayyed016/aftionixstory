@@ -6,6 +6,8 @@ export type GenerateTextInput = {
   signal?: AbortSignal;
   /** Resolved server-side only — never from client. */
   model?: string;
+  /** Safe operation label for structured logs (never user content). */
+  operation?: string;
 };
 
 export type GenerateTextResult = {
@@ -25,4 +27,4 @@ export interface AIProvider {
   generateText(input: GenerateTextInput): Promise<GenerateTextResult>;
 }
 
-export type AIProviderName = "gemini" | "mock";
+export type AIProviderName = "gemini" | "openai" | "mock";

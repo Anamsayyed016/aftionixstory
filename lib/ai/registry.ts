@@ -3,6 +3,7 @@ import "server-only";
 import { AIError } from "@/lib/ai/errors";
 import { GeminiProvider } from "@/lib/ai/providers/gemini";
 import { MockAIProvider } from "@/lib/ai/providers/mock";
+import { OpenAIProvider } from "@/lib/ai/providers/openai";
 import type { AIProvider, AIProviderName } from "@/lib/ai/types";
 import { getAiEnv } from "@/lib/env";
 
@@ -23,6 +24,8 @@ export function getAIProvider(name?: AIProviderName): AIProvider {
       return new MockAIProvider();
     case "gemini":
       return new GeminiProvider();
+    case "openai":
+      return new OpenAIProvider();
     default:
       throw new AIError(
         "AI_NOT_CONFIGURED",
