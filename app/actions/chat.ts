@@ -61,6 +61,11 @@ function coerceCurrentStory(raw: unknown): NormalizedChatStoryDraft | null {
  * Conversational create-story turn.
  * Does not write a Story — only extracts a draft for the user to confirm.
  */
+/**
+ * @deprecated Create Story chat must use `storyAgentTurnAction` instead.
+ * Kept only for Phase 2 extraction unit tests / internal helpers.
+ * Do not call from CreateStoryChat UI.
+ */
 export async function chatCreateStoryAction(
   input: unknown
 ): Promise<ActionResult<ChatCreateStoryActionData>> {

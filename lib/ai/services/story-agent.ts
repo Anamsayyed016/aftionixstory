@@ -8,7 +8,7 @@ import {
 import type { AIProvider } from "@/lib/ai/types";
 import { extractJsonObject } from "@/lib/chat/create-story-extraction";
 import { getAiEnv, resolveAgentModel } from "@/lib/env";
-import { shouldBlockGeneration } from "@/lib/story-agent/intent";
+import { applyControlToDecision, shouldBlockGeneration } from "@/lib/story-agent/intent";
 import {
   applyMemoryPatch,
   emptyStoryMemory,
@@ -44,6 +44,7 @@ export async function runStoryAgentDecision(params: {
   provider: string;
   model: string;
   durationMs: number;
+  agentProfile: "agent";
 }> {
   const provider =
     params.provider ?? (await import("@/lib/ai/registry")).getAIProvider();
@@ -59,8 +60,8 @@ export async function runStoryAgentDecision(params: {
       storyId: params.storyId,
       hasUnsavedDraft: Boolean(params.memory.latestDraft?.content),
     }),
-    temperature: 0.6,
-    maxOutputTokens: 2048,
+    temperature: 0.7,
+    maxOutputTokens: 1600,
     model,
     operation: "story_agent_turn",
     reasoningEffort: "minimal",
@@ -78,10 +79,18 @@ export async function runStoryAgentDecision(params: {
     );
   }
 
-  // Enforce do-not-start preference even if model asks to generate
+  decision = applyControlToDecision(
+    decision,
+    params.userMessage,
+    Boolean(params.memory.userPreferences.doNotStartYet)
+  );
+
+  // Second pass after control preferences may have flipped
   const generationBlocked = shouldBlockGeneration({
     intent: decision.intent,
-    doNotStartYet: params.memory.userPreferences.doNotStartYet,
+    doNotStartYet:
+      Boolean(decision.memoryPatch.preferences?.doNotStartYet) ||
+      Boolean(params.memory.userPreferences.doNotStartYet),
     userMessage: params.userMessage,
   });
 
@@ -93,9 +102,6 @@ export async function runStoryAgentDecision(params: {
     decision = {
       ...decision,
       action: { type: "none", payload: {} },
-      assistantReply:
-        decision.assistantReply ||
-        "Understood — I won’t start writing yet. Tell me when you want to begin.",
     };
   }
 
@@ -104,6 +110,7 @@ export async function runStoryAgentDecision(params: {
     provider: result.provider,
     model: result.model,
     durationMs: result.durationMs,
+    agentProfile: "agent",
   };
 }
 

@@ -235,22 +235,23 @@ export async function storyAgentTurnAction(
     nextMemory = routed.memory;
 
     let assistantReply = decisionResult.decision.assistantReply;
-    if (!routed.result.ok && routed.result.message) {
-      // Prefer conversational decision reply; append action note only when needed
+    if (routed.result.clarificationOnly && routed.result.message) {
+      assistantReply = routed.result.message;
+    } else if (routed.result.ok && routed.result.draft) {
+      const preview = routed.result.draft.content.slice(0, 480);
+      assistantReply = `${assistantReply}\n\n——\nDraft ready: ${routed.result.draft.title}\n\n${preview}${
+        routed.result.draft.content.length > 480 ? "…" : ""
+      }`;
+    } else if (!routed.result.ok && routed.result.message) {
       if (
         decisionResult.decision.action.type !== "none" &&
         !assistantReply.toLowerCase().includes("won’t start") &&
         !assistantReply.toLowerCase().includes("won't start")
       ) {
         assistantReply = `${assistantReply}\n\n${routed.result.message}`;
+      } else if (decisionResult.decision.action.type !== "none") {
+        assistantReply = routed.result.message;
       }
-    }
-    if (
-      routed.result.ok &&
-      routed.result.draft &&
-      decisionResult.decision.action.type !== "none"
-    ) {
-      // Keep reply natural; draft is returned separately for UI
     }
 
     const nextStoryId = routed.result.storyId ?? conversation.storyId;
@@ -268,6 +269,11 @@ export async function storyAgentTurnAction(
       title: nextMemory.storyMemory.title || undefined,
     });
 
+    const buildId =
+      process.env.STORYVERSE_BUILD_ID ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      "local-dev";
+
     await appendOwnedChatMessage({
       userId: user.id,
       conversationId,
@@ -275,14 +281,33 @@ export async function storyAgentTurnAction(
       content: assistantReply,
       requestId: assistantRequestId,
       metadata: {
+        flow: "story_agent",
+        buildId,
         intent: decisionResult.decision.intent,
         actionType: routed.result.type,
         actionOk: routed.result.ok,
         provider: decisionResult.provider,
         model: decisionResult.model,
+        agentProfile: "agent",
         durationMs: decisionResult.durationMs,
       } as Prisma.InputJsonValue,
     });
+
+    console.info(
+      JSON.stringify({
+        event: "story_agent.turn",
+        buildId,
+        flow: "story_agent",
+        intent: decisionResult.decision.intent,
+        actionType: routed.result.type,
+        actionOk: routed.result.ok,
+        provider: decisionResult.provider,
+        model: decisionResult.model,
+        hasDraft: Boolean(routed.result.draft),
+        conversationId,
+        timestamp: new Date().toISOString(),
+      })
+    );
 
     return ok({
       conversationId,

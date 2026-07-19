@@ -2,6 +2,10 @@ import "server-only";
 
 import { createStoryAction } from "@/app/actions/stories";
 import { saveEpisodeAction } from "@/app/actions/episodes";
+import {
+  generateConversationalDraft,
+  hasUsableWritingContext,
+} from "@/lib/ai/services/conversational-draft";
 import { generateEpisodeDraft } from "@/lib/ai/services/generate-episode";
 import {
   getMissingCreateFields,
@@ -30,6 +34,7 @@ export type ActionRouterResult = {
   };
   suggestions?: Array<{ label: string; prompt: string }>;
   data?: unknown;
+  clarificationOnly?: boolean;
 };
 
 export async function routeStoryAgentAction(params: {
@@ -52,12 +57,12 @@ export async function routeStoryAgentAction(params: {
         : actionType === "suggest_options"
           ? [
               {
-                label: "Suggest opening scenes",
-                prompt: "Suggest three opening situations.",
+                label: "Suggest 3 concepts",
+                prompt: "Suggest three unique story concepts for me.",
               },
               {
-                label: "Deepen characters",
-                prompt: "Help me deepen the main characters.",
+                label: "I have a character",
+                prompt: "I have a character idea to start with.",
               },
             ]
           : params.decision.suggestions;
@@ -87,13 +92,13 @@ export async function routeStoryAgentAction(params: {
         result: {
           type: "create_story",
           ok: false,
-          message: `Still need a bit more before creating: ${missing.join(", ")}.`,
+          message:
+            "Almost ready to save — I still need a clearer title feel, genre vibe, language, or main character name before creating the Story record.",
         },
       };
     }
 
     const candidate = memoryToWizardCandidate(memory);
-    // Soft defaults already applied in memoryToWizardCandidate
     const wizard = createStoryWizardSchema.safeParse({
       ...candidate,
       status: "ACTIVE",
@@ -106,7 +111,7 @@ export async function routeStoryAgentAction(params: {
           type: "create_story",
           ok: false,
           message:
-            "I still need a clearer title, genre, language, or main character before creating the story.",
+            "I can keep drafting with you — when you want the Story saved, give me at least a title feel and one named character.",
         },
       };
     }
@@ -144,10 +149,7 @@ export async function routeStoryAgentAction(params: {
     };
   }
 
-  if (
-    actionType === "generate_episode" ||
-    actionType === "revise_draft"
-  ) {
+  if (actionType === "generate_episode" || actionType === "revise_draft") {
     if (params.generationBlocked) {
       return {
         memory,
@@ -155,36 +157,90 @@ export async function routeStoryAgentAction(params: {
           type: actionType,
           ok: false,
           message:
-            "Understood — I won’t start writing yet. Say “start now” when you’re ready.",
+            "Understood — I won’t start writing yet. Say “start the story” when you’re ready.",
         },
       };
     }
 
-    const storyId = params.storyId;
-    if (!storyId) {
-      return {
-        memory,
-        result: {
-          type: actionType,
-          ok: false,
-          message:
-            "We need a created story first. Say “create the story” when the setup feels ready.",
-        },
-      };
-    }
-
-    const action =
-      actionType === "revise_draft" ? "REGENERATE" : "NEW_EPISODE";
     const instruction =
       typeof params.decision.action.payload?.instruction === "string" &&
       params.decision.action.payload.instruction.trim()
         ? String(params.decision.action.payload.instruction)
         : params.userMessage;
 
+    // Path A: no Story yet — conversational opening draft into latestDraft
+    if (!params.storyId) {
+      if (!hasUsableWritingContext(memory)) {
+        return {
+          memory,
+          result: {
+            type: actionType,
+            ok: false,
+            clarificationOnly: true,
+            message:
+              "Bilkul—kis type ki story start karun: romance, thriller, fantasy, ya main ek unique concept choose karun?",
+          },
+        };
+      }
+
+      try {
+        const draft = await generateConversationalDraft({
+          userId: params.userId,
+          memory,
+          userInstruction: instruction,
+          clientRequestId: `ep_${params.turnRequestId}`,
+          reviseExistingContent:
+            actionType === "revise_draft"
+              ? memory.latestDraft?.content ?? null
+              : null,
+        });
+
+        memory = {
+          ...memory,
+          latestDraft: {
+            title: draft.title,
+            content: draft.content,
+            wordCount: draft.wordCount,
+            clientRequestId: draft.clientRequestId,
+            action: draft.action,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+
+        return {
+          memory,
+          result: {
+            type: actionType,
+            ok: true,
+            draft: {
+              title: draft.title,
+              content: draft.content,
+              wordCount: draft.wordCount,
+              clientRequestId: draft.clientRequestId,
+              action: draft.action,
+            },
+          },
+        };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Could not generate the story draft.";
+        return {
+          memory,
+          result: { type: actionType, ok: false, message },
+        };
+      }
+    }
+
+    // Path B: Story exists — reuse full episode pipeline
+    const action =
+      actionType === "revise_draft" ? "REGENERATE" : "NEW_EPISODE";
+
     try {
       const draft = await generateEpisodeDraft({
         userId: params.userId,
-        storyId,
+        storyId: params.storyId,
         userInstruction: instruction,
         action: action as "NEW_EPISODE" | "REGENERATE" | "CONTINUE",
         clientRequestId: `ep_${params.turnRequestId}`,
@@ -198,6 +254,7 @@ export async function routeStoryAgentAction(params: {
           wordCount: draft.wordCount,
           clientRequestId: draft.clientRequestId,
           action: draft.action,
+          replaceEpisodeId: draft.replaceEpisodeId,
         },
         updatedAt: new Date().toISOString(),
       };
@@ -237,7 +294,9 @@ export async function routeStoryAgentAction(params: {
         result: {
           type: "save_episode",
           ok: false,
-          message: "There is no unsaved episode draft to save yet.",
+          message: !params.storyId
+            ? "Create/save the Story first, then I can save this episode to it."
+            : "There is no unsaved episode draft to save yet.",
         },
       };
     }

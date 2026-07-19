@@ -153,14 +153,14 @@ describe("Story Agent intent guards", () => {
       shouldBlockGeneration({
         intent: "start_story",
         doNotStartYet: true,
-        userMessage: "start the story",
+        userMessage: "maybe write a little",
       })
     ).toBe(true);
     expect(
       shouldBlockGeneration({
         intent: "start_story",
         doNotStartYet: true,
-        userMessage: "start the story now",
+        userMessage: "start the story",
       })
     ).toBe(false);
   });
@@ -238,13 +238,13 @@ describe("Story Agent provider decision parsing", () => {
       JSON.stringify(
         baseDecision({
           assistantReply: "Starting episode 1…",
-          intent: "start_story",
+          intent: "generate_episode",
           action: { type: "generate_episode", payload: {} },
         })
       )
     );
     const result = await runStoryAgentDecision({
-      userMessage: "start the story",
+      userMessage: "write a scene about them arguing",
       memory,
       recentMessages: [],
       storyId: "story_1",

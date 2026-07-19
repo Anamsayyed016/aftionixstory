@@ -5,6 +5,20 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "edge") return;
 
+  const buildId =
+    process.env.STORYVERSE_BUILD_ID ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    "local-dev";
+
+  console.info(
+    JSON.stringify({
+      event: "storyverse.boot",
+      buildId,
+      chatFlow: "story_agent",
+      timestamp: new Date().toISOString(),
+    })
+  );
+
   try {
     const { logAiConfigurationAtStartup } = await import("@/lib/ai/health");
     logAiConfigurationAtStartup();
