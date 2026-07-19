@@ -1,51 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
-import {
-  googleSignInAction,
-  registerAction,
-  type ActionResult,
-} from "@/app/actions/auth";
+import { Toast } from "@/components/ui/toast";
+import { GoogleSignInButton } from "@/components/auth/google-signin-button";
+import { registerAction, type ActionResult } from "@/app/actions/auth";
 
 const initial: ActionResult | null = null;
 
+const inputClassName =
+  "h-11 w-full rounded-xl border border-border bg-charcoal/80 px-3.5 text-sm text-ink placeholder:text-ink-faint transition-[border-color,box-shadow] focus:border-violet-soft focus:outline-none focus:ring-2 focus:ring-lilac/30";
+
 export function SignUpForm({ googleEnabled }: { googleEnabled: boolean }) {
   const [state, formAction, pending] = useActionState(registerAction, initial);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (state && !state.success) {
+      setToastMessage(state.error);
+    }
+  }, [state]);
 
   return (
-    <div className="space-y-5">
-      {googleEnabled && (
-        <>
-          <form action={googleSignInAction}>
-            <input type="hidden" name="callbackUrl" value="/dashboard" />
-            <Button type="submit" variant="secondary" className="w-full">
-              Continue with Google
-            </Button>
-          </form>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase tracking-wider">
-              <span className="bg-panel px-2 font-mono text-ink-faint">
-                or email
-              </span>
-            </div>
-          </div>
-        </>
-      )}
-
-      {state && !state.success && (
-        <p
-          role="alert"
-          className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
-        >
-          {state.error}
-        </p>
-      )}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+      className="space-y-5"
+    >
+      <Toast
+        message={toastMessage}
+        variant="error"
+        onDismiss={() => setToastMessage(null)}
+      />
 
       <form action={formAction} className="space-y-4">
         <div className="space-y-1.5">
@@ -58,7 +48,12 @@ export function SignUpForm({ googleEnabled }: { googleEnabled: boolean }) {
             type="text"
             autoComplete="name"
             required
-            className="h-11 w-full rounded-md border border-border bg-charcoal px-3 text-sm text-ink placeholder:text-ink-faint focus:border-violet-soft"
+            aria-invalid={
+              state && !state.success && !!state.fieldErrors?.name
+                ? true
+                : undefined
+            }
+            className={inputClassName}
             placeholder="Your name"
           />
           {state && !state.success && state.fieldErrors?.name?.[0] && (
@@ -75,7 +70,12 @@ export function SignUpForm({ googleEnabled }: { googleEnabled: boolean }) {
             type="email"
             autoComplete="email"
             required
-            className="h-11 w-full rounded-md border border-border bg-charcoal px-3 text-sm text-ink placeholder:text-ink-faint focus:border-violet-soft"
+            aria-invalid={
+              state && !state.success && !!state.fieldErrors?.email
+                ? true
+                : undefined
+            }
+            className={inputClassName}
             placeholder="you@example.com"
           />
           {state && !state.success && state.fieldErrors?.email?.[0] && (
@@ -92,7 +92,12 @@ export function SignUpForm({ googleEnabled }: { googleEnabled: boolean }) {
             type="password"
             autoComplete="new-password"
             required
-            className="h-11 w-full rounded-md border border-border bg-charcoal px-3 text-sm text-ink placeholder:text-ink-faint focus:border-violet-soft"
+            aria-invalid={
+              state && !state.success && !!state.fieldErrors?.password
+                ? true
+                : undefined
+            }
+            className={inputClassName}
             placeholder="At least 8 characters"
           />
           <p className="text-xs text-ink-faint">
@@ -104,17 +109,40 @@ export function SignUpForm({ googleEnabled }: { googleEnabled: boolean }) {
             </p>
           )}
         </div>
-        <Button type="submit" className="w-full" loading={pending}>
-          Create account
+        <Button type="submit" className="h-12 w-full rounded-xl" loading={pending}>
+          Create Account
         </Button>
       </form>
 
-      <p className="text-center text-sm text-ink-dim">
+      {googleEnabled ? (
+        <>
+          <div className="relative py-1" role="separator" aria-label="or">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-[0.18em]">
+              <span className="bg-panel/90 px-3 font-mono text-ink-faint backdrop-blur-sm">
+                OR
+              </span>
+            </div>
+          </div>
+
+          <GoogleSignInButton
+            callbackUrl="/dashboard"
+            onError={(message) => setToastMessage(message)}
+          />
+        </>
+      ) : null}
+
+      <p className="pt-1 text-center text-sm text-ink-dim">
         Already writing?{" "}
-        <Link href="/sign-in" className="text-lilac hover:underline">
-          Sign in
+        <Link
+          href="/sign-in"
+          className="font-medium text-lilac transition-colors hover:text-violet-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+        >
+          Sign In
         </Link>
       </p>
-    </div>
+    </motion.div>
   );
 }

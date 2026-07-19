@@ -13,8 +13,8 @@ export default function SignInPage() {
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to continue writing where you left off."
+      title="Welcome Back"
+      subtitle="Continue your storytelling journey."
     >
       <Suspense
         fallback={
