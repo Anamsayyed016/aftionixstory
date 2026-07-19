@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { History, PanelRightOpen, Sparkles } from "lucide-react";
+import { History, PanelRightOpen, Plus, Sparkles } from "lucide-react";
 
-import { chatCreateStoryAction } from "@/app/actions/chat";
+import { storyAgentTurnAction } from "@/app/actions/story-agent";
 import {
-  appendChatMessageAction,
   archiveConversationAction,
   createConversationAction,
   ensureConversationAction,
@@ -25,9 +24,16 @@ import { Button } from "@/components/ui/button";
 import { CREATE_SUGGESTIONS, CHAT_SHELL_COPY } from "@/lib/chat/constants";
 import {
   evaluateStoryCompleteness,
+  normalizeChatStoryDraft,
   type NormalizedChatStoryDraft,
 } from "@/lib/chat/create-story-extraction";
-import { shouldAutoOpenReview } from "@/lib/chat/story-progress";
+import {
+  describeMemoryStatus,
+  emptyStoryMemory,
+  memoryToWizardCandidate,
+  parseStoryMemory,
+} from "@/lib/story-agent/memory-patch";
+import type { StoryMemory } from "@/lib/story-agent/schema";
 import type { ChatMessage, ChatSuggestion } from "@/lib/chat/types";
 import { buildChatMessage, canSendMessage } from "@/lib/chat/utils";
 import { cn } from "@/lib/utils";
@@ -37,6 +43,32 @@ function newRequestId(): string {
     return crypto.randomUUID().replace(/-/g, "");
   }
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function memoryToDraft(memory: StoryMemory): NormalizedChatStoryDraft | null {
+  if (
+    !memory.storyMemory.title &&
+    !memory.storyMemory.concept &&
+    memory.characters.length === 0
+  ) {
+    return null;
+  }
+  const candidate = memoryToWizardCandidate(memory);
+  return normalizeChatStoryDraft({
+    title: candidate.title,
+    description: candidate.description,
+    genre: candidate.genre,
+    language: candidate.language,
+    tone: candidate.tone,
+    setting: candidate.setting,
+    pointOfView: candidate.pointOfView,
+    pacing: candidate.pacing,
+    writingStyle: candidate.writingStyle,
+    plot: candidate.initialPlot,
+    characters: candidate.characters,
+    relationships: candidate.relationships,
+    writingRules: candidate.writingRules,
+  });
 }
 
 type CreateStoryChatProps = {
@@ -51,42 +83,43 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [story, setStory] = useState<NormalizedChatStoryDraft | null>(null);
+  const [memory, setMemory] = useState<StoryMemory | null>(null);
+  const [storyDraft, setStoryDraft] = useState<NormalizedChatStoryDraft | null>(
+    null
+  );
   const [createError, setCreateError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationStatus, setConversationStatus] = useState<
     "ACTIVE" | "ARCHIVED"
   >("ACTIVE");
+  const [linkedStoryId, setLinkedStoryId] = useState<string | null>(null);
   const [history, setHistory] = useState<ConversationHistoryItemData[]>([]);
   const [restoring, setRestoring] = useState(true);
   const [persistHint, setPersistHint] = useState<string | null>(null);
+  const [memoryStatus, setMemoryStatus] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<ChatSuggestion[]>([]);
+  const [episodePreview, setEpisodePreview] = useState<{
+    title: string;
+    content: string;
+    wordCount: number;
+  } | null>(null);
   const sendingLockRef = useRef(false);
   const createLockRef = useRef(false);
-  const stateTimerRef = useRef<number | null>(null);
   const lastFailedPromptRef = useRef<string | null>(null);
-  const previousStatusRef = useRef<"complete" | "needs_more_info" | null>(null);
 
-  const completeness = story ? evaluateStoryCompleteness(story) : null;
+  const completeness = storyDraft
+    ? evaluateStoryCompleteness(storyDraft)
+    : null;
   const effectiveStatus = completeness?.status ?? "needs_more_info";
   const effectiveMissing = completeness?.missing ?? [];
   const createEnabled =
     effectiveStatus === "complete" && completeness?.wizardInput != null;
   const archivedConversation = conversationStatus === "ARCHIVED";
-  const showReviewButton = Boolean(story) || messages.length > 0;
-
-  useEffect(() => {
-    if (
-      shouldAutoOpenReview({
-        previousStatus: previousStatusRef.current,
-        nextStatus: effectiveStatus,
-      })
-    ) {
-      setReviewOpen(true);
-    }
-    previousStatusRef.current = effectiveStatus;
-  }, [effectiveStatus]);
+  const showReviewButton =
+    Boolean(memory && (memory.characters.length > 0 || memory.storyMemory.title)) ||
+    reviewOpen;
 
   const refreshHistory = useCallback(async () => {
     const listed = await listConversationsAction({
@@ -111,6 +144,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
     (data: {
       conversationId: string;
       status: "ACTIVE" | "ARCHIVED";
+      storyId?: string | null;
       messages: Array<{
         id: string;
         role: "user" | "assistant";
@@ -122,6 +156,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
     }) => {
       setConversationId(data.conversationId);
       setConversationStatus(data.status);
+      setLinkedStoryId(data.storyId ?? null);
       setMessages(
         data.messages.map((m) => ({
           id: m.id,
@@ -131,16 +166,30 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           status: m.status,
         }))
       );
-      const state = (data.state ?? {}) as {
-        draftForm?: NormalizedChatStoryDraft;
-        extraction?: NormalizedChatStoryDraft;
-      };
-      const restored = state.draftForm ?? state.extraction ?? null;
-      setStory(restored);
-      previousStatusRef.current = restored
-        ? evaluateStoryCompleteness(restored).status
-        : null;
-      setPersistHint(restored ? "Restored" : "Ready");
+      const parsedMemory = parseStoryMemory(data.state);
+      const hasMemory =
+        parsedMemory.characters.length > 0 ||
+        Boolean(parsedMemory.storyMemory.title) ||
+        Boolean(parsedMemory.storyMemory.concept) ||
+        (data.state &&
+          typeof data.state === "object" &&
+          ("storyMemory" in (data.state as object) ||
+            "characters" in (data.state as object)));
+      const nextMemory = hasMemory ? parsedMemory : emptyStoryMemory();
+      setMemory(nextMemory);
+      setStoryDraft(memoryToDraft(nextMemory));
+      setMemoryStatus(describeMemoryStatus(nextMemory));
+      setEpisodePreview(
+        nextMemory.latestDraft?.content
+          ? {
+              title: nextMemory.latestDraft.title || "Draft",
+              content: nextMemory.latestDraft.content,
+              wordCount: nextMemory.latestDraft.wordCount || 0,
+            }
+          : null
+      );
+      setSuggestions([]);
+      setPersistHint(hasMemory ? "Restored" : "Ready");
       setCreateError(null);
       lastFailedPromptRef.current = null;
     },
@@ -169,31 +218,6 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
       cancelled = true;
     };
   }, [applyLoadedConversation, refreshHistory]);
-
-  useEffect(() => {
-    if (!conversationId || restoring || archivedConversation) return;
-    if (stateTimerRef.current) window.clearTimeout(stateTimerRef.current);
-    const status = story
-      ? evaluateStoryCompleteness(story).status
-      : "needs_more_info";
-    const missing = story ? evaluateStoryCompleteness(story).missing : [];
-    stateTimerRef.current = window.setTimeout(() => {
-      void updateConversationStateAction({
-        conversationId,
-        state: {
-          extraction: story ?? undefined,
-          draftForm: story ?? undefined,
-          extractionStatus: status,
-          missing,
-        },
-      }).then((result) => {
-        if (result.success) setPersistHint("Saved");
-      });
-    }, 700);
-    return () => {
-      if (stateTimerRef.current) window.clearTimeout(stateTimerRef.current);
-    };
-  }, [archivedConversation, conversationId, restoring, story]);
 
   const openConversation = useCallback(
     async (id: string) => {
@@ -235,10 +259,13 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         conversationId: created.data.conversationId,
       });
       if (loaded.success) applyLoadedConversation(loaded.data);
-      setStory(null);
+      setMemory(emptyStoryMemory());
+      setStoryDraft(null);
       setMessages([]);
       setReviewOpen(false);
-      previousStatusRef.current = null;
+      setEpisodePreview(null);
+      setSuggestions([]);
+      setMemoryStatus("Building your story world");
       setPersistHint("New chat");
     } finally {
       setBusy(false);
@@ -276,38 +303,18 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
       sendingLockRef.current = true;
       setBusy(true);
       setDraft("");
-      setPersistHint("Saving…");
+      setPersistHint("Thinking…");
       lastFailedPromptRef.current = content;
 
-      const userRequestId = `u_${newRequestId()}`;
+      const turnRequestId = newRequestId();
       const userMessage = buildChatMessage("user", content, "sent");
       setMessages((prev) => [...prev, userMessage]);
 
-      const appendedUser = await appendChatMessageAction({
-        conversationId,
-        role: "USER",
-        content,
-        requestId: userRequestId,
-      });
-      if (!appendedUser.success) {
-        setMessages((prev) => [
-          ...prev,
-          buildChatMessage("assistant", appendedUser.error.message, "error"),
-        ]);
-        setBusy(false);
-        sendingLockRef.current = false;
-        return;
-      }
-
       try {
-        const historyForAi = [...messages, userMessage].map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
-
-        const result = await chatCreateStoryAction({
-          messages: historyForAi,
-          currentStory: story ?? undefined,
+        const result = await storyAgentTurnAction({
+          conversationId,
+          message: content,
+          turnRequestId,
         });
 
         if (!result.success) {
@@ -316,13 +323,6 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
             ...prev,
             buildChatMessage("assistant", errMsg, "error"),
           ]);
-          await appendChatMessageAction({
-            conversationId,
-            role: "ASSISTANT",
-            content: errMsg,
-            status: "ERROR",
-            requestId: `a_${newRequestId()}`,
-          });
           return;
         }
 
@@ -331,24 +331,30 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           ...prev,
           buildChatMessage("assistant", result.data.assistantReply, "sent"),
         ]);
-        setStory(result.data.story);
-
-        await appendChatMessageAction({
-          conversationId,
-          role: "ASSISTANT",
-          content: result.data.assistantReply,
-          requestId: `a_${newRequestId()}`,
-        });
-
-        await updateConversationStateAction({
-          conversationId,
-          state: {
-            extraction: result.data.story,
-            draftForm: result.data.story,
-            extractionStatus: result.data.status,
-            missing: result.data.missing,
-          },
-        });
+        setMemory(result.data.memory);
+        setStoryDraft(memoryToDraft(result.data.memory));
+        setMemoryStatus(result.data.memoryStatus);
+        setLinkedStoryId(result.data.storyId);
+        setSuggestions(
+          result.data.suggestions.map((s, index) => ({
+            id: `ctx-${index}-${s.label}`,
+            label: s.label,
+            prompt: s.prompt,
+          }))
+        );
+        setEpisodePreview(
+          result.data.draft
+            ? {
+                title: result.data.draft.title,
+                content: result.data.draft.content,
+                wordCount: result.data.draft.wordCount,
+              }
+            : null
+        );
+        if (result.data.showReview) setReviewOpen(true);
+        if (result.data.actionType === "create_story" && result.data.actionOk) {
+          setReviewOpen(false);
+        }
         await refreshHistory();
         setPersistHint("Saved");
       } catch {
@@ -358,19 +364,12 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           ...prev,
           buildChatMessage("assistant", errMsg, "error"),
         ]);
-        await appendChatMessageAction({
-          conversationId,
-          role: "ASSISTANT",
-          content: errMsg,
-          status: "ERROR",
-          requestId: `a_${newRequestId()}`,
-        });
       } finally {
         setBusy(false);
         sendingLockRef.current = false;
       }
     },
-    [archivedConversation, conversationId, messages, refreshHistory, story]
+    [archivedConversation, conversationId, refreshHistory]
   );
 
   function handleSend() {
@@ -387,8 +386,10 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   }
 
   async function handleCreate() {
-    if (!story || createLockRef.current || creating || !conversationId) return;
-    const evaluated = evaluateStoryCompleteness(story);
+    if (!storyDraft || createLockRef.current || creating || !conversationId) {
+      return;
+    }
+    const evaluated = evaluateStoryCompleteness(storyDraft);
     if (evaluated.status !== "complete" || !evaluated.wizardInput) return;
 
     createLockRef.current = true;
@@ -407,11 +408,13 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         conversationId,
         storyId: result.data.storyId,
         state: {
-          extraction: story,
-          draftForm: story,
-          extractionStatus: "complete",
-          missing: [],
+          ...(memory ?? emptyStoryMemory()),
           storyId: result.data.storyId,
+          storyMemory: {
+            ...(memory?.storyMemory ?? {}),
+            storyStatus: "created",
+            title: storyDraft.title,
+          },
         },
       });
 
@@ -443,10 +446,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         onMobileClose={() => setHistoryOpen(false)}
       />
 
-      <section
-        aria-label={copy.title}
-        className="flex min-w-0 flex-1 flex-col"
-      >
+      <section aria-label={copy.title} className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-start justify-between gap-3 border-b border-border/80 px-3 py-3 sm:px-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -475,21 +475,32 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <span className="rounded-full border border-border bg-charcoal/70 px-2.5 py-1 text-[11px] text-violet-soft">
               Live
             </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="rounded-xl"
+              disabled={restoring}
+              onClick={() => void startNewConversation()}
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+              New Chat
+            </Button>
             {showReviewButton ? (
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
                 className="rounded-xl"
-                disabled={!story || restoring}
+                disabled={!storyDraft || restoring}
                 onClick={() => setReviewOpen(true)}
               >
                 <PanelRightOpen className="h-3.5 w-3.5" aria-hidden />
-                Review Story
+                Story Details
               </Button>
             ) : null}
             {onClose ? (
@@ -506,7 +517,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           </div>
         </header>
 
-        <StoryProgress story={story} />
+        <StoryProgress memory={memory} statusText={memoryStatus} />
 
         <div className="min-h-0 flex-1">
           <ChatMessageList
@@ -521,6 +532,34 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
           />
         </div>
 
+        {suggestions.length > 0 && !busy ? (
+          <div className="flex flex-wrap gap-2 border-t border-border/50 px-3 py-2 sm:px-4">
+            {suggestions.slice(0, 4).map((suggestion) => (
+              <button
+                key={suggestion.id}
+                type="button"
+                disabled={creating || restoring || archivedConversation}
+                onClick={() => handleSelectSuggestion(suggestion)}
+                className="rounded-full border border-border bg-charcoal/50 px-3 py-1 text-xs text-ink-dim transition-colors hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
+              >
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {episodePreview ? (
+          <div className="border-t border-border/60 bg-charcoal/40 px-3 py-2 sm:px-4">
+            <p className="text-xs text-violet-soft">Unsaved episode draft</p>
+            <p className="mt-0.5 truncate text-sm font-medium text-ink">
+              {episodePreview.title}
+            </p>
+            <p className="mt-1 line-clamp-3 text-xs text-ink-dim">
+              {episodePreview.content}
+            </p>
+          </div>
+        ) : null}
+
         <div className="pb-[max(0px,env(safe-area-inset-bottom))]">
           <ChatComposer
             value={draft}
@@ -533,16 +572,16 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         </div>
       </section>
 
-      {story ? (
+      {storyDraft ? (
         <StoryReviewDrawer
           open={reviewOpen}
           onClose={() => setReviewOpen(false)}
-          story={story}
+          story={storyDraft}
           status={effectiveStatus}
           missing={effectiveMissing}
           creating={creating}
-          createEnabled={createEnabled && !archivedConversation}
-          onChange={setStory}
+          createEnabled={createEnabled && !archivedConversation && !linkedStoryId}
+          onChange={setStoryDraft}
           onCreate={() => void handleCreate()}
           error={createError}
         />

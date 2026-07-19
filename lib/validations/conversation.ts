@@ -73,6 +73,15 @@ export const createConversationStateSchema = z.object({
   missing: z.array(z.string()).optional(),
   draftForm: z.unknown().optional(),
   storyId: z.string().optional(),
+  // Conversational Story Agent memory (additive)
+  storyMemory: z.unknown().optional(),
+  characters: z.unknown().optional(),
+  relationships: z.unknown().optional(),
+  writingRules: z.unknown().optional(),
+  userPreferences: z.unknown().optional(),
+  latestDraft: z.unknown().optional(),
+  updatedAt: z.string().optional(),
+  agentVersion: z.string().optional(),
 });
 
 export const continueConversationStateSchema = z.object({

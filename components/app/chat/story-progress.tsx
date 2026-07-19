@@ -1,53 +1,42 @@
 "use client";
 
-import { useState } from "react";
-import { Check, ChevronDown, CircleDashed } from "lucide-react";
+import { useMemo, useState } from "react";
 
-import {
-  summarizeStoryProgress,
-  type StoryEssentialChip,
-} from "@/lib/chat/story-progress";
-import type { NormalizedChatStoryDraft } from "@/lib/chat/create-story-extraction";
+import { describeMemoryStatus } from "@/lib/story-agent/memory-patch";
+import type { StoryMemory } from "@/lib/story-agent/schema";
 import { cn } from "@/lib/utils";
 
 type StoryProgressProps = {
-  story: NormalizedChatStoryDraft | null;
+  memory: StoryMemory | null;
+  statusText?: string | null;
   className?: string;
-  defaultExpanded?: boolean;
 };
 
-function Chip({ chip }: { chip: StoryEssentialChip }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]",
-        chip.collected
-          ? "border-success/30 bg-success/10 text-success"
-          : "border-border bg-charcoal/50 text-ink-faint"
-      )}
-    >
-      {chip.collected ? (
-        <Check className="h-3 w-3" aria-hidden />
-      ) : (
-        <CircleDashed className="h-3 w-3" aria-hidden />
-      )}
-      {chip.label}
-      {chip.collected ? " ✓" : " missing"}
-    </span>
-  );
-}
-
 export function StoryProgress({
-  story,
+  memory,
+  statusText,
   className,
-  defaultExpanded = false,
 }: StoryProgressProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const summary = summarizeStoryProgress(story);
+  const [expanded, setExpanded] = useState(false);
+  const label = statusText || (memory ? describeMemoryStatus(memory) : null);
 
-  if (summary.collected === 0 && !story) {
-    return null;
-  }
+  const details = useMemo(() => {
+    if (!memory) return [];
+    const chips: string[] = [];
+    if (memory.storyMemory.title) chips.push(`Title: ${memory.storyMemory.title}`);
+    if (memory.characters.length) {
+      chips.push(
+        `Characters: ${memory.characters.map((c) => c.name).slice(0, 4).join(", ")}`
+      );
+    }
+    if (memory.userPreferences.doNotStartYet) {
+      chips.push("Holding off on writing");
+    }
+    if (memory.latestDraft?.content) chips.push("Unsaved episode draft");
+    return chips;
+  }, [memory]);
+
+  if (!label) return null;
 
   return (
     <div
@@ -61,26 +50,20 @@ export function StoryProgress({
         onClick={() => setExpanded((v) => !v)}
         className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac"
         aria-expanded={expanded}
-        aria-controls="story-progress-chips"
       >
-        <p className="text-xs text-ink-dim">{summary.label}</p>
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 text-ink-faint transition-transform",
-            expanded && "rotate-180"
-          )}
-          aria-hidden
-        />
+        <p className="text-xs text-ink-dim">{label}</p>
+        {details.length > 0 ? (
+          <span className="text-[11px] text-ink-faint">
+            {expanded ? "Hide" : "Details"}
+          </span>
+        ) : null}
       </button>
-      {expanded ? (
-        <div
-          id="story-progress-chips"
-          className="mt-2 flex flex-wrap gap-1.5 px-1 pb-1"
-        >
-          {summary.chips.map((chip) => (
-            <Chip key={chip.key} chip={chip} />
+      {expanded && details.length > 0 ? (
+        <ul className="mt-1 space-y-0.5 px-1 pb-1 text-[11px] text-ink-faint">
+          {details.map((item) => (
+            <li key={item}>{item}</li>
           ))}
-        </div>
+        </ul>
       ) : null}
     </div>
   );

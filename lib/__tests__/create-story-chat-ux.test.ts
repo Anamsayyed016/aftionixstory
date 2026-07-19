@@ -48,19 +48,20 @@ describe("Create Story chat UX helpers", () => {
   it("uses conversational empty-state copy", () => {
     expect(CHAT_SHELL_COPY.create.title).toBe("Story Assistant");
     expect(CHAT_SHELL_COPY.create.emptyTitle).toBe("Let’s create your story");
-    expect(CHAT_SHELL_COPY.create.emptyDescription).toContain("one line");
+    expect(CHAT_SHELL_COPY.create.emptyDescription).toContain("however it comes");
   });
 
   it("ships suggestion cards that send matching prompts", () => {
     expect(CREATE_SUGGESTIONS).toHaveLength(4);
     for (const suggestion of CREATE_SUGGESTIONS) {
-      expect(suggestion.prompt).toBe(suggestion.label);
+      expect(suggestion.prompt.length).toBeGreaterThan(0);
+      expect(suggestion.label.length).toBeGreaterThan(0);
     }
     expect(CREATE_SUGGESTIONS.map((s) => s.label)).toEqual([
-      "A forbidden romance set in college",
-      "A dark fantasy about a cursed prince",
-      "A family drama with secrets and betrayal",
-      "Help me build a story from scratch",
+      "I have a new story concept",
+      "Help me create a forbidden romance",
+      "I only have two characters",
+      "Suggest something unique",
     ]);
   });
 
