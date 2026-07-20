@@ -15,6 +15,10 @@ export function serializeDynamicContextForPrompt(
 ): string {
   const parts: string[] = [];
 
+  if (ctx.instructionContract?.trim()) {
+    parts.push(section("INSTRUCTION CONTRACT", ctx.instructionContract));
+  }
+
   parts.push(
     section(
       "STORY",

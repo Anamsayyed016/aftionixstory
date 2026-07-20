@@ -36,6 +36,8 @@ import {
 import { maybeDecorateChatReply, readStyleProfile } from "@/lib/story-agent/style-profile";
 import { runToolFrameworkTurn } from "@/lib/tools/brain-adapter";
 import { isStoryToolFrameworkEnabled } from "@/lib/tools/feature-flag";
+import { applyInstructionFidelityPreTurn } from "@/lib/story-fidelity/brain-adapter";
+import { isInstructionFidelityEnabled } from "@/lib/story-fidelity/feature-flag";
 
 function baseFlow(request: ConversationTurnRequest): ConversationFlow {
   return request.conversationFlow ?? { ...DEFAULT_CONVERSATION_FLOW, lastOffers: [] };
@@ -61,21 +63,91 @@ export async function runConversationTurn(
     }
   );
 
-  const memorySummary = summarizeMemoryForLogs(getMemoryV2(request.memory));
+  let workingMemory = request.memory;
+  let workingPlan = plan;
+  let workingRequest = request;
+
+  // ---- Phase G.5: resolve/lock facts + readiness before clarification/tools ----
+  if (isInstructionFidelityEnabled()) {
+    const fidelity = applyInstructionFidelityPreTurn({
+      memory: workingMemory,
+      userMessage: request.userMessage,
+      plan: workingPlan,
+      flow,
+      turnRequestId: request.turnRequestId,
+    });
+    workingMemory = fidelity.memory;
+    workingPlan = fidelity.plan;
+    flow = fidelity.flow;
+    workingRequest = { ...request, memory: workingMemory };
+
+    logAiEvent("info", "story_fidelity.readiness", {
+      requestId: request.turnRequestId,
+      conversationId: request.conversationId,
+      operation: workingPlan.operation,
+      ready: fidelity.readiness.ready,
+      mode: fidelity.readiness.mode,
+      generationAllowed: fidelity.readiness.generationAllowed,
+      blockingCount: fidelity.readiness.blockingReasons.length,
+      requiredFactCount:
+        (fidelity.readiness.resolvedFactsSnapshot?.characters.mainMaleLead
+          ? 1
+          : 0) +
+        (fidelity.readiness.resolvedFactsSnapshot?.characters.mainFemaleLead
+          ? 1
+          : 0) +
+        (fidelity.readiness.resolvedFactsSnapshot?.setting.primarySetting
+          ? 1
+          : 0),
+    });
+
+    if (fidelity.blockCreativeGeneration && fidelity.planningReply) {
+      const style = readStyleProfile({
+        emojiStyle: workingMemory.userPreferences.emojiStyle,
+      });
+      return {
+        resultType: "conversation",
+        operation: "conversational_chat",
+        assistantReply: maybeDecorateChatReply(
+          fidelity.planningReply,
+          style.emojiStyle
+        ),
+        suggestions: [
+          { label: "Start the story", prompt: "Start the story" },
+          { label: "Add format rules", prompt: "Character uppercase me aayenge" },
+        ],
+        memory: workingMemory,
+        storyId: request.storyId,
+        draft: null,
+        showReview: false,
+        actionType: "none",
+        actionOk: true,
+        requiresConfirmation: false,
+        outputMode: "structured",
+        durationMs: Date.now() - started,
+        retryCount: 0,
+        plan: workingPlan,
+        brainVersion: BRAIN_VERSION,
+        conversationFlow: flow,
+      };
+    }
+  }
+
+  const memorySummary = summarizeMemoryForLogs(getMemoryV2(workingMemory));
   logAiEvent("info", "conversation_brain.plan", {
     requestId: request.turnRequestId,
     conversationId: request.conversationId,
-    intent: plan.intent,
-    storyIntent: plan.storyIntent,
-    operation: plan.operation,
-    confidence: plan.confidence,
-    needsMemory: plan.needsMemory,
-    needsCreativeGeneration: plan.needsCreativeGeneration,
-    deterministicHandled: plan.deterministicHandled,
-    aiRequired: plan.aiRequired,
-    plannerSource: plan.plannerSource,
-    intentSource: plan.intentSource,
-    collaborationMode: Boolean(plan.collaborationMode),
+    intent: workingPlan.intent,
+    storyIntent: workingPlan.storyIntent,
+    operation: workingPlan.operation,
+    confidence: workingPlan.confidence,
+    needsMemory: workingPlan.needsMemory,
+    needsCreativeGeneration: workingPlan.needsCreativeGeneration,
+    deterministicHandled: workingPlan.deterministicHandled,
+    aiRequired: workingPlan.aiRequired,
+    plannerSource: workingPlan.plannerSource,
+    intentSource: workingPlan.intentSource,
+    collaborationMode: Boolean(workingPlan.collaborationMode),
     generationBlocked: flow.generationBlocked,
     brainVersion: BRAIN_VERSION,
     memoryVersion: memorySummary.memoryVersion,
@@ -89,8 +161,8 @@ export async function runConversationTurn(
   const mentioned = extractMentionedCharacters(request.userMessage).map(
     (c) => c.name
   );
-  const memorySlice = searchMemory(request.memory, {
-    intent: plan.intent,
+  const memorySlice = searchMemory(workingMemory, {
+    intent: workingPlan.intent,
     userMessage: request.userMessage,
     mentionedNames: mentioned,
   });
@@ -98,7 +170,7 @@ export async function runConversationTurn(
   logAiEvent("info", "conversation_brain.memory_search", {
     requestId: request.turnRequestId,
     conversationId: request.conversationId,
-    intent: plan.intent,
+    intent: workingPlan.intent,
     sectionCount: memorySlice.sectionLabels.length,
     characterCount: memorySlice.characters.length,
   });
@@ -108,13 +180,13 @@ export async function runConversationTurn(
     try {
       const dyn = buildDynamicContext(
         buildContextRequestFromPlan({
-          intent: plan.storyIntent || plan.intent,
-          operation: plan.operation,
+          intent: workingPlan.storyIntent || workingPlan.intent,
+          operation: workingPlan.operation,
           userMessage: request.userMessage,
-          memory: getMemoryV2(request.memory),
+          memory: getMemoryV2(workingMemory),
           recentMessages: request.recentMessages,
           conversationFlow: flow,
-          entities: plan.intentRoute?.entities || {
+          entities: workingPlan.intentRoute?.entities || {
             characterNames: mentioned,
             episodeNumber: null,
             requestedTone: null,
@@ -151,8 +223,8 @@ export async function runConversationTurn(
   // ---- Phase G: Story Tool Framework (mutations only) ----
   if (isStoryToolFrameworkEnabled()) {
     const toolTurn = await runToolFrameworkTurn({
-      request,
-      plan,
+      request: workingRequest,
+      plan: workingPlan,
       flow,
       started,
     });
@@ -162,22 +234,22 @@ export async function runConversationTurn(
   }
 
   // ---- Phase B: clarification without creative/provider failure ----
-  if (plan.needsClarification && plan.question && !plan.offerResolution) {
+  if (workingPlan.needsClarification && workingPlan.question && !workingPlan.offerResolution) {
     flow = mergeConversationFlow(flow, {
-      lastIntent: plan.intent,
+      lastIntent: workingPlan.intent,
     });
     const style = readStyleProfile({
-      emojiStyle: request.memory.userPreferences.emojiStyle,
+      emojiStyle: workingMemory.userPreferences.emojiStyle,
     });
     return {
       resultType: "conversation",
       operation: "conversational_chat",
-      assistantReply: maybeDecorateChatReply(plan.question, style.emojiStyle),
+      assistantReply: maybeDecorateChatReply(workingPlan.question, style.emojiStyle),
       suggestions: [
         { label: "Write a scene", prompt: "Write a short opening scene." },
         { label: "Brainstorm ideas", prompt: "Suggest three unique story ideas." },
       ],
-      memory: request.memory,
+      memory: workingMemory,
       storyId: request.storyId,
       draft: null,
       showReview: false,
@@ -187,29 +259,29 @@ export async function runConversationTurn(
       outputMode: "structured",
       durationMs: Date.now() - started,
       retryCount: 0,
-      plan,
+      plan: workingPlan,
       brainVersion: BRAIN_VERSION,
       conversationFlow: flow,
     };
   }
 
   // ---- Phase A: clear generation block ----
-  if (plan.clearGenerationBlock) {
+  if (workingPlan.clearGenerationBlock) {
     flow = mergeConversationFlow(flow, {
       generationBlocked: false,
       phase: "ready_to_write",
-      lastIntent: plan.intent,
+      lastIntent: workingPlan.intent,
       lastOffers: [],
       lastOfferType: "none",
       awaiting: { type: "none", topic: "none" },
     });
     const style = readStyleProfile({
-      emojiStyle: request.memory.userPreferences.emojiStyle,
+      emojiStyle: workingMemory.userPreferences.emojiStyle,
     });
     const memory = {
-      ...request.memory,
+      ...workingMemory,
       userPreferences: {
-        ...request.memory.userPreferences,
+        ...workingMemory.userPreferences,
         doNotStartYet: false,
       },
       updatedAt: new Date().toISOString(),
@@ -235,7 +307,7 @@ export async function runConversationTurn(
       outputMode: "structured",
       durationMs: Date.now() - started,
       retryCount: 0,
-      plan,
+      plan: workingPlan,
       brainVersion: BRAIN_VERSION,
       conversationFlow: flow,
     };
@@ -243,15 +315,15 @@ export async function runConversationTurn(
 
   // ---- Phase A: blocked creative attempt ----
   if (
-    plan.matchedSignals.includes("generation_blocked") &&
-    plan.deterministicHandled
+    workingPlan.matchedSignals.includes("generation_blocked") &&
+    workingPlan.deterministicHandled
   ) {
     flow = mergeConversationFlow(flow, {
       generationBlocked: true,
-      lastIntent: plan.intent,
+      lastIntent: workingPlan.intent,
     });
     const style = readStyleProfile({
-      emojiStyle: request.memory.userPreferences.emojiStyle,
+      emojiStyle: workingMemory.userPreferences.emojiStyle,
     });
     return {
       resultType: "conversation",
@@ -267,9 +339,9 @@ export async function runConversationTurn(
         },
       ],
       memory: {
-        ...request.memory,
+        ...workingMemory,
         userPreferences: {
-          ...request.memory.userPreferences,
+          ...workingMemory.userPreferences,
           doNotStartYet: true,
         },
       },
@@ -282,55 +354,55 @@ export async function runConversationTurn(
       outputMode: "structured",
       durationMs: Date.now() - started,
       retryCount: 0,
-      plan,
+      plan: workingPlan,
       brainVersion: BRAIN_VERSION,
       conversationFlow: flow,
     };
   }
 
   // ---- Phase A: offer / awaiting resolution ----
-  if (plan.offerResolution) {
+  if (workingPlan.offerResolution) {
     const turn = runOfferResolutionTurn({
-      resolution: plan.offerResolution,
-      memory: request.memory,
+      resolution: workingPlan.offerResolution,
+      memory: workingMemory,
       flow,
       storyId: request.storyId,
     });
     return {
       ...turn,
-      plan,
+      plan: workingPlan,
       brainVersion: BRAIN_VERSION,
       conversationFlow: turn.conversationFlow,
     };
   }
 
-  if (plan.awaitingResolution) {
+  if (workingPlan.awaitingResolution) {
     const turn = runAwaitingResolutionTurn({
-      resolution: plan.awaitingResolution,
-      memory: request.memory,
+      resolution: workingPlan.awaitingResolution,
+      memory: workingMemory,
       flow,
       storyId: request.storyId,
     });
     return {
       ...turn,
-      plan,
+      plan: workingPlan,
       brainVersion: BRAIN_VERSION,
       conversationFlow: turn.conversationFlow,
     };
   }
 
   // ---- Phase A: collaborative brainstorm ----
-  if (plan.collaborationMode && plan.operation === "brainstorm") {
+  if (workingPlan.collaborationMode && workingPlan.operation === "brainstorm") {
     const turn = await runCollaborativeBrainstormTurn({
       userId: request.userId,
       conversationId: request.conversationId,
       storyId: request.storyId,
-      memory: request.memory,
+      memory: workingMemory,
       userMessage: request.userMessage,
       recentMessages: request.recentMessages,
       turnRequestId: request.turnRequestId,
       flow,
-      openConcept: plan.openConcept ?? {
+      openConcept: workingPlan.openConcept ?? {
         matched: true,
         kind: "help_create",
         genreHints: [],
@@ -340,7 +412,7 @@ export async function runConversationTurn(
     });
     return {
       ...turn,
-      plan,
+      plan: workingPlan,
       brainVersion: BRAIN_VERSION,
       conversationFlow: turn.conversationFlow,
     };
@@ -351,26 +423,26 @@ export async function runConversationTurn(
     userId: request.userId,
     conversationId: request.conversationId,
     storyId: request.storyId,
-    memory: request.memory,
+    memory: workingMemory,
     userMessage: request.userMessage,
     recentMessages: request.recentMessages,
     turnRequestId: request.turnRequestId,
-    intent: plan.storyIntent || plan.intent,
+    intent: workingPlan.storyIntent || workingPlan.intent,
   });
 
   // Sync flow flags from plan / memory prefs
   const blocked =
-    plan.setGenerationBlock === true ||
+    workingPlan.setGenerationBlock === true ||
     Boolean(turn.memory.userPreferences.doNotStartYet) ||
     flow.generationBlocked;
 
   flow = mergeConversationFlow(flow, {
-    generationBlocked: plan.clearGenerationBlock ? false : blocked,
-    lastIntent: plan.intent,
+    generationBlocked: workingPlan.clearGenerationBlock ? false : blocked,
+    lastIntent: workingPlan.intent,
     phase:
-      plan.intent === "do_not_start"
+      workingPlan.intent === "do_not_start"
         ? "exploring"
-        : plan.intent === "greeting"
+        : workingPlan.intent === "greeting"
           ? flow.phase
           : flow.phase === "open"
             ? "exploring"
@@ -399,7 +471,7 @@ export async function runConversationTurn(
   logAiEvent("info", "conversation_brain.turn_complete", {
     requestId: request.turnRequestId,
     conversationId: request.conversationId,
-    intent: plan.intent,
+    intent: workingPlan.intent,
     operation: turn.operation,
     resultType: turn.resultType,
     durationMs: Date.now() - started,
@@ -410,7 +482,7 @@ export async function runConversationTurn(
 
   return {
     ...turn,
-    plan,
+    plan: workingPlan,
     brainVersion: BRAIN_VERSION,
     conversationFlow: flow,
   };

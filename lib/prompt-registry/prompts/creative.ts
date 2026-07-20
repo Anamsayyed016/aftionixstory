@@ -40,6 +40,8 @@ function creativeSystem(
 
 function sceneBuilder(def: PromptDefinition, req: PromptRequest) {
   const names = req.context.characters.map((c) => c.name).join(", ") || "(from request)";
+  const contract = (req.context as { instructionContract?: string | null })
+    .instructionContract;
   const system = creativeSystem(def, req, [
     "Write only the requested scene as plain prose.",
     "CURRENT USER REQUEST has highest priority.",
@@ -47,9 +49,11 @@ function sceneBuilder(def: PromptDefinition, req: PromptRequest) {
     "Do not introduce unrelated lead characters.",
     "Do not substitute cast/setting from an unrelated previous draft.",
     "Target ~300–600 words unless the user specified otherwise.",
+    "Honor the INSTRUCTION CONTRACT / generation contract exactly when present.",
   ]);
   const user = joinLayers([
     currentUserInstruction(req.userMessage),
+    contract ? `INSTRUCTION CONTRACT:\n${contract}` : "",
     `REQUESTED CHARACTERS:\n${names}`,
     serializeCreativeContext(req.context),
     "OUTPUT: Optional TITLE: … then --- then body. Prose only.",
@@ -60,6 +64,7 @@ function sceneBuilder(def: PromptDefinition, req: PromptRequest) {
     system,
     user,
     includedSections: [
+      "instructionContract",
       "story",
       "characters",
       "relationships",
@@ -262,5 +267,97 @@ export const creativePrompts: PromptDefinition[] = [
     requiredContextSections: ["story", "locations"],
     enabled: true,
     builder: descriptionBuilder,
+  }),
+  def({
+    id: "story.generation.strict",
+    version: "1.0.0",
+    category: "creative",
+    description: "Strict fidelity scene/episode generation (Phase G.5).",
+    supportedIntents: ["write_scene", "write_episode", "continue_story"],
+    outputMode: "text",
+    contextProfile: "write_scene",
+    temperatureProfile: "creative",
+    maxOutputTokensProfile: "long_creative",
+    requiresDraft: false,
+    requiredContextSections: [
+      "instructionContract",
+      "characters",
+      "preferences",
+      "writingRules",
+    ],
+    enabled: true,
+    builder: (d, r) => {
+      const contract =
+        (r.context as { instructionContract?: string | null })
+          .instructionContract || "";
+      const system = creativeSystem(d, r, [
+        "Generate story prose that obeys the STORY GENERATION CONTRACT exactly.",
+        "Do not invent replacement leads.",
+        "Do not change setting or language.",
+        "Apply all format rules (case, brackets, dialogue placement, scenes).",
+        "Output prose only — no planning commentary.",
+      ]);
+      const user = joinLayers([
+        currentUserInstruction(r.userMessage),
+        contract,
+        serializeCreativeContext(r.context),
+        "OUTPUT: Optional TITLE: … then --- then body.",
+      ]);
+      return composePromptResult({
+        def: d,
+        request: r,
+        system,
+        user,
+        includedSections: [
+          "instructionContract",
+          "story",
+          "characters",
+          "writingRules",
+          "preferences",
+        ],
+      });
+    },
+  }),
+  def({
+    id: "story.repair.fidelity",
+    version: "1.0.0",
+    category: "creative",
+    description: "Single-pass fidelity repair (Phase G.5).",
+    supportedIntents: ["rewrite"],
+    outputMode: "text",
+    contextProfile: "rewrite",
+    temperatureProfile: "balanced",
+    maxOutputTokensProfile: "long_creative",
+    requiresDraft: true,
+    requiredContextSections: ["instructionContract", "latestDraft", "characters"],
+    enabled: true,
+    builder: (d, r) => {
+      const contract =
+        (r.context as { instructionContract?: string | null })
+          .instructionContract || "";
+      const system = creativeSystem(d, r, [
+        "Repair the draft to satisfy the generation contract.",
+        "Replace unrelated characters with required leads.",
+        "Restore locked setting, language, and format.",
+        "Do not explain corrections — return corrected prose only.",
+      ]);
+      const draft = r.context.latestDraft?.content || "";
+      const user = joinLayers([
+        currentUserInstruction(r.userMessage),
+        contract,
+        `ORIGINAL DRAFT:\n${draft.slice(0, 10000)}`,
+        r.metadata?.revisionFocus
+          ? `VIOLATION CODES: ${r.metadata.revisionFocus}`
+          : "",
+        "OUTPUT: Corrected story prose only.",
+      ]);
+      return composePromptResult({
+        def: d,
+        request: r,
+        system,
+        user,
+        includedSections: ["instructionContract", "latestDraft", "characters"],
+      });
+    },
   }),
 ];

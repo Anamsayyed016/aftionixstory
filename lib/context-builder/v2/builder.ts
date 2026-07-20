@@ -35,6 +35,13 @@ import {
   estimateContextTokens,
   pruneToBudget,
 } from "@/lib/context-builder/v2/token-budget";
+import { isInstructionFidelityEnabled } from "@/lib/story-fidelity/feature-flag";
+import {
+  buildStoryGenerationContract,
+  serializeGenerationContract,
+} from "@/lib/story-fidelity/generation-contract";
+import { readFidelityState } from "@/lib/story-fidelity/resolve-facts";
+import { toLegacyStoryMemory } from "@/lib/story-memory/v2";
 
 export function buildDynamicContext(req: ContextRequest): DynamicContext {
   const profile = resolveOperationProfile(req.intent, req.operation);
@@ -186,6 +193,31 @@ export function buildDynamicContext(req: ContextRequest): DynamicContext {
       }))
     : [];
 
+  let instructionContract: string | null = null;
+  if (
+    isInstructionFidelityEnabled() &&
+    (wants("instructionContract") ||
+      req.operation.includes("write") ||
+      req.operation.includes("episode") ||
+      req.operation.includes("revise"))
+  ) {
+    try {
+      const legacy = Object.assign(toLegacyStoryMemory(req.memory), {
+        memoryVersion: 2,
+        __memoryV2: req.memory,
+      });
+      const state = readFidelityState(legacy as never);
+      const contract = buildStoryGenerationContract({
+        facts: state.resolvedFacts,
+        operation: req.operation,
+        latestInstruction: req.userMessage,
+      });
+      instructionContract = serializeGenerationContract(contract);
+    } catch {
+      instructionContract = null;
+    }
+  }
+
   let ctx: DynamicContext = {
     contextVersion: 2,
     operation: req.operation,
@@ -213,6 +245,7 @@ export function buildDynamicContext(req: ContextRequest): DynamicContext {
           ? req.memory.recentSummary
           : null,
     knowledge,
+    instructionContract,
     retrieval: {
       includedEntityIds: [
         ...characters.map((c) => c.id),

@@ -40,6 +40,7 @@ export function estimateContextTokens(ctx: DynamicContext): {
   add("latestDraft", ctx.latestDraft);
   add("recentSummary", ctx.recentSummary);
   add("knowledge", ctx.knowledge);
+  add("instructionContract", ctx.instructionContract);
 
   const total = Object.values(sections).reduce((a, b) => a + b, 0);
   return { total, sections };

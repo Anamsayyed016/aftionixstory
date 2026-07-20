@@ -91,6 +91,7 @@ function slimContext(memory: StoryMemory): DynamicContext {
     latestDraft: null,
     recentSummary: null,
     knowledge: { authorKnowledge: [], characterKnowledge: {} },
+    instructionContract: null,
     retrieval: {
       includedEntityIds: [],
       excludedCounts: {},

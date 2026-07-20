@@ -25,6 +25,11 @@ import {
   resolveMaxOutputTokens,
   promptLogFieldsForAiEvent,
 } from "@/lib/prompt-registry";
+import {
+  appendContractToPrompt,
+  enforceInstructionFidelityOnDraft,
+} from "@/lib/story-fidelity/generate-with-fidelity";
+import { isInstructionFidelityEnabled } from "@/lib/story-fidelity/feature-flag";
 
 export type WriteSceneResult = {
   title: string;
@@ -172,6 +177,15 @@ STRICT RELEVANCE CORRECTION:
   };
 
   let { system, prompt, temperature, maxOutputTokens } = buildPrompts(false);
+  if (isInstructionFidelityEnabled()) {
+    ({ system, prompt } = appendContractToPrompt({
+      system,
+      prompt,
+      memory: params.memory,
+      userMessage: params.userMessage,
+      operation: params.mode === "revise" ? "revise_draft" : "write_scene",
+    }));
+  }
   let result = await generateCreativeText({
     systemInstruction: system,
     prompt,
@@ -249,13 +263,15 @@ STRICT RELEVANCE CORRECTION:
 
   await incrementSuccessfulGeneration(params.userId);
 
-  return {
+  let out = {
     title:
       result.title ||
       (params.mode === "revise" ? "Revised draft" : "Scene draft"),
     content: result.content,
     wordCount: result.wordCount,
-    draftKind: params.mode === "revise" ? "rewrite" : "scene",
+    draftKind: (params.mode === "revise" ? "rewrite" : "scene") as
+      | "scene"
+      | "rewrite",
     provider: result.provider,
     model: result.model,
     durationMs: result.durationMs,
@@ -265,4 +281,22 @@ STRICT RELEVANCE CORRECTION:
     relevanceRetry,
     ...promptMeta,
   };
+
+  if (isInstructionFidelityEnabled() && params.mode === "scene") {
+    const enforced = await enforceInstructionFidelityOnDraft({
+      memory: params.memory,
+      userMessage: params.userMessage,
+      operation: "write_scene",
+      draft: out,
+      provider: params.provider,
+      languagePrefs: ctx.languagePrefs,
+    });
+    out = {
+      ...out,
+      ...enforced.draft,
+      draftKind: out.draftKind,
+    };
+  }
+
+  return out;
 }

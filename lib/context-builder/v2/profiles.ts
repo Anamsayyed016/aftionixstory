@@ -24,7 +24,8 @@ export type ContextSection =
   | "recentConversation"
   | "latestDraft"
   | "recentSummary"
-  | "knowledge";
+  | "knowledge"
+  | "instructionContract";
 
 export type OperationProfile = {
   id: string;
@@ -61,6 +62,7 @@ const minimalChat: OperationProfile = {
 const creativeScene: OperationProfile = {
   id: "write_scene",
   required: [
+    "instructionContract",
     "story",
     "characters",
     "relationships",

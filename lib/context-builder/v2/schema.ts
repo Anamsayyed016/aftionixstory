@@ -214,6 +214,8 @@ export const dynamicContextSchema = z.object({
     authorKnowledge: [],
     characterKnowledge: {},
   }),
+  /** Phase G.5 — protected instruction contract (never pruned) */
+  instructionContract: z.string().nullable().optional().default(null),
   retrieval: contextRetrievalSchema.default({
     includedEntityIds: [],
     excludedCounts: {},

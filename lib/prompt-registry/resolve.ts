@@ -5,6 +5,7 @@
 
 import type { ConversationFlow } from "@/lib/conversation-brain/collaboration-state";
 import type { PromptId } from "@/lib/prompt-registry/ids";
+import { isInstructionFidelityEnabled } from "@/lib/story-fidelity/feature-flag";
 
 export type ResolvePromptIdInput = {
   intent?: string | null;
@@ -132,11 +133,29 @@ export function resolvePromptId(input: ResolvePromptIdInput): PromptId {
   }
 
   if (input.intent && INTENT_TO_PROMPT[input.intent]) {
-    return INTENT_TO_PROMPT[input.intent];
+    const id = INTENT_TO_PROMPT[input.intent];
+    if (
+      isInstructionFidelityEnabled() &&
+      (id === "creative.scene" ||
+        id === "creative.episode" ||
+        id === "creative.continue")
+    ) {
+      return "story.generation.strict";
+    }
+    return id;
   }
 
   if (input.operation && OPERATION_TO_PROMPT[input.operation]) {
-    return OPERATION_TO_PROMPT[input.operation];
+    const id = OPERATION_TO_PROMPT[input.operation];
+    if (
+      isInstructionFidelityEnabled() &&
+      (id === "creative.scene" ||
+        id === "creative.episode" ||
+        id === "creative.continue")
+    ) {
+      return "story.generation.strict";
+    }
+    return id;
   }
 
   return "conversation.normal";

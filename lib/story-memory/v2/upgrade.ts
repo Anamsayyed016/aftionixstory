@@ -436,6 +436,7 @@ export function upgradeStoryMemory(input: unknown): StoryMemoryV2 {
   upgraded.recentSummary = asString(root.recentSummary);
   upgraded.updatedAt = asString(root.updatedAt) || nowIso();
   upgraded.metadata = {
+    ...metadata,
     memoryConflicts: Array.isArray(metadata.memoryConflicts)
       ? (metadata.memoryConflicts as StoryMemoryV2["metadata"]["memoryConflicts"])
       : [],

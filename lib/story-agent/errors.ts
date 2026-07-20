@@ -25,6 +25,7 @@ export type StoryAgentErrorCode =
   | "GENERATION_LIMIT_REACHED"
   | "CONTEXT_MISMATCH"
   | "CONTEXT_ISOLATION_ERROR"
+  | "INSTRUCTION_FIDELITY_FAILED"
   | "UNKNOWN_AI_ERROR";
 
 export class StoryAgentError extends Error {
@@ -117,6 +118,8 @@ export function friendlyMessageForCode(
       return "Generated scene didn’t match your requested characters. Previous draft is unchanged—please retry.";
     case "CONTEXT_ISOLATION_ERROR":
       return "That draft belonged to another chat. Please retry in this conversation.";
+    case "INSTRUCTION_FIDELITY_FAILED":
+      return "I couldn’t generate this episode while preserving your confirmed characters and format. Please try once more.";
     case "INTENT_ROUTING_FAILED":
       return "I couldn’t finish that reply. Please try once more. 🙂";
     default:

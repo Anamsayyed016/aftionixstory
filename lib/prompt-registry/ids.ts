@@ -66,6 +66,9 @@ export const PROMPT_IDS = [
   "internal.response_review",
   // Phase G — Tool Framework
   "tool.plan",
+  // Phase G.5 — Instruction Fidelity
+  "story.generation.strict",
+  "story.repair.fidelity",
 ] as const;
 
 export type PromptId = (typeof PROMPT_IDS)[number];

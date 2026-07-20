@@ -88,6 +88,11 @@ const aiSchema = z
       .enum(["true", "false", "1", "0", "yes", "no", ""])
       .optional()
       .default("false"),
+    /** Phase G.5: Instruction Fidelity + output validation */
+    AI_INSTRUCTION_FIDELITY_V1_ENABLED: z
+      .enum(["true", "false", "1", "0", "yes", "no", ""])
+      .optional()
+      .default("false"),
   })
   .superRefine((data, ctx) => {
     if (process.env.NODE_ENV === "production" && data.AI_PROVIDER === "mock") {
@@ -187,6 +192,8 @@ function readRawAiEnv() {
       process.env.AI_PROVIDER_CIRCUIT_BREAKER_ENABLED || "true",
     AI_STORY_TOOL_FRAMEWORK_ENABLED:
       process.env.AI_STORY_TOOL_FRAMEWORK_ENABLED || "false",
+    AI_INSTRUCTION_FIDELITY_V1_ENABLED:
+      process.env.AI_INSTRUCTION_FIDELITY_V1_ENABLED || "false",
   };
 }
 

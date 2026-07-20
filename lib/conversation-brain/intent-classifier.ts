@@ -138,6 +138,7 @@ export async function classifyIntentWithLlm(params: {
       latestDraft: null,
       recentSummary: null,
       knowledge: { authorKnowledge: [], characterKnowledge: {} },
+      instructionContract: null,
       retrieval: {
         includedEntityIds: [],
         excludedCounts: {},
