@@ -111,9 +111,12 @@ export function responseFingerprint(reply: string): string {
   return `${t.length}:${t.slice(0, 32).toLowerCase()}`;
 }
 
-/** User-facing retry copy when a live provider fails — never a fake story answer. */
+/** Generic chat/provider failure — never claim “story ideas” for non-brainstorm ops. */
 export const PROVIDER_FAILURE_USER_MESSAGE =
-  "I couldn’t generate the story ideas correctly. Please retry once.";
+  "I couldn’t finish that reply. Please try once more.";
 
 export const BRAINSTORM_FAILURE_USER_MESSAGE =
   "I couldn’t generate the story ideas correctly. Please retry once.";
+
+export const MEMORY_FAILURE_USER_MESSAGE =
+  "I couldn’t save that story detail. Please try once more.";

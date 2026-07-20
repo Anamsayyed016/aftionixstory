@@ -66,7 +66,10 @@ describe("No fake concept template in product path", () => {
   });
 
   it("exposes a non-creative provider failure message", () => {
-    expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).toContain("retry");
+    expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).toMatch(/try|retry/);
+    expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).not.toContain(
+      "story ideas"
+    );
     expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).not.toContain(
       "slow-burn"
     );

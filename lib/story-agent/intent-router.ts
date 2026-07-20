@@ -4,9 +4,10 @@ import {
 } from "@/lib/story-agent/language-preferences";
 import { isConceptCreateRequest } from "@/lib/story-agent/concept-reply";
 import { looksLikeFreshSceneRequest } from "@/lib/story-agent/entity-resolver";
+import { extractMemoryFacts } from "@/lib/story-agent/memory-facts";
 import { detectStyleFeedback, readStyleProfile } from "@/lib/story-agent/style-profile";
 import type { StoryOperation } from "@/lib/story-agent/operations";
-import type { StoryMemory } from "@/lib/story-agent/schema";
+import type { MemoryPatch, StoryMemory } from "@/lib/story-agent/schema";
 
 export type IntentConfidence = "high" | "medium" | "low";
 
@@ -19,6 +20,9 @@ export type IntentRoute = {
   clearGenerationBlock?: boolean;
   /** Optional fixed reply (no model needed). */
   fixedReply?: string;
+  /** Deterministic memory patch when intent is update_memory. */
+  memoryPatch?: MemoryPatch;
+  matchedSignals?: string[];
   reason: string;
   /** Language detection metadata for observability. */
   languageLabel?: string;
@@ -349,6 +353,21 @@ export function routeIntent(
       confidence: "medium",
       skipClassifier: false,
       reason: "summarize",
+    };
+  }
+
+  // Explicit story facts / corrections — before brainstorm so "Azar male lead"
+  // never becomes a concept-generation failure.
+  const memoryFacts = extractMemoryFacts(text, memory);
+  if (memoryFacts.matched) {
+    return {
+      operation: "memory_update",
+      confidence: memoryFacts.confidence,
+      skipClassifier: true,
+      fixedReply: memoryFacts.confirmReply,
+      memoryPatch: memoryFacts.patch,
+      matchedSignals: memoryFacts.matchedSignals,
+      reason: "memory_facts",
     };
   }
 

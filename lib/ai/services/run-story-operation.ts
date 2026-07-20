@@ -26,6 +26,7 @@ import {
   looksLikeHardcodedConceptTemplate,
   looksLikeOnboardingGreeting,
   BRAINSTORM_FAILURE_USER_MESSAGE,
+  MEMORY_FAILURE_USER_MESSAGE,
   PROVIDER_FAILURE_USER_MESSAGE,
   responseFingerprint,
   responseMentionsTopic,
@@ -47,7 +48,10 @@ import {
   isStoryAgentError,
   StoryAgentError,
 } from "@/lib/story-agent/errors";
-import { describeMemoryStatus } from "@/lib/story-agent/memory-patch";
+import {
+  applyMemoryPatch,
+  describeMemoryStatus,
+} from "@/lib/story-agent/memory-patch";
 import type { NormalizedTurnResult } from "@/lib/story-agent/operation-result";
 import {
   OPERATION_PROFILES,
@@ -312,13 +316,20 @@ export async function runStoryOperation(params: {
 
   // ---- Fixed reply path (no model) ----
   if (route.fixedReply && route.skipClassifier) {
+    if (route.memoryPatch) {
+      memory = applyMemoryPatch(memory, route.memoryPatch);
+    }
     const style = readStyleProfile({
       emojiStyle: memory.userPreferences.emojiStyle,
     });
     let assistantReply = route.fixedReply;
-    if (styleApplied.confirmReply && styleApplied.styleLabel) {
+    if (
+      styleApplied.confirmReply &&
+      styleApplied.styleLabel &&
+      route.reason === "style_preference_only"
+    ) {
       assistantReply = styleApplied.confirmReply;
-    } else {
+    } else if (route.reason !== "memory_facts") {
       assistantReply = maybeDecorateChatReply(assistantReply, style.emojiStyle);
     }
     const suggestions =
@@ -333,19 +344,33 @@ export async function runStoryOperation(params: {
               prompt: "I have a character idea to start with.",
             },
           ]
-        : [];
+        : operation === "memory_update"
+          ? [
+              {
+                label: "Suggest options",
+                prompt: "Suggest a few story options based on what we have.",
+              },
+              {
+                label: "Write a scene",
+                prompt: "Write a short scene with these characters.",
+              },
+            ]
+          : [];
 
     console.info(
       JSON.stringify({
         event: "story_operation.turn",
         operation,
         detectedIntent: route.reason,
+        intentConfidence: route.confidence,
+        matchedSignals: route.matchedSignals ?? [],
         messageLength: params.userMessage.length,
         messageFingerprint: extractStoryConcept(params.userMessage).fingerprint,
         languageLabel: route.languageLabel ?? langApplied.languageLabel,
         narrationLanguage: memory.userPreferences.narrationLanguage,
         dialogueLanguage: memory.userPreferences.dialogueLanguage,
         outputMode: "none",
+        providerCallMade: false,
         providerResultValid: false,
         fallbackUsed: false,
         provider: null,
@@ -910,6 +935,12 @@ STRICT: Answer this exact request with 3–5 concrete, distinct story concepts o
     const isGreetingOnly = /^(hey|hi|hello|hola|help|namaste)[.!?]*$/i.test(
       params.userMessage.trim()
     );
+    const failureCopy =
+      structuredOp === "memory_update"
+        ? MEMORY_FAILURE_USER_MESSAGE
+        : isStoryAgentError(error)
+          ? friendlyMessageForCode(error.code, structuredOp)
+          : PROVIDER_FAILURE_USER_MESSAGE;
     const fallback = isGreetingOnly
       ? maybeDecorateChatReply(
           "Hey! 😊 Apna rough story idea batao—ek character, scene, ya sirf ek feeling bhi chalegi.",
@@ -917,7 +948,7 @@ STRICT: Answer this exact request with 3–5 concrete, distinct story concepts o
             emojiStyle: memory.userPreferences.emojiStyle,
           }).emojiStyle
         )
-      : PROVIDER_FAILURE_USER_MESSAGE;
+      : failureCopy;
 
     console.info(
       JSON.stringify({

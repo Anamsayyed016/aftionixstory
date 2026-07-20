@@ -71,9 +71,13 @@ export function friendlyMessageForCode(
       return "I couldn’t complete that scene correctly. Your previous draft is safe—please retry.";
     case "AGENT_RESPONSE_INVALID":
     case "MEMORY_PATCH_INVALID":
-      return operation === "brainstorm" || operation === "suggest_options"
-        ? "I couldn’t generate the story ideas correctly. Please retry once."
-        : "I couldn’t finish that reply. Please try once more. 🙂";
+      if (operation === "brainstorm" || operation === "suggest_options") {
+        return "I couldn’t generate the story ideas correctly. Please retry once.";
+      }
+      if (operation === "memory_update") {
+        return "I couldn’t save that story detail. Please try once more.";
+      }
+      return "I couldn’t finish that reply. Please try once more. 🙂";
     case "PROVIDER_AUTH_FAILED":
     case "MODEL_UNAVAILABLE":
       return "The story assistant isn’t fully configured right now. Please try again later.";
