@@ -27,7 +27,7 @@ const GENRE_PATTERNS: Array<{ re: RegExp; label: string }> = [
 ];
 
 const CREATE_CONCEPT_SIGNAL =
-  /\b(help\s+me\s+create|create\s+a|i\s+want\s+a|make\s+a|suggest\s+a|suggest\s+three|story\s+about|concept|idea|brainstorm|opening\s+situations?)\b/i;
+  /\b(help\s+me\s+create|create\s+a|i\s+want\s+a|make\s+a|suggest\s+a|suggest\s+three|suggest\s+something|serialized\s+story|unique\s+for\s+a|story\s+about|concept|idea|brainstorm|opening\s+situations?)\b/i;
 
 export function isConceptCreateRequest(message: string): boolean {
   const text = message.trim();
@@ -113,4 +113,7 @@ export function responseFingerprint(reply: string): string {
 
 /** User-facing retry copy when a live provider fails — never a fake story answer. */
 export const PROVIDER_FAILURE_USER_MESSAGE =
-  "Main is request ka proper response generate nahi kar paayi. Please retry once. Your story details are safe.";
+  "I couldn’t generate the story ideas correctly. Please retry once.";
+
+export const BRAINSTORM_FAILURE_USER_MESSAGE =
+  "I couldn’t generate the story ideas correctly. Please retry once.";

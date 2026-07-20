@@ -15,7 +15,7 @@ import { isAIError } from "@/lib/ai/errors";
 import { getAIProvider } from "@/lib/ai/registry";
 import {
   mergeDecisionIntoMemory,
-  parseStoryAgentTurnResult,
+  parseAgentDecisionResilient,
 } from "@/lib/ai/services/story-agent";
 import { generateWriteScene } from "@/lib/ai/services/write-scene";
 import { getAiEnv, resolveAgentModel } from "@/lib/env";
@@ -25,6 +25,7 @@ import {
   extractStoryConcept,
   looksLikeHardcodedConceptTemplate,
   looksLikeOnboardingGreeting,
+  BRAINSTORM_FAILURE_USER_MESSAGE,
   PROVIDER_FAILURE_USER_MESSAGE,
   responseFingerprint,
   responseMentionsTopic,
@@ -248,13 +249,14 @@ async function runStructuredAgent(params: {
 
   let decision: StoryAgentTurnResult;
   try {
-    decision = parseStoryAgentTurnResult(result.text);
+    decision = parseAgentDecisionResilient(result.text, {
+      preferIntent:
+        params.operation === "brainstorm" || params.operation === "suggest_options"
+          ? "brainstorm"
+          : "chat",
+    });
   } catch (error) {
-    if (isAIError(error)) {
-      throw new Error(
-        "I couldn’t understand the assistant’s reply format. Please try again."
-      );
-    }
+    // Preserve AIError codes for truthful fallbacks upstream
     throw error;
   }
 
@@ -396,15 +398,16 @@ export async function runStoryOperation(params: {
 
     const isProviderReplyUsable = (reply: string) => {
       const text = reply.trim();
-      if (!text) return false;
+      if (!text || text.length < 24) return false;
       if (looksLikeOnboardingGreeting(text)) return false;
       if (looksLikeHardcodedConceptTemplate(text)) return false;
+      // Accept substantive brainstorm replies; topic match is soft signal only
+      if (text.length >= 60) return true;
       return (
         responseMentionsTopic(text, conceptMeta.topicLabel) ||
-        /opening|situation|option|concept|scene|character|horror|comedy|thriller|romance|fantasy|conflict|kiss|suggest/i.test(
+        /opening|situation|option|concept|scene|character|horror|comedy|thriller|romance|fantasy|conflict|kiss|suggest|unique|serial/i.test(
           text
-        ) ||
-        text.length > 80
+        )
       );
     };
 
@@ -417,6 +420,7 @@ export async function runStoryOperation(params: {
     let durationMs = Date.now() - started;
     let assistantReply = "";
     let suggestions: Array<{ label: string; prompt: string }> = [];
+    let normalizedErrorCode: string | undefined;
 
     try {
       providerCallMade = true;
@@ -435,7 +439,7 @@ export async function runStoryOperation(params: {
           memory,
           userMessage: `${params.userMessage}
 
-STRICT: Answer this exact request with a concrete, specific reply. Do not ask which conflict type if the user already specified it. Do not use generic slow-burn templates.`,
+STRICT: Answer this exact request with 3–5 concrete, distinct story concepts or openings. Include a short hook for each. Do not ask which conflict type if already specified. Do not use generic slow-burn templates. Return valid JSON with assistantReply.`,
           recentMessages: params.recentMessages,
         });
         reply = agent.decision.assistantReply?.trim() || "";
@@ -444,7 +448,7 @@ STRICT: Answer this exact request with a concrete, specific reply. Do not ask wh
       if (!isProviderReplyUsable(reply)) {
         throw new StoryAgentError(
           "AGENT_RESPONSE_INVALID",
-          PROVIDER_FAILURE_USER_MESSAGE,
+          BRAINSTORM_FAILURE_USER_MESSAGE,
           { retryable: true, operation: "brainstorm" }
         );
       }
@@ -472,12 +476,17 @@ STRICT: Answer this exact request with a concrete, specific reply. Do not ask wh
       durationMs = agent.durationMs;
     } catch (error) {
       fallbackUsed = true;
-      fallbackType = isStoryAgentError(error)
+      normalizedErrorCode = isStoryAgentError(error)
         ? error.code
-        : "provider_failed";
+        : isAIError(error)
+          ? error.code
+          : "AGENT_RESPONSE_INVALID";
+      fallbackType = normalizedErrorCode;
       const message = isStoryAgentError(error)
-        ? friendlyMessageForCode(error.code, "brainstorm")
-        : PROVIDER_FAILURE_USER_MESSAGE;
+        ? error.message || BRAINSTORM_FAILURE_USER_MESSAGE
+        : isAIError(error)
+          ? BRAINSTORM_FAILURE_USER_MESSAGE
+          : BRAINSTORM_FAILURE_USER_MESSAGE;
 
       console.info(
         JSON.stringify({
@@ -490,6 +499,7 @@ STRICT: Answer this exact request with a concrete, specific reply. Do not ask wh
           providerSuccess: false,
           fallbackUsed: true,
           fallbackType,
+          normalizedErrorCode,
           providerResultValid: false,
           durationMs: Date.now() - started,
           conversationId: params.conversationId,

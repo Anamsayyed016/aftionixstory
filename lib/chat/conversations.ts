@@ -67,14 +67,22 @@ export async function listOwnedConversations(params: {
   mode: ConversationMode;
   storyId?: string;
   limit?: number;
+  /** Default ACTIVE-only for sidebar history. */
+  status?: "ACTIVE" | "ARCHIVED" | "ALL";
 }) {
   const limit = params.limit ?? HISTORY_LIMIT;
+  const statusWhere =
+    params.status === "ALL"
+      ? { status: { in: ["ACTIVE", "ARCHIVED"] as ("ACTIVE" | "ARCHIVED")[] } }
+      : params.status === "ARCHIVED"
+        ? { status: "ARCHIVED" as const }
+        : { status: "ACTIVE" as const };
   const rows = await prisma.conversation.findMany({
     where: {
       userId: params.userId,
       mode: params.mode,
       ...(params.storyId ? { storyId: params.storyId } : {}),
-      status: { in: ["ACTIVE", "ARCHIVED"] },
+      ...statusWhere,
     },
     orderBy: { lastMessageAt: "desc" },
     take: limit,
@@ -250,11 +258,24 @@ export async function archiveOwnedConversation(
   userId: string,
   conversationId: string
 ) {
-  await requireOwnedConversation(userId, conversationId);
-  return prisma.conversation.update({
+  const owned = await requireOwnedConversation(userId, conversationId);
+  const previousStatus = owned.status;
+  const archived = await prisma.conversation.update({
     where: { id: conversationId },
     data: { status: "ARCHIVED" },
   });
+  console.info(
+    JSON.stringify({
+      event: "conversation.archive",
+      conversationId,
+      userIdHash: userId.slice(0, 8),
+      action: "archive",
+      ownershipResult: "ok",
+      previousStatus,
+      newStatus: archived.status,
+    })
+  );
+  return archived;
 }
 
 export async function findLatestActiveConversation(params: {

@@ -114,7 +114,9 @@ const MEMORY = [
 ];
 
 const BRAINSTORM = [
-  /\bsuggest\s+(ideas?|options?|concepts?)\b/i,
+  /\bsuggest\s+(ideas?|options?|concepts?|something)\b/i,
+  /\bsuggest\s+.+\b(unique|serialized|serial)\b/i,
+  /\bunique\b.+\b(serialized|serial)\s+story\b/i,
   /\boptions?\s+do\b/i,
   /\btwist\s+batao\b/i,
   /\bconcept\s+suggest\b/i,

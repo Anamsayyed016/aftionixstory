@@ -45,6 +45,7 @@ describe("Provider routing hardening", () => {
     );
     expect(PROVIDER_FAILURE_USER_MESSAGE).not.toMatch(/slow-burn/i);
     expect(PROVIDER_FAILURE_USER_MESSAGE).not.toMatch(/core conflict/i);
+    expect(PROVIDER_FAILURE_USER_MESSAGE).not.toMatch(/story details are safe/i);
   });
 
   it("mock is only via explicit DI in this suite", () => {

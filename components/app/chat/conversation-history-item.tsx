@@ -16,6 +16,7 @@ export type ConversationHistoryItemData = {
 type ConversationHistoryItemProps = {
   item: ConversationHistoryItemData;
   active: boolean;
+  archiving?: boolean;
   onOpen: (id: string) => void;
   onArchive: (id: string) => void;
 };
@@ -36,6 +37,7 @@ function formatWhen(iso: string): string {
 export function ConversationHistoryItem({
   item,
   active,
+  archiving = false,
   onOpen,
   onArchive,
 }: ConversationHistoryItemProps) {
@@ -76,9 +78,14 @@ export function ConversationHistoryItem({
       {item.status === "ACTIVE" ? (
         <button
           type="button"
-          onClick={() => onArchive(item.id)}
+          disabled={archiving}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onArchive(item.id);
+          }}
           aria-label={`Archive ${item.title || "conversation"}`}
-          className="rounded-lg p-1.5 text-ink-faint opacity-70 transition-opacity hover:bg-white/5 hover:text-ink group-hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac"
+          className="rounded-lg p-1.5 text-ink-faint opacity-100 transition-opacity hover:bg-white/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac disabled:opacity-40 sm:opacity-70 sm:group-hover:opacity-100"
         >
           <Archive className="h-3.5 w-3.5" aria-hidden />
         </button>

@@ -33,6 +33,80 @@ export function parseStoryAgentTurnResult(raw: string): StoryAgentTurnResult {
   return parsed.data;
 }
 
+/**
+ * Resilient parse for brainstorm / chat agent envelopes.
+ * Coerces unknown intents and recovers assistantReply from partial JSON or plain text.
+ */
+export function parseAgentDecisionResilient(
+  raw: string,
+  opts?: { preferIntent?: StoryAgentTurnResult["intent"] }
+): StoryAgentTurnResult {
+  try {
+    return parseStoryAgentTurnResult(raw);
+  } catch {
+    // continue to recovery
+  }
+
+  let json: unknown = null;
+  try {
+    json = extractJsonObject(raw);
+  } catch {
+    json = null;
+  }
+
+  if (json && typeof json === "object") {
+    const record = json as Record<string, unknown>;
+    const replyCandidate =
+      (typeof record.assistantReply === "string" && record.assistantReply) ||
+      (typeof record.reply === "string" && record.reply) ||
+      (typeof record.message === "string" && record.message) ||
+      "";
+    const coerced = {
+      assistantReply: String(replyCandidate).trim(),
+      intent: opts?.preferIntent || "brainstorm",
+      requiresConfirmation: false,
+      clarificationQuestion: null,
+      memoryPatch: {
+        story: {},
+        characters: [],
+        relationships: [],
+        writingRules: [],
+        preferences: {},
+        remove: [],
+      },
+      action: { type: "suggest_options", payload: {} },
+      suggestions: Array.isArray(record.suggestions) ? record.suggestions : [],
+    };
+    const parsed = storyAgentTurnResultSchema.safeParse(coerced);
+    if (parsed.success && parsed.data.assistantReply.length >= 20) {
+      return parsed.data;
+    }
+  }
+
+  const plain = raw.trim();
+  if (
+    plain.length >= 40 &&
+    !plain.startsWith("{") &&
+    !looksLikeEmptyJson(plain)
+  ) {
+    return storyAgentTurnResultSchema.parse({
+      assistantReply: plain.slice(0, 8000),
+      intent: opts?.preferIntent || "brainstorm",
+      action: { type: "suggest_options", payload: {} },
+    });
+  }
+
+  throw new AIError(
+    "AI_INVALID_RESPONSE",
+    "I couldn’t understand the assistant’s reply format. Please try again.",
+    true
+  );
+}
+
+function looksLikeEmptyJson(text: string): boolean {
+  return text.startsWith("{") && text.length < 40;
+}
+
 export async function runStoryAgentDecision(params: {
   userMessage: string;
   memory: StoryMemory;

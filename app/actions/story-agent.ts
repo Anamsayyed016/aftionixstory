@@ -46,6 +46,8 @@ const storyAgentTurnInputSchema = z.object({
     .min(8)
     .max(80)
     .regex(/^[A-Za-z0-9_-]+$/),
+  /** Retry: reuse last USER message instead of appending a duplicate. */
+  reuseLastUserMessage: z.boolean().optional().default(false),
 });
 
 export type StoryAgentTurnActionData = {
@@ -174,7 +176,8 @@ export async function storyAgentTurnAction(
       return fail("VALIDATION_ERROR", "Please enter a valid message.");
     }
 
-    const { conversationId, message, turnRequestId } = parsed.data;
+    const { conversationId, message, turnRequestId, reuseLastUserMessage } =
+      parsed.data;
     const messageFingerprint = extractStoryConcept(message).fingerprint;
     const userRequestId = `t_${turnRequestId}_u`;
     const assistantRequestId = `t_${turnRequestId}_a`;
@@ -188,6 +191,7 @@ export async function storyAgentTurnAction(
         messageFingerprint,
         messageLength: message.length,
         messagePreview: message.slice(0, 48),
+        reuseLastUserMessage,
       })
     );
 
@@ -242,13 +246,35 @@ export async function storyAgentTurnAction(
       });
     }
 
-    const appendedUser = await appendOwnedChatMessage({
-      userId: user.id,
-      conversationId,
-      role: "USER",
-      content: message,
-      requestId: userRequestId,
-    });
+    let appendedUser: Awaited<ReturnType<typeof appendOwnedChatMessage>>;
+    if (reuseLastUserMessage) {
+      const lastUser = [...existingMessages]
+        .reverse()
+        .find((m) => m.role === "USER");
+      if (lastUser && lastUser.content.trim() === message.trim()) {
+        appendedUser = {
+          conversation,
+          message: lastUser,
+          duplicated: true as const,
+        };
+      } else {
+        appendedUser = await appendOwnedChatMessage({
+          userId: user.id,
+          conversationId,
+          role: "USER",
+          content: message,
+          requestId: userRequestId,
+        });
+      }
+    } else {
+      appendedUser = await appendOwnedChatMessage({
+        userId: user.id,
+        conversationId,
+        role: "USER",
+        content: message,
+        requestId: userRequestId,
+      });
+    }
 
     const memory = readMemoryFromConversationState(
       appendedUser.conversation.state ?? conversation.state

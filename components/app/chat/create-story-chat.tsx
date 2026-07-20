@@ -113,8 +113,11 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   const [lastOperation, setLastOperation] = useState<string>("conversational_chat");
   const [feedbackHint, setFeedbackHint] = useState<string | null>(null);
   const [contextHint, setContextHint] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archivingId, setArchivingId] = useState<string | null>(null);
   const sendingLockRef = useRef(false);
   const createLockRef = useRef(false);
+  const archiveLockRef = useRef(false);
   const lastFailedPromptRef = useRef<string | null>(null);
   /** Monotonic: bumps on each send; stale restores must not overwrite. */
   const turnSeqRef = useRef(0);
@@ -329,22 +332,49 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
   }
 
   async function archiveConversation(id: string) {
-    const result = await archiveConversationAction({ conversationId: id });
-    if (!result.success) {
-      setMessages((prev) => [
-        ...prev,
-        buildChatMessage("assistant", result.error.message, "error"),
-      ]);
-      return;
-    }
-    await refreshHistory();
-    if (conversationId === id) {
-      await startNewConversation();
+    if (archiveLockRef.current) return;
+    archiveLockRef.current = true;
+    setArchivingId(id);
+    setArchiveError(null);
+    const archiveVersion = ++restoreSeqRef.current;
+    try {
+      const result = await archiveConversationAction({ conversationId: id });
+      if (!result.success) {
+        setArchiveError(
+          result.error.message ||
+            "Couldn’t archive this conversation. Please try again."
+        );
+        return;
+      }
+
+      // Optimistic remove from ACTIVE history
+      setHistory((prev) => prev.filter((c) => c.id !== id));
+
+      if (conversationId === id) {
+        const listed = await listConversationsAction({
+          mode: "CREATE",
+          limit: 20,
+        });
+        if (archiveVersion !== restoreSeqRef.current) return;
+        if (listed.success && listed.data.conversations.length > 0) {
+          const nextId = listed.data.conversations[0].id;
+          await openConversation(nextId);
+        } else {
+          await startNewConversation();
+        }
+      } else {
+        await refreshHistory();
+      }
+    } catch {
+      setArchiveError("Couldn’t archive this conversation. Please try again.");
+    } finally {
+      archiveLockRef.current = false;
+      setArchivingId(null);
     }
   }
 
   const sendPrompt = useCallback(
-    async (raw: string) => {
+    async (raw: string, opts?: { isRetry?: boolean }) => {
       const content = raw.trim();
       if (
         sendingLockRef.current ||
@@ -365,14 +395,37 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
       lastFailedPromptRef.current = content;
 
       const turnRequestId = newRequestId();
-      const userMessage = buildChatMessage("user", content, "sent");
-      setMessages((prev) => [...prev, userMessage]);
+      const isRetry = Boolean(opts?.isRetry);
+
+      if (isRetry) {
+        setMessages((prev) => {
+          const next = [...prev];
+          while (
+            next.length > 0 &&
+            next[next.length - 1].role === "assistant" &&
+            next[next.length - 1].status === "error"
+          ) {
+            next.pop();
+          }
+          const last = next[next.length - 1];
+          if (last?.role === "user" && last.content === content) {
+            return next;
+          }
+          return [...next, buildChatMessage("user", content, "sent")];
+        });
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          buildChatMessage("user", content, "sent"),
+        ]);
+      }
 
       try {
         const result = await storyAgentTurnAction({
           conversationId: conversationAtSend,
           message: content,
           turnRequestId,
+          reuseLastUserMessage: isRetry,
         });
 
         // Stale turn or user switched conversation — do not clobber UI
@@ -493,7 +546,8 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
 
   function handleRetry() {
     const prompt = lastFailedPromptRef.current;
-    if (prompt) void sendPrompt(prompt);
+    if (!prompt || sendingLockRef.current) return;
+    void sendPrompt(prompt, { isRetry: true });
   }
 
   async function handleCreate() {
@@ -550,6 +604,7 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
         items={history}
         activeId={conversationId}
         loading={restoring}
+        archivingId={archivingId}
         onOpen={(id) => void openConversation(id)}
         onArchive={(id) => void archiveConversation(id)}
         onNew={() => void startNewConversation()}
@@ -586,6 +641,11 @@ export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
             </div>
             {persistHint ? (
               <p className="mt-1 text-[11px] text-ink-faint">{persistHint}</p>
+            ) : null}
+            {archiveError ? (
+              <p className="mt-1 text-[11px] text-danger" role="alert">
+                {archiveError}
+              </p>
             ) : null}
           </div>
 

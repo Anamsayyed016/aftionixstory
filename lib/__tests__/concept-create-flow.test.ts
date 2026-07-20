@@ -70,6 +70,9 @@ describe("No fake concept template in product path", () => {
     expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).not.toContain(
       "slow-burn"
     );
+    expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).not.toContain(
+      "story details are safe"
+    );
   });
 
   it("extracts topics without inventing user-facing answers", () => {

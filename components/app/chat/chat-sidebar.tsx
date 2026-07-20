@@ -14,6 +14,7 @@ type ChatSidebarProps = {
   items: ConversationHistoryItemData[];
   activeId: string | null;
   loading?: boolean;
+  archivingId?: string | null;
   onOpen: (id: string) => void;
   onArchive: (id: string) => void;
   onNew: () => void;
@@ -26,6 +27,7 @@ function SidebarBody({
   items,
   activeId,
   loading,
+  archivingId,
   onOpen,
   onArchive,
   onNew,
@@ -34,6 +36,7 @@ function SidebarBody({
   items: ConversationHistoryItemData[];
   activeId: string | null;
   loading: boolean;
+  archivingId?: string | null;
   onOpen: (id: string) => void;
   onArchive: (id: string) => void;
   onNew: () => void;
@@ -82,6 +85,7 @@ function SidebarBody({
                 <ConversationHistoryItem
                   item={item}
                   active={item.id === activeId}
+                  archiving={archivingId === item.id}
                   onOpen={(id) => {
                     onOpen(id);
                     onItemActivate?.();
@@ -101,6 +105,7 @@ export function ChatSidebar({
   items,
   activeId,
   loading = false,
+  archivingId = null,
   onOpen,
   onArchive,
   onNew,
@@ -141,6 +146,7 @@ export function ChatSidebar({
           items={items}
           activeId={activeId}
           loading={loading}
+          archivingId={archivingId}
           onOpen={onOpen}
           onArchive={onArchive}
           onNew={onNew}
@@ -179,6 +185,7 @@ export function ChatSidebar({
               items={items}
               activeId={activeId}
               loading={loading}
+              archivingId={archivingId}
               onOpen={onOpen}
               onArchive={onArchive}
               onNew={() => {

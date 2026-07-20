@@ -367,6 +367,7 @@ export async function updateConversationStateAction(
 export async function archiveConversationAction(
   input: unknown
 ): Promise<ActionResult<{ conversationId: string }>> {
+  const started = Date.now();
   try {
     const user = await requireAuthenticatedUser();
     const parsed = conversationIdSchema.safeParse(input);
@@ -377,6 +378,16 @@ export async function archiveConversationAction(
     const archived = await archiveOwnedConversation(
       user.id,
       parsed.data.conversationId
+    );
+    console.info(
+      JSON.stringify({
+        event: "conversation.archive_action",
+        conversationId: archived.id,
+        userIdHash: user.id.slice(0, 8),
+        action: "archive",
+        newStatus: "ARCHIVED",
+        durationMs: Date.now() - started,
+      })
     );
     return ok({ conversationId: archived.id });
   } catch (error) {

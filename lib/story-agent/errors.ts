@@ -50,7 +50,9 @@ export function friendlyMessageForCode(
     operation === "revise_draft" ||
     operation === "start_story" ||
     operation === "generate_episode" ||
-    operation === "continue_episode";
+    operation === "continue_episode" ||
+    operation === "brainstorm" ||
+    operation === "suggest_options";
 
   switch (code) {
     case "PROVIDER_RATE_LIMITED":
@@ -60,14 +62,18 @@ export function friendlyMessageForCode(
       return "Is month ki generation limit poori ho chuki hai. Baad mein try karein.";
     case "PROVIDER_TIMEOUT":
       return creative
-        ? "I couldn’t complete that scene in time. Your previous draft is safe—please retry."
+        ? operation === "brainstorm" || operation === "suggest_options"
+          ? "I couldn’t generate the story ideas correctly. Please retry once."
+          : "I couldn’t complete that scene in time. Your previous draft is safe—please retry."
         : "I couldn’t finish that reply in time. Please try once more. 🙂";
     case "CREATIVE_RESPONSE_EMPTY":
     case "CREATIVE_RESPONSE_TRUNCATED":
       return "I couldn’t complete that scene correctly. Your previous draft is safe—please retry.";
     case "AGENT_RESPONSE_INVALID":
     case "MEMORY_PATCH_INVALID":
-      return "I couldn’t finish that reply. Please try once more. 🙂";
+      return operation === "brainstorm" || operation === "suggest_options"
+        ? "I couldn’t generate the story ideas correctly. Please retry once."
+        : "I couldn’t finish that reply. Please try once more. 🙂";
     case "PROVIDER_AUTH_FAILED":
     case "MODEL_UNAVAILABLE":
       return "The story assistant isn’t fully configured right now. Please try again later.";
