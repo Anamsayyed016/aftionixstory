@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { formatConversationWhenUtc } from "@/lib/chat/format-conversation-when";
 import { parseNewStoryPageParams } from "@/lib/chat/new-story-page-params";
+import {
+  canSendMessage,
+  isComposerInteractionLocked,
+} from "@/lib/chat/utils";
 import { routeIntent } from "@/lib/story-agent/intent-router";
 import {
   BRAINSTORM_FAILURE_USER_MESSAGE,
@@ -48,6 +52,61 @@ describe("Hydration-safe /stories/new params", () => {
     expect(page).toContain("initialPrompt={prompt}");
     expect(page).not.toContain("useSearchParams");
     expect(page).not.toContain("Suspense");
+  });
+});
+
+describe("Composer click lock (Send / suggestions)", () => {
+  it("unlocks once conversationId exists even if restoring history", () => {
+    expect(
+      isComposerInteractionLocked({
+        restoring: true,
+        conversationId: "conv_1",
+      })
+    ).toBe(false);
+  });
+
+  it("locks only while restoring without a conversation id", () => {
+    expect(
+      isComposerInteractionLocked({
+        restoring: true,
+        conversationId: null,
+      })
+    ).toBe(true);
+  });
+
+  it("keeps Send enabled for a non-empty prefilled prompt when unlocked", () => {
+    const locked = isComposerInteractionLocked({
+      restoring: true,
+      conversationId: "conv_1",
+    });
+    expect(locked).toBe(false);
+    expect(
+      canSendMessage(
+        "I want to start a new story. Help me shape the concept.",
+        locked
+      )
+    ).toBe(true);
+  });
+
+  it("strips prompt via history.replaceState, not App Router navigation", () => {
+    const source = readFileSync(
+      path.resolve("components/app/new-story-entry.tsx"),
+      "utf8"
+    );
+    expect(source).toContain("history.replaceState");
+    expect(source).toContain("stripPromptQueryFromUrl");
+    expect(source).not.toMatch(/\brouter\.replace\b/);
+  });
+
+  it("CreateStoryChat uses composerLocked helper for Send", () => {
+    const source = readFileSync(
+      path.resolve("components/app/chat/create-story-chat.tsx"),
+      "utf8"
+    );
+    expect(source).toContain("isComposerInteractionLocked");
+    expect(source).toContain("composerLocked");
+    expect(source).toContain("disabled={composerLocked}");
+    expect(source).toMatch(/ensureConversationAction/);
   });
 });
 

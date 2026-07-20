@@ -87,16 +87,18 @@ describe("Create → Story Assistant integration contracts", () => {
     );
   });
 
-  it("NewStoryEntry uses server props and clears prompt after mount", () => {
+  it("NewStoryEntry uses server props and strips prompt without soft navigation", () => {
     const source = readFileSync(
       path.resolve("components/app/new-story-entry.tsx"),
       "utf8"
     );
     expect(source).toContain("initialMode");
     expect(source).toContain("initialPrompt");
-    expect(source).toContain('searchParams.delete("prompt")');
+    expect(source).toContain("history.replaceState");
+    expect(source).not.toMatch(/\brouter\.replace\b/);
     expect(source).not.toContain("useSearchParams");
     expect(source).not.toContain("captureStarterPrompt");
+    expect(source).toContain("stripPromptQueryFromUrl");
     expect(source).toContain("initialComposerValue");
     expect(source).toContain("StoryWizard");
   });

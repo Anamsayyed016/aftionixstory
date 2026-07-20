@@ -22,6 +22,23 @@ export function canSendMessage(content: string, busy: boolean): boolean {
   );
 }
 
+/**
+ * Composer / suggestion clicks must not stay locked for the whole history restore.
+ * Lock only while we still lack an active conversation during boot, or while
+ * creating / archived.
+ */
+export function isComposerInteractionLocked(opts: {
+  creating?: boolean;
+  archived?: boolean;
+  restoring?: boolean;
+  conversationId?: string | null;
+}): boolean {
+  if (opts.creating) return true;
+  if (opts.archived) return true;
+  if (opts.restoring && !opts.conversationId) return true;
+  return false;
+}
+
 export function shouldSendOnKeyDown(event: {
   key: string;
   shiftKey: boolean;

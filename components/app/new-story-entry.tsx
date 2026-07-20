@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { ChatModeToggle } from "@/components/app/chat/chat-mode-toggle";
 import { CreateStoryChat } from "@/components/app/chat/create-story-chat";
@@ -21,6 +20,21 @@ type NewStoryEntryProps = {
 };
 
 /**
+ * Strip `prompt` from the address bar without a Next.js soft navigation.
+ * Using the App Router replace API re-renders the RSC page and can remount/abort
+ * chat boot, leaving restoring=true and disabling Send forever.
+ */
+export function stripPromptQueryFromUrl(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("prompt")) return;
+  url.searchParams.delete("prompt");
+  const query = url.searchParams.toString();
+  const next = query ? `${url.pathname}?${query}` : url.pathname;
+  window.history.replaceState(window.history.state, "", next);
+}
+
+/**
  * Chat shell height accounts for:
  * app header + page title + mode toggle + main padding + mobile nav (pb-24).
  * Inner CreateStoryChat uses flex + min-h-0 so the composer stays visible.
@@ -29,25 +43,12 @@ export function NewStoryEntry({
   initialMode,
   initialPrompt = "",
 }: NewStoryEntryProps) {
-  const router = useRouter();
   const [entryMode, setEntryMode] = useState<NewStoryEntryMode>(initialMode);
   const [starterPrompt] = useState(() => initialPrompt.trim());
 
-  // Strip prompt from the URL after mount so refresh does not re-prefill.
-  // Does not change first-paint markup (server already rendered with props).
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has("prompt")) return;
-    url.searchParams.delete("prompt");
-    if (!url.searchParams.get("mode") && initialMode === "chat") {
-      url.searchParams.set("mode", "chat");
-    }
-    const query = url.searchParams.toString();
-    router.replace(query ? `${url.pathname}?${query}` : url.pathname, {
-      scroll: false,
-    });
-  }, [initialMode, router]);
+    stripPromptQueryFromUrl();
+  }, []);
 
   if (entryMode === "wizard") {
     return (

@@ -36,7 +36,7 @@ import {
 } from "@/lib/story-agent/memory-patch";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import type { ChatMessage, ChatSuggestion } from "@/lib/chat/types";
-import { buildChatMessage, canSendMessage } from "@/lib/chat/utils";
+import { buildChatMessage, canSendMessage, isComposerInteractionLocked } from "@/lib/chat/utils";
 import { cn } from "@/lib/utils";
 
 /** Dedupes Strict Mode double-mount boot so we don't create two empty chats. */
@@ -142,6 +142,12 @@ export function CreateStoryChat({
   const showReviewButton =
     Boolean(memory && (memory.characters.length > 0 || memory.storyMemory.title)) ||
     reviewOpen;
+  const composerLocked = isComposerInteractionLocked({
+    creating,
+    archived: archivedConversation,
+    restoring,
+    conversationId,
+  });
 
   const refreshHistory = useCallback(async () => {
     const listed = await listConversationsAction({
@@ -256,6 +262,10 @@ export function CreateStoryChat({
 
         const conversationIdToLoad = await createStoryBootPromise;
         if (!conversationIdToLoad || cancelled) return;
+
+        // Unlock composer as soon as we have an id — do not wait for full message load.
+        activeConversationIdRef.current = conversationIdToLoad;
+        setConversationId(conversationIdToLoad);
 
         const loaded = await loadConversationAction({
           conversationId: conversationIdToLoad,
@@ -385,7 +395,29 @@ export function CreateStoryChat({
       if (
         sendingLockRef.current ||
         !canSendMessage(content, false) ||
-        !conversationId ||
+        archivedConversation
+      ) {
+        return;
+      }
+
+      let conversationAtSend = conversationId;
+      if (!conversationAtSend) {
+        const ensured = await ensureConversationAction({ mode: "CREATE" });
+        if (!ensured.success) {
+          setMessages((prev) => [
+            ...prev,
+            buildChatMessage("assistant", ensured.error.message, "error"),
+          ]);
+          return;
+        }
+        conversationAtSend = ensured.data.conversationId;
+        activeConversationIdRef.current = conversationAtSend;
+        setConversationId(conversationAtSend);
+        createStoryBootPromise = Promise.resolve(conversationAtSend);
+      }
+
+      if (
+        sendingLockRef.current ||
         archivedConversation
       ) {
         return;
@@ -393,8 +425,7 @@ export function CreateStoryChat({
 
       sendingLockRef.current = true;
       const myTurn = ++turnSeqRef.current;
-      const conversationAtSend = conversationId;
-      activeConversationIdRef.current = conversationId;
+      activeConversationIdRef.current = conversationAtSend;
       setBusy(true);
       setDraft("");
       setPersistHint("Thinking…");
@@ -609,7 +640,7 @@ export function CreateStoryChat({
       <ChatSidebar
         items={history}
         activeId={conversationId}
-        loading={restoring}
+        loading={restoring && !conversationId}
         archivingId={archivingId}
         onOpen={(id) => void openConversation(id)}
         onArchive={(id) => void archiveConversation(id)}
@@ -664,7 +695,7 @@ export function CreateStoryChat({
               size="sm"
               variant="secondary"
               className="rounded-xl"
-              disabled={restoring}
+              disabled={restoring && !conversationId}
               onClick={() => void startNewConversation()}
             >
               <Plus className="h-3.5 w-3.5" aria-hidden />
@@ -709,7 +740,7 @@ export function CreateStoryChat({
               emptyDescription={copy.emptyDescription}
               suggestions={CREATE_SUGGESTIONS}
               onSelectSuggestion={handleSelectSuggestion}
-              disabled={creating || restoring || archivedConversation}
+              disabled={composerLocked}
               busy={busy && !restoring}
               onRetryError={handleRetry}
               className="h-auto min-h-0 overflow-visible"
@@ -721,7 +752,7 @@ export function CreateStoryChat({
                   <button
                     key={suggestion.id}
                     type="button"
-                    disabled={creating || restoring || archivedConversation}
+                    disabled={composerLocked}
                     onClick={() => handleSelectSuggestion(suggestion)}
                     className="rounded-full border border-border bg-charcoal/50 px-3 py-1 text-xs text-ink-dim transition-colors hover:border-violet-soft/40 hover:text-ink disabled:opacity-50"
                   >
@@ -857,7 +888,7 @@ export function CreateStoryChat({
               onChange={setDraft}
               onSend={handleSend}
               placeholder={copy.placeholder}
-              disabled={creating || restoring || archivedConversation}
+              disabled={composerLocked}
               busy={busy}
             />
           </div>
