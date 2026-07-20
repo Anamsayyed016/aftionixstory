@@ -3,11 +3,13 @@ import "server-only";
 import { buildStoryContext } from "@/lib/ai/context/story-context-builder";
 import { buildReviseDraftPrompt } from "@/lib/ai/prompts/revise-draft-prompt";
 import { buildWriteScenePrompt } from "@/lib/ai/prompts/write-scene-prompt";
+import { logAiEvent } from "@/lib/ai/logger";
 import { generateCreativeText } from "@/lib/ai/services/creative-text";
 import type { AIProvider } from "@/lib/ai/types";
 import { assessDraftRelevance } from "@/lib/story-agent/draft-relevance";
 import { resolveSceneRequest } from "@/lib/story-agent/entity-resolver";
 import { StoryAgentError } from "@/lib/story-agent/errors";
+import { getMemoryV2 } from "@/lib/story-agent/memory-patch";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import { readStyleProfile } from "@/lib/story-agent/style-profile";
 import {
@@ -15,6 +17,14 @@ import {
   assertWithinGenerationLimit,
   incrementSuccessfulGeneration,
 } from "@/lib/usage/generation";
+import {
+  composeCreateChatPrompt,
+  isPromptRegistryV2Enabled,
+  promptResultToLegacyParts,
+  resolveTemperature,
+  resolveMaxOutputTokens,
+  promptLogFieldsForAiEvent,
+} from "@/lib/prompt-registry";
 
 export type WriteSceneResult = {
   title: string;
@@ -43,7 +53,9 @@ export async function generateWriteScene(params: {
   storyId?: string | null;
   recentMessages?: Array<{ role: string; content: string }>;
   provider?: AIProvider;
-}): Promise<WriteSceneResult> {
+  /** Phase B/E intent for revision-specific prompts */
+  intent?: string | null;
+}): Promise<WriteSceneResult & { promptId?: string; promptVersion?: string }> {
   await assertWithinGenerationLimit(params.userId);
   await assertGenerationRateLimit(params.userId);
 
@@ -87,12 +99,64 @@ export async function generateWriteScene(params: {
 
   const resolved = resolveSceneRequest(params.userMessage, params.memory);
 
+  let promptMeta: { promptId?: string; promptVersion?: string } = {};
+
   const buildPrompts = (strict: boolean) => {
+    if (isPromptRegistryV2Enabled()) {
+      const intent =
+        params.intent ||
+        (params.mode === "revise" ? "rewrite" : "write_scene");
+      const built = composeCreateChatPrompt({
+        intent,
+        operation: params.mode === "revise" ? "revise_draft" : "write_scene",
+        userMessage: params.userMessage,
+        memory: getMemoryV2(params.memory),
+        recentMessages: params.recentMessages,
+        conversationId: params.conversationId,
+        storyId: params.storyId,
+      });
+      promptMeta = {
+        promptId: built.promptId,
+        promptVersion: built.promptVersion,
+      };
+      logAiEvent("info", "prompt_registry.build", {
+        ...promptLogFieldsForAiEvent(built),
+        conversationId: params.conversationId,
+      });
+      const parts = promptResultToLegacyParts(built);
+      if (!strict || resolved.characterNames.length === 0) {
+        return {
+          ...parts,
+          temperature: resolveTemperature(built.providerHints.temperatureProfile),
+          maxOutputTokens: resolveMaxOutputTokens(
+            built.providerHints.maxOutputTokensProfile
+          ),
+        };
+      }
+      return {
+        system: parts.system,
+        prompt: `${parts.prompt}
+
+STRICT RELEVANCE CORRECTION:
+- The previous attempt used the wrong characters or setup.
+- You MUST center the scene on: ${resolved.characterNames.join(", ")}.
+- Do NOT use any other lead characters.
+- Honor the current request exactly: ${params.userMessage}`,
+        temperature: resolveTemperature(built.providerHints.temperatureProfile),
+        maxOutputTokens: resolveMaxOutputTokens(
+          built.providerHints.maxOutputTokensProfile
+        ),
+      };
+    }
+
     if (params.mode === "revise") {
-      return buildReviseDraftPrompt(ctx, ctx.languagePrefs, style);
+      const base = buildReviseDraftPrompt(ctx, ctx.languagePrefs, style);
+      return { ...base, temperature: 0.85, maxOutputTokens: 8192 };
     }
     const base = buildWriteScenePrompt(ctx, style);
-    if (!strict || resolved.characterNames.length === 0) return base;
+    if (!strict || resolved.characterNames.length === 0) {
+      return { ...base, temperature: 0.85, maxOutputTokens: 8192 };
+    }
     return {
       system: base.system,
       prompt: `${base.prompt}
@@ -102,10 +166,12 @@ STRICT RELEVANCE CORRECTION:
 - You MUST center the scene on: ${resolved.characterNames.join(", ")}.
 - Do NOT use any other lead characters.
 - Honor the current request exactly: ${params.userMessage}`,
+      temperature: 0.85,
+      maxOutputTokens: 8192,
     };
   };
 
-  let { system, prompt } = buildPrompts(false);
+  let { system, prompt, temperature, maxOutputTokens } = buildPrompts(false);
   let result = await generateCreativeText({
     systemInstruction: system,
     prompt,
@@ -113,8 +179,8 @@ STRICT RELEVANCE CORRECTION:
       params.mode === "revise"
         ? "story_agent_revise_draft"
         : "story_agent_write_scene",
-    temperature: 0.85,
-    maxOutputTokens: 8192,
+    temperature,
+    maxOutputTokens,
     provider: params.provider,
     languagePrefs: ctx.languagePrefs,
   });
@@ -152,13 +218,13 @@ STRICT RELEVANCE CORRECTION:
     if (!relevance.ok) {
       contextMismatch = true;
       relevanceRetry = true;
-      ({ system, prompt } = buildPrompts(true));
+      ({ system, prompt, temperature, maxOutputTokens } = buildPrompts(true));
       result = await generateCreativeText({
         systemInstruction: system,
         prompt,
         operation: "story_agent_write_scene",
-        temperature: 0.7,
-        maxOutputTokens: 8192,
+        temperature: Math.min(temperature, 0.7),
+        maxOutputTokens,
         provider: params.provider,
         languagePrefs: ctx.languagePrefs,
       });
@@ -197,5 +263,6 @@ STRICT RELEVANCE CORRECTION:
     languageComplianceRetry: result.languageComplianceRetry,
     contextMismatch,
     relevanceRetry,
+    ...promptMeta,
   };
 }

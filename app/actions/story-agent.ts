@@ -8,8 +8,9 @@ import { isAIError } from "@/lib/ai/errors";
 import { readMemoryFromConversationState } from "@/lib/ai/services/story-agent";
 import {
   memoryStatusForOperation,
-  runStoryOperation,
-} from "@/lib/ai/services/run-story-operation";
+  runConversationTurn,
+} from "@/lib/conversation-brain/server";
+import { readConversationFlow } from "@/lib/conversation-brain";
 import { fail, ok, type ActionResult } from "@/lib/actions/result";
 import {
   AuthzError,
@@ -30,6 +31,8 @@ import {
   type StoryAgentErrorCode,
 } from "@/lib/story-agent/errors";
 import type { StoryMemory } from "@/lib/story-agent/schema";
+import { getMemoryV2 } from "@/lib/story-agent/memory-patch";
+import { memoryV2ToPersistedState } from "@/lib/story-memory/v2";
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import {
   assertGenerationRateLimit,
@@ -146,17 +149,25 @@ function buildPersistedState(params: {
   previous: unknown;
   memory: StoryMemory;
   storyId: string | null;
+  conversationFlow?: unknown;
 }) {
   const previous =
     params.previous && typeof params.previous === "object"
       ? (params.previous as Record<string, unknown>)
       : {};
 
+  const v2 = getMemoryV2(params.memory);
+  const memoryBlob = memoryV2ToPersistedState(v2);
+
   return {
     ...previous,
-    ...params.memory,
+    ...memoryBlob,
     storyId: params.storyId ?? previous.storyId,
     agentVersion: "2",
+    brainVersion: "0",
+    memoryVersion: 2,
+    conversationFlow:
+      params.conversationFlow ?? previous.conversationFlow ?? undefined,
     draftForm: previous.draftForm,
     extraction: previous.extraction,
   };
@@ -192,6 +203,7 @@ export async function storyAgentTurnAction(
         messageLength: message.length,
         messagePreview: message.slice(0, 48),
         reuseLastUserMessage,
+        turnState: "RECEIVED",
       })
     );
 
@@ -264,6 +276,10 @@ export async function storyAgentTurnAction(
           role: "USER",
           content: message,
           requestId: userRequestId,
+          metadata: {
+            turnRequestId,
+            turnState: "RECEIVED",
+          } as Prisma.InputJsonValue,
         });
       }
     } else {
@@ -273,12 +289,16 @@ export async function storyAgentTurnAction(
         role: "USER",
         content: message,
         requestId: userRequestId,
+        metadata: {
+          turnRequestId,
+          turnState: "RECEIVED",
+        } as Prisma.InputJsonValue,
       });
     }
 
-    const memory = readMemoryFromConversationState(
-      appendedUser.conversation.state ?? conversation.state
-    );
+    const stateSource = appendedUser.conversation.state ?? conversation.state;
+    const memory = readMemoryFromConversationState(stateSource);
+    const conversationFlow = readConversationFlow(stateSource);
 
     const recent = existingMessages
       .concat(appendedUser.duplicated ? [] : [appendedUser.message])
@@ -291,9 +311,12 @@ export async function storyAgentTurnAction(
         content: m.content,
       }));
 
-    let turn;
+    let turn!: Awaited<ReturnType<typeof runConversationTurn>>;
+    let turnState: "ROUTED" | "PROCESSING" | "COMPLETED" | "FAILED" =
+      "ROUTED";
     try {
-      turn = await runStoryOperation({
+      turnState = "PROCESSING";
+      turn = await runConversationTurn({
         userId: user.id,
         conversationId,
         storyId: conversation.storyId,
@@ -301,8 +324,11 @@ export async function storyAgentTurnAction(
         userMessage: message,
         recentMessages: recent,
         turnRequestId,
+        conversationFlow,
       });
+      turnState = turn.resultType === "error" ? "FAILED" : "COMPLETED";
     } catch (error) {
+      turnState = "FAILED";
       const errMsg =
         error instanceof Error
           ? error.message
@@ -319,8 +345,20 @@ export async function storyAgentTurnAction(
         content: friendly,
         status: "ERROR",
         requestId: assistantRequestId,
+        metadata: {
+          flow: "story_agent",
+          turnRequestId,
+          turnState: "FAILED",
+          code: isStoryAgentError(error) ? error.code : "UNKNOWN_AI_ERROR",
+          retryable: isStoryAgentError(error) ? error.retryable : true,
+        } as Prisma.InputJsonValue,
       });
       throw error;
+    } finally {
+      // Ensure we never leave the turn in PROCESSING without a terminal state.
+      if (turnState === "PROCESSING") {
+        turnState = "FAILED";
+      }
     }
 
     const nextStoryId = turn.storyId ?? conversation.storyId;
@@ -328,6 +366,7 @@ export async function storyAgentTurnAction(
       previous: conversation.state,
       memory: turn.memory,
       storyId: nextStoryId,
+      conversationFlow: turn.conversationFlow,
     });
 
     await updateOwnedConversationState({
@@ -356,6 +395,7 @@ export async function storyAgentTurnAction(
       metadata: {
         flow: "story_agent",
         agentVersion: "2",
+        brainVersion: turn.brainVersion,
         buildId,
         resultType: turn.resultType,
         operation: turn.operation,
@@ -366,6 +406,20 @@ export async function storyAgentTurnAction(
         outputMode: turn.outputMode,
         durationMs: turn.durationMs,
         retryCount: turn.retryCount ?? 0,
+        turnRequestId,
+        turnState,
+        code: turn.errorCode,
+        retryable: turn.retryable,
+        planIntent: turn.plan.intent,
+        planConfidence: turn.plan.confidence,
+        plannerSource: turn.plan.plannerSource,
+        aiRequired: turn.plan.aiRequired,
+        deterministicHandled: turn.plan.deterministicHandled,
+        intent: turn.plan.storyIntent ?? turn.plan.intent,
+        intentConfidence: turn.plan.confidence,
+        intentSource: turn.plan.intentSource ?? turn.plan.plannerSource,
+        promptId: turn.promptId,
+        promptVersion: turn.promptVersion,
       } as Prisma.InputJsonValue,
     });
 
@@ -402,7 +456,7 @@ export async function storyAgentTurnAction(
       assistantReply: turn.assistantReply,
       resultType: turn.resultType,
       operation: turn.operation,
-      intent: turn.operation,
+      intent: turn.plan.intent,
       suggestions: turn.suggestions,
       memoryStatus: memoryStatusForOperation(
         turn.memory,

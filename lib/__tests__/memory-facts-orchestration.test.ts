@@ -150,17 +150,15 @@ describe("Operation-specific failure copy", () => {
     expect(MEMORY_FAILURE_USER_MESSAGE.toLowerCase()).not.toContain(
       "story ideas"
     );
-    expect(BRAINSTORM_FAILURE_USER_MESSAGE.toLowerCase()).toContain(
-      "story ideas"
-    );
+    expect(BRAINSTORM_FAILURE_USER_MESSAGE.toLowerCase()).toContain("ideas");
     expect(
       friendlyMessageForCode("AGENT_RESPONSE_INVALID", "memory_update")
-    ).not.toMatch(/story ideas/i);
+    ).not.toMatch(/ideas/i);
     expect(
       friendlyMessageForCode("AGENT_RESPONSE_INVALID", "conversational_chat")
-    ).not.toMatch(/story ideas/i);
+    ).not.toMatch(/ideas right now/i);
     expect(
       friendlyMessageForCode("AGENT_RESPONSE_INVALID", "brainstorm")
-    ).toMatch(/story ideas/i);
+    ).toMatch(/ideas/i);
   });
 });

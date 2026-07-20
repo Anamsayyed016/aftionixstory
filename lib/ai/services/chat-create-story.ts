@@ -8,6 +8,7 @@ import { AIError, isAIError } from "@/lib/ai/errors";
 import { logAiEvent } from "@/lib/ai/logger";
 import type { AIProvider } from "@/lib/ai/types";
 import { getAiEnv, resolveStoryModel } from "@/lib/env";
+import { generateTextCompat } from "@/lib/provider-router/v2/legacy-generate";
 import type { CreateStoryWizardInput } from "@/lib/validations/story";
 
 export type ChatTurn = {
@@ -146,7 +147,7 @@ function mergeDrafts(
 }
 
 async function generateExtractionText(
-  provider: AIProvider,
+  provider: AIProvider | undefined,
   messages: ChatTurn[],
   currentStory: NormalizedChatStoryDraft | null | undefined,
   repairHint?: string
@@ -158,15 +159,20 @@ async function generateExtractionText(
       : ""
   }`;
 
-  return provider.generateText({
-    systemInstruction: SYSTEM_INSTRUCTION,
-    prompt,
-    temperature: 0.4,
-    maxOutputTokens: 4096,
-    model: resolveStoryModel(env),
-    operation: "chat_create_story",
-    // Extraction only — keep episode/summary writing on default reasoning.
-    reasoningEffort: "minimal",
+  return generateTextCompat({
+    provider,
+    modelKind: "story",
+    input: {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      prompt,
+      temperature: 0.4,
+      maxOutputTokens: 4096,
+      model: resolveStoryModel(env),
+      operation: "chat_create_story",
+      // Extraction only — keep episode/summary writing on default reasoning.
+      reasoningEffort: "minimal",
+      outputMode: "json",
+    },
   });
 }
 
@@ -183,10 +189,9 @@ export async function runChatCreateStoryTurn(params: {
     );
   }
 
-  const provider =
-    params.provider ?? (await import("@/lib/ai/registry")).getAIProvider();
+  const provider = params.provider;
   let rawText = "";
-  let providerName = provider.name;
+  let providerName = provider?.name ?? "router";
   let model = "";
   let providerDuration = 0;
   let repairTriggered = false;

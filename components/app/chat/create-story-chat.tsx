@@ -228,7 +228,40 @@ export function CreateStoryChat({
             }
           : null
       );
-      setSuggestions([]);
+      // Restore Phase A offer chips from conversationFlow
+      const flowRaw =
+        data.state &&
+        typeof data.state === "object" &&
+        (data.state as { conversationFlow?: unknown }).conversationFlow;
+      const offers =
+        flowRaw &&
+        typeof flowRaw === "object" &&
+        Array.isArray((flowRaw as { lastOffers?: unknown }).lastOffers)
+          ? (
+              (flowRaw as { lastOffers: Array<Record<string, unknown>> })
+                .lastOffers
+            )
+          : [];
+      setSuggestions(
+        offers
+          .slice(0, 4)
+          .map((o, index) => {
+            const label = typeof o.label === "string" ? o.label : "";
+            const prompt =
+              typeof o.prompt === "string" && o.prompt.trim()
+                ? o.prompt
+                : label;
+            if (!label) return null;
+            return {
+              id: typeof o.id === "string" ? o.id : `restored_${index}`,
+              label,
+              prompt,
+            };
+          })
+          .filter((s): s is { id: string; label: string; prompt: string } =>
+            Boolean(s)
+          )
+      );
       setPersistHint(hasMemory ? "Restored" : "Ready");
       setCreateError(null);
       lastFailedPromptRef.current = null;

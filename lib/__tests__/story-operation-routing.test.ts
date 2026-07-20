@@ -227,12 +227,13 @@ describe("UI / action wiring", () => {
     expect(source).toContain("creative_draft");
   });
 
-  it("storyAgentTurnAction delegates to runStoryOperation", () => {
+  it("storyAgentTurnAction delegates to Conversation Brain", () => {
     const source = readFileSync(
       path.resolve("app/actions/story-agent.ts"),
       "utf8"
     );
-    expect(source).toContain("runStoryOperation");
+    expect(source).toContain("runConversationTurn");
+    expect(source).toContain("@/lib/conversation-brain/server");
     expect(source).not.toContain("runStoryAgentDecision");
   });
 });

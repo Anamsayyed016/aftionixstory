@@ -116,7 +116,10 @@ export const PROVIDER_FAILURE_USER_MESSAGE =
   "I couldn’t finish that reply. Please try once more.";
 
 export const BRAINSTORM_FAILURE_USER_MESSAGE =
-  "I couldn’t generate the story ideas correctly. Please retry once.";
+  "I couldn’t generate the ideas right now. Please retry once.";
 
 export const MEMORY_FAILURE_USER_MESSAGE =
   "I couldn’t save that story detail. Please try once more.";
+
+export const CREATIVE_FAILURE_USER_MESSAGE =
+  "I couldn’t generate that scene right now. Your story setup is saved—please retry shortly.";

@@ -1,8 +1,8 @@
 import "server-only";
 
 import { AIError } from "@/lib/ai/errors";
+import { generateWithFailover } from "@/lib/ai/failover";
 import { logAiEvent } from "@/lib/ai/logger";
-import { getAIProvider } from "@/lib/ai/registry";
 import { assessHinglishQuality } from "@/lib/ai/quality/hinglish-quality";
 import { NATURAL_HINGLISH_PROMPT } from "@/lib/ai/quality/hinglish-quality";
 import {
@@ -11,13 +11,13 @@ import {
 } from "@/lib/ai/quality/output-integrity";
 import { countWords } from "@/lib/ai/token-estimator";
 import type { AIProvider } from "@/lib/ai/types";
-import { getAiEnv, resolveCreativeModel } from "@/lib/env";
 import {
   checkLanguageCompliance,
   formatLanguagePromptBlock,
   type LanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
 import { StoryAgentError } from "@/lib/story-agent/errors";
+import { CREATIVE_FAILURE_USER_MESSAGE } from "@/lib/story-agent/concept-reply";
 
 export type CreativeTextResult = {
   text: string;
@@ -158,31 +158,31 @@ export async function generateCreativeText(params: {
   maxOutputTokens?: number;
   provider?: AIProvider;
   languagePrefs?: LanguagePreferences;
+  turnRequestId?: string;
 }): Promise<CreativeTextResult> {
-  const env = getAiEnv();
-  const model = resolveCreativeModel(env);
-  const provider = params.provider ?? getAIProvider();
   let retryCount = 0;
   let languageComplianceRetry = false;
 
   logAiEvent("info", "ai.creative_text.start", {
     operation: params.operation,
-    provider: provider.name,
-    model,
     outputMode: "text",
     narrationLanguage: params.languagePrefs?.narrationLanguage,
     dialogueLanguage: params.languagePrefs?.dialogueLanguage,
   });
 
   const call = async (system: string, prompt: string) =>
-    provider.generateText({
-      systemInstruction: system,
-      prompt,
-      temperature: params.temperature ?? 0.85,
-      maxOutputTokens: params.maxOutputTokens ?? 8192,
-      model,
-      operation: params.operation,
-      outputMode: "text",
+    generateWithFailover({
+      modelKind: "creative",
+      providerOverride: params.provider,
+      turnRequestId: params.turnRequestId,
+      input: {
+        systemInstruction: system,
+        prompt,
+        temperature: params.temperature ?? 0.85,
+        maxOutputTokens: params.maxOutputTokens ?? 8192,
+        operation: params.operation,
+        outputMode: "text",
+      },
     });
 
   let result = await call(params.systemInstruction, params.prompt);
@@ -193,7 +193,7 @@ export async function generateCreativeText(params: {
   if (!result.text.trim()) {
     throw new StoryAgentError(
       "CREATIVE_RESPONSE_EMPTY",
-      "I couldn’t complete that scene correctly. Your previous draft is safe—please retry.",
+      CREATIVE_FAILURE_USER_MESSAGE,
       { retryable: true, operation: params.operation }
     );
   }
@@ -235,7 +235,7 @@ Continue seamlessly:`
     if (!integrity.ok && integrity.truncated) {
       throw new StoryAgentError(
         "CREATIVE_RESPONSE_TRUNCATED",
-        "I couldn’t complete that scene correctly. Your previous draft is safe—please retry.",
+        CREATIVE_FAILURE_USER_MESSAGE,
         { retryable: true, operation: params.operation }
       );
     }

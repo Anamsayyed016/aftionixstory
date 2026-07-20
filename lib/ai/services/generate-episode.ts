@@ -5,17 +5,24 @@ import { Prisma } from "@prisma/client";
 
 import { AIError, isAIError } from "@/lib/ai/errors";
 import { buildEpisodePrompt } from "@/lib/ai/prompt-builder";
-import { getAIProvider } from "@/lib/ai/registry";
 import { parseEpisodeOutput } from "@/lib/ai/response-parser";
 import { countWords } from "@/lib/ai/token-estimator";
 import { prisma } from "@/lib/db";
 import { loadGenerationContext } from "@/lib/data/episodes";
 import { getAiEnv, resolveStoryModel } from "@/lib/env";
 import {
+  buildGenerationRequestFromSystemPrompt,
+  generate as gatewayGenerate,
+  generationResultToLegacyText,
+  isProviderError,
+  isProviderRouterV2Enabled,
+} from "@/lib/provider-router/v2";
+import {
   assertGenerationRateLimit,
   assertWithinGenerationLimit,
   incrementSuccessfulGeneration,
 } from "@/lib/usage/generation";
+import { getAIProvider } from "@/lib/ai/registry";
 
 export type GenerateEpisodeDraftResult = {
   clientRequestId: string;
@@ -151,18 +158,46 @@ export async function generateEpisodeDraft(params: {
   });
 
   const env = getAiEnv();
-  const provider = getAIProvider();
   const started = Date.now();
 
   try {
-    const result = await provider.generateText({
-      systemInstruction: built.systemInstruction,
-      prompt: built.prompt,
-      temperature: 0.9,
-      maxOutputTokens: 4096,
-      model: resolveStoryModel(env),
-      operation: "generate_episode",
-    });
+    let result: {
+      text: string;
+      provider: string;
+      model: string;
+      durationMs: number;
+      inputCharacters: number;
+      outputCharacters: number;
+      estimatedInputTokens?: number;
+      estimatedOutputTokens?: number;
+    };
+
+    if (isProviderRouterV2Enabled()) {
+      const request = buildGenerationRequestFromSystemPrompt({
+        system: built.systemInstruction,
+        prompt: built.prompt,
+        operation: "generate_episode",
+        outputMode: "text",
+        turnRequestId: params.clientRequestId,
+        temperature: 0.9,
+        maxOutputTokens: 4096,
+        modelKind: "story",
+        promptId: "legacy.generate_episode",
+        promptVersion: "0.0.0-legacy",
+      });
+      const gen = await gatewayGenerate(request);
+      result = generationResultToLegacyText(gen);
+    } else {
+      const provider = getAIProvider();
+      result = await provider.generateText({
+        systemInstruction: built.systemInstruction,
+        prompt: built.prompt,
+        temperature: 0.9,
+        maxOutputTokens: 4096,
+        model: resolveStoryModel(env),
+        operation: "generate_episode",
+      });
+    }
 
     const parsed = parseEpisodeOutput(
       result.text,
@@ -201,13 +236,17 @@ export async function generateEpisodeDraft(params: {
       replaceEpisodeId,
     };
   } catch (error) {
-    const code = isAIError(error) ? error.code : "AI_REQUEST_FAILED";
+    const code = isProviderError(error)
+      ? error.code
+      : isAIError(error)
+        ? error.code
+        : "AI_REQUEST_FAILED";
     try {
       await prisma.generationLog.create({
         data: {
           userId: params.userId,
           storyId: params.storyId,
-          provider: provider.name,
+          provider: "unknown",
           model: resolveStoryModel(env),
           action: params.action,
           durationMs: Date.now() - started,

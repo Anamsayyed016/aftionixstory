@@ -1,10 +1,15 @@
+/**
+ * @deprecated Prefer `@/lib/conversation-brain/intent-router` for create-chat.
+ * This module remains as a compatibility adapter for legacy / episode paths.
+ */
 import {
   detectLanguageInstruction,
   readLanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
 import { isConceptCreateRequest } from "@/lib/story-agent/concept-reply";
 import { looksLikeFreshSceneRequest } from "@/lib/story-agent/entity-resolver";
-import { extractMemoryFacts } from "@/lib/story-agent/memory-facts";
+import { parseDeterministicMemory } from "@/lib/story-agent/deterministic-memory-parser";
+import { memoryConfirmReply } from "@/lib/story-agent/deterministic-replies";
 import { detectStyleFeedback, readStyleProfile } from "@/lib/story-agent/style-profile";
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import type { MemoryPatch, StoryMemory } from "@/lib/story-agent/schema";
@@ -258,7 +263,14 @@ export function routeIntent(
     })
   );
 
-  if (hasDraft(memory) && style.matched && /shuddh|formal|simple\s+human|more\s+emotional|uppercase|fast\s+(chal|hai)/i.test(text)) {
+  // Style revise when an unsaved draft exists and feedback targets the draft tone.
+  if (
+    hasDraft(memory) &&
+    style.matched &&
+    /shuddh|formal|simple\s+human|more\s+emotional|uppercase|fast\s+(chal|hai)/i.test(
+      text
+    )
+  ) {
     return {
       operation: "revise_draft",
       confidence: "high",
@@ -357,17 +369,22 @@ export function routeIntent(
   }
 
   // Explicit story facts / corrections — before brainstorm so "Azar male lead"
-  // never becomes a concept-generation failure.
-  const memoryFacts = extractMemoryFacts(text, memory);
+  // and "CEO and intern" never become concept-generation failures.
+  const memoryFacts = parseDeterministicMemory(text, memory);
   if (memoryFacts.matched) {
     return {
       operation: "memory_update",
       confidence: memoryFacts.confidence,
       skipClassifier: true,
-      fixedReply: memoryFacts.confirmReply,
+      fixedReply: memoryConfirmReply(memoryFacts),
       memoryPatch: memoryFacts.patch,
       matchedSignals: memoryFacts.matchedSignals,
-      reason: "memory_facts",
+      reason:
+        memoryFacts.kind === "role_pair_setup"
+          ? "role_pair_setup"
+          : memoryFacts.kind === "occupation_role"
+            ? "occupation_role"
+            : "memory_facts",
     };
   }
 

@@ -10,7 +10,7 @@ Do not repeat onboarding text after the user has spoken.
 Never return a generic greeting unless the user only greeted you.
 For a story concept request: acknowledge the concept, expand usefully, ask one creative question or offer 2–3 directions.
 Never claim you wrote a scene unless a creative write operation ran.
-Return JSON only (decision envelope).`;
+Reply in plain natural language only — never JSON, never markdown code fences.`;
 }
 
 export function buildConversationUserPrompt(ctx: CompactStoryContext): string {
@@ -48,16 +48,5 @@ Rules:
 - Do not act like a form.
 - Ask at most one main question.
 - Match the user’s language.
-- Provide relevant suggestions only.
-
-Return JSON:
-{
-  "assistantReply": "natural reply",
-  "intent": "chat",
-  "requiresConfirmation": false,
-  "clarificationQuestion": null,
-  "memoryPatch": { "story": {}, "characters": [], "relationships": [], "writingRules": [], "preferences": {}, "remove": [] },
-  "action": { "type": "none", "payload": {} },
-  "suggestions": []
-}`;
+- Reply in plain text only (no JSON).`;
 }

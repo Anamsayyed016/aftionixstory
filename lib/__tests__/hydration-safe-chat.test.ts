@@ -185,9 +185,7 @@ describe("Separate AI routing RCA (not hydration)", () => {
   });
 
   it("keeps brainstorm failure copy separate from chat/memory", () => {
-    expect(BRAINSTORM_FAILURE_USER_MESSAGE.toLowerCase()).toContain(
-      "story ideas"
-    );
+    expect(BRAINSTORM_FAILURE_USER_MESSAGE.toLowerCase()).toContain("ideas");
     expect(PROVIDER_FAILURE_USER_MESSAGE.toLowerCase()).not.toContain(
       "story ideas"
     );

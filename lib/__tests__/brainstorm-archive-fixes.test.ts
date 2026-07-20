@@ -45,9 +45,7 @@ describe("Brainstorm parse resilience", () => {
 
 describe("Brainstorm failure copy", () => {
   it("does not claim story details are safe by default", () => {
-    expect(BRAINSTORM_FAILURE_USER_MESSAGE.toLowerCase()).toContain(
-      "story ideas"
-    );
+    expect(BRAINSTORM_FAILURE_USER_MESSAGE.toLowerCase()).toContain("ideas");
     expect(BRAINSTORM_FAILURE_USER_MESSAGE.toLowerCase()).not.toContain(
       "story details are safe"
     );

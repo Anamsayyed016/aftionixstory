@@ -166,7 +166,9 @@ export function detectStyleFeedback(
     /\b(bahut\s+)?shuddh\b/i.test(text) ||
     /\btoo\s+formal\b/i.test(text) ||
     /\bsimple\s+(words?|human|type)\b/i.test(text) ||
-    /\bsimple\s+human\b/i.test(text)
+    /\bsimple\s+human\b/i.test(text) ||
+    /\bformal\s+hindi\s+mat\b/i.test(text) ||
+    /\bformal\s+hindi\s+(avoid|nahi)\b/i.test(text)
   ) {
     matched = true;
     patch.formality = "casual";
@@ -175,6 +177,18 @@ export function detectStyleFeedback(
     label = "casual_anti_formal";
     confirmReply =
       "Got it—ab language simple, modern Hinglish rahegi; overly formal Hindi avoid karungi. ✨";
+  }
+
+  if (
+    /\bdialogues?\s+natural\b/i.test(text) ||
+    /\bnatural\s+(dialogues?|rakho)\b/i.test(text)
+  ) {
+    matched = true;
+    patch.dialogueStyle = "natural";
+    patch.formality = patch.formality ?? "casual";
+    label = "natural_dialogues";
+    confirmReply =
+      "Got it ✨ Dialogues natural aur human-sounding rakhungi—overly cinematic nahi.";
   }
 
   if (
@@ -221,7 +235,9 @@ export function detectStyleFeedback(
     /\bstory\s+fast\b/i.test(text) ||
     /\bfast\s+(chal|hai)\b/i.test(text) ||
     /\btoo\s+fast\b/i.test(text) ||
-    /\bslow\s+(karo|burn)\b/i.test(text)
+    /\bslow\s+(karo|burn|pacing)\b/i.test(text) ||
+    /\bpacing\s+slow\b/i.test(text) ||
+    /\bslow\s+pacing\b/i.test(text)
   ) {
     matched = true;
     patch.pacingHint = "slow";

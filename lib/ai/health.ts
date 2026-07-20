@@ -4,6 +4,10 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 
 import {
+  getCircuitSnapshot,
+  type CircuitState,
+} from "@/lib/ai/circuit-breaker";
+import {
   AIError,
   isAIError,
   normalizeProviderError,
@@ -15,8 +19,10 @@ import {
   isActiveAiKeyPresent,
   resolveAgentModel,
   resolveCreativeModel,
+  resolveFailoverProviders,
   resolveStoryModel,
   resolveSummaryModel,
+  type AiProviderLive,
 } from "@/lib/env";
 
 export type AiHealthStatus =
@@ -27,19 +33,27 @@ export type AiHealthStatus =
   | "model_not_found"
   | "timeout"
   | "network_error"
-  | "provider_error";
+  | "provider_error"
+  | "circuit_open";
 
 export type AiHealthCheckResult = {
   ok: boolean;
   status: AiHealthStatus;
   provider: string;
+  model: string;
   storyModel: string;
   summaryModel: string;
+  configured: boolean;
   keyPresent: boolean;
   probedModel: string | null;
   httpStatus?: number;
   code?: AIErrorCode;
   durationMs: number;
+  latencyMs: number;
+  lastSuccessAt: number | null;
+  lastFailureAt: number | null;
+  circuitState: CircuitState;
+  normalizedError?: string;
   message: string;
 };
 
@@ -58,6 +72,8 @@ function classifyHealthFailure(error: AIError): AiHealthStatus {
       return "timeout";
     case "AI_REQUEST_FAILED":
       return "network_error";
+    case "AI_PROVIDER_UNAVAILABLE":
+      return "provider_error";
     default:
       return "provider_error";
   }
@@ -69,9 +85,12 @@ function classifyHealthFailure(error: AIError): AiHealthStatus {
  */
 export function getAiConfigurationSnapshot() {
   const env = getAiEnv();
+  const failover = resolveFailoverProviders(env);
   return {
     provider: env.AI_PROVIDER,
     resolvedProvider: env.AI_PROVIDER,
+    primaryProvider: failover.primary,
+    fallbackProvider: failover.fallback,
     agentModel: resolveAgentModel(env),
     creativeModel: resolveCreativeModel(env),
     storyModel: resolveStoryModel(env),
@@ -86,6 +105,8 @@ export function logAiConfigurationAtStartup() {
   logAiEvent("info", "ai.configuration", {
     provider: snap.provider,
     resolvedProvider: snap.resolvedProvider,
+    primaryProvider: snap.primaryProvider,
+    fallbackProvider: snap.fallbackProvider ?? undefined,
     agentModel: snap.agentModel,
     creativeModel: snap.creativeModel,
     model: snap.storyModel,
@@ -126,32 +147,45 @@ async function probeOpenAI(params: {
 }
 
 /**
- * Minimal provider probe. Call explicitly only (CLI/admin/diagnostics).
- * Never invoke on user chat/generation paths.
+ * Server-only provider health snapshot (optional live probe).
+ * Never expose keys or full provider error bodies to clients.
+ * Do not call on every chat message.
  */
 export async function probeAiHealth(options?: {
   model?: string;
   provider?: "gemini" | "openai" | "mock";
+  /** When false, returns circuit/config only (no network). Default true for CLI. */
+  liveProbe?: boolean;
 }): Promise<AiHealthCheckResult> {
   const env = getAiEnv();
   const started = Date.now();
-  const provider = options?.provider || env.AI_PROVIDER;
+  const provider = (options?.provider || env.AI_PROVIDER) as string;
   const storyModel = resolveStoryModel(env);
   const summaryModel = resolveSummaryModel(env);
   const probedModel =
     options?.model ||
     (provider === "openai" ? env.OPENAI_STORY_MODEL : env.GEMINI_STORY_MODEL);
+  const circuit = getCircuitSnapshot(
+    provider === "mock" ? "mock" : provider,
+    probedModel
+  );
 
   if (provider === "mock") {
     return {
       ok: true,
       status: "ok",
       provider,
+      model: "mock",
       storyModel,
       summaryModel,
+      configured: true,
       keyPresent: true,
       probedModel: null,
       durationMs: Date.now() - started,
+      latencyMs: Date.now() - started,
+      lastSuccessAt: circuit.lastSuccessAt,
+      lastFailureAt: circuit.lastFailureAt,
+      circuitState: "CLOSED",
       message: "Mock provider; probe skipped.",
     };
   }
@@ -166,16 +200,43 @@ export async function probeAiHealth(options?: {
       ok: false,
       status: "not_configured",
       provider,
+      model: probedModel,
       storyModel,
       summaryModel,
+      configured: false,
       keyPresent: false,
       probedModel,
       durationMs: Date.now() - started,
+      latencyMs: Date.now() - started,
+      lastSuccessAt: circuit.lastSuccessAt,
+      lastFailureAt: circuit.lastFailureAt,
+      circuitState: circuit.state,
       code: "AI_NOT_CONFIGURED",
+      normalizedError: "PROVIDER_CONFIG_INVALID",
       message:
         provider === "openai"
           ? "OPENAI_API_KEY is not configured."
           : "GEMINI_API_KEY is not configured.",
+    };
+  }
+
+  if (options?.liveProbe === false) {
+    return {
+      ok: circuit.state !== "OPEN",
+      status: circuit.state === "OPEN" ? "circuit_open" : "ok",
+      provider,
+      model: probedModel,
+      storyModel,
+      summaryModel,
+      configured: true,
+      keyPresent: true,
+      probedModel,
+      durationMs: Date.now() - started,
+      latencyMs: 0,
+      lastSuccessAt: circuit.lastSuccessAt,
+      lastFailureAt: circuit.lastFailureAt,
+      circuitState: circuit.state,
+      message: "Configuration snapshot only (live probe skipped).",
     };
   }
 
@@ -192,12 +253,19 @@ export async function probeAiHealth(options?: {
         ok: false,
         status: "provider_error",
         provider,
+        model: probedModel,
         storyModel,
         summaryModel,
+        configured: true,
         keyPresent: true,
         probedModel,
         durationMs,
+        latencyMs: durationMs,
+        lastSuccessAt: circuit.lastSuccessAt,
+        lastFailureAt: circuit.lastFailureAt,
+        circuitState: getCircuitSnapshot(provider, probedModel).state,
         code: "AI_INVALID_RESPONSE",
+        normalizedError: "STRUCTURED_RESPONSE_INVALID",
         message: "Provider returned an empty health-check response.",
       };
     }
@@ -208,18 +276,26 @@ export async function probeAiHealth(options?: {
       durationMs,
       operation: "health_check",
       code: "OK",
+      circuitState: getCircuitSnapshot(provider, probedModel).state,
     });
 
+    const snap = getCircuitSnapshot(provider, probedModel);
     return {
       ok: true,
       status: "ok",
       provider,
+      model: probedModel,
       storyModel,
       summaryModel,
+      configured: true,
       keyPresent: true,
       probedModel,
       httpStatus: 200,
       durationMs,
+      latencyMs: durationMs,
+      lastSuccessAt: snap.lastSuccessAt ?? Date.now(),
+      lastFailureAt: snap.lastFailureAt,
+      circuitState: snap.state,
       message: `${provider} health check succeeded.`,
     };
   } catch (error) {
@@ -228,6 +304,7 @@ export async function probeAiHealth(options?: {
       : normalizeProviderError(error);
     const durationMs = Date.now() - started;
     const status = classifyHealthFailure(normalized);
+    const snap = getCircuitSnapshot(provider as AiProviderLive, probedModel);
 
     logAiEvent("warn", "ai.health_check", {
       provider,
@@ -236,19 +313,27 @@ export async function probeAiHealth(options?: {
       httpStatus: normalized.status,
       durationMs,
       operation: "health_check",
+      circuitState: snap.state,
     });
 
     return {
       ok: false,
       status,
       provider,
+      model: probedModel,
       storyModel,
       summaryModel,
+      configured: true,
       keyPresent: true,
       probedModel,
       httpStatus: normalized.status,
       code: normalized.code,
       durationMs,
+      latencyMs: durationMs,
+      lastSuccessAt: snap.lastSuccessAt,
+      lastFailureAt: snap.lastFailureAt ?? Date.now(),
+      circuitState: snap.state,
+      normalizedError: normalized.code,
       message: normalized.message,
     };
   }

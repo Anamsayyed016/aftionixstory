@@ -8,6 +8,7 @@ import {
 import type { AIProvider } from "@/lib/ai/types";
 import { extractJsonObject } from "@/lib/chat/create-story-extraction";
 import { getAiEnv, resolveAgentModel } from "@/lib/env";
+import { generateTextCompat } from "@/lib/provider-router/v2/legacy-generate";
 import { applyControlToDecision, shouldBlockGeneration } from "@/lib/story-agent/intent";
 import {
   applyMemoryPatch,
@@ -120,26 +121,28 @@ export async function runStoryAgentDecision(params: {
   durationMs: number;
   agentProfile: "agent";
 }> {
-  const provider =
-    params.provider ?? (await import("@/lib/ai/registry")).getAIProvider();
   const env = getAiEnv();
   const model = resolveAgentModel(env);
 
-  const result = await provider.generateText({
-    systemInstruction: STORY_AGENT_SYSTEM,
-    prompt: buildStoryAgentUserPrompt({
-      userMessage: params.userMessage,
-      memory: params.memory,
-      recentMessages: params.recentMessages,
-      storyId: params.storyId,
-      hasUnsavedDraft: Boolean(params.memory.latestDraft?.content),
-    }),
-    temperature: 0.7,
-    maxOutputTokens: 1600,
-    model,
-    operation: "story_agent_turn",
-    reasoningEffort: "minimal",
-    outputMode: "json",
+  const result = await generateTextCompat({
+    provider: params.provider,
+    modelKind: "agent",
+    input: {
+      systemInstruction: STORY_AGENT_SYSTEM,
+      prompt: buildStoryAgentUserPrompt({
+        userMessage: params.userMessage,
+        memory: params.memory,
+        recentMessages: params.recentMessages,
+        storyId: params.storyId,
+        hasUnsavedDraft: Boolean(params.memory.latestDraft?.content),
+      }),
+      temperature: 0.7,
+      maxOutputTokens: 1600,
+      model,
+      operation: "story_agent_turn",
+      reasoningEffort: "minimal",
+      outputMode: "json",
+    },
   });
 
   let decision: StoryAgentTurnResult;
@@ -199,7 +202,13 @@ export function mergeDecisionIntoMemory(
 export function readMemoryFromConversationState(state: unknown): StoryMemory {
   if (!state || typeof state !== "object") return emptyStoryMemory();
   const record = state as Record<string, unknown>;
-  if (record.storyMemory || record.characters || record.userPreferences) {
+  if (
+    record.memoryVersion === 2 ||
+    record.storyMemory ||
+    record.characters ||
+    record.userPreferences ||
+    record.story
+  ) {
     return parseStoryMemory(record);
   }
   // Legacy create-state: seed lightly from draftForm/extraction if present
@@ -242,7 +251,9 @@ export function readMemoryFromConversationState(state: unknown): StoryMemory {
       ? draft.characters
           .filter(
             (c): c is Record<string, unknown> =>
-              typeof c === "object" && c !== null && typeof (c as { name?: unknown }).name === "string"
+              typeof c === "object" &&
+              c !== null &&
+              typeof (c as { name?: unknown }).name === "string"
           )
           .map((c) => ({
             tempId: typeof c.clientId === "string" ? c.clientId : undefined,

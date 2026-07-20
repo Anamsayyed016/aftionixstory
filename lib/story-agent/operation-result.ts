@@ -71,4 +71,9 @@ export type NormalizedTurnResult = {
   retryCount?: number;
   errorCode?: string;
   retryable?: boolean;
+  /** Phase A collaboration flow (optional on legacy executor results). */
+  conversationFlow?: import("@/lib/conversation-brain/collaboration-state").ConversationFlow;
+  /** Phase E prompt registry metadata (never full prompt text). */
+  promptId?: string;
+  promptVersion?: string;
 };

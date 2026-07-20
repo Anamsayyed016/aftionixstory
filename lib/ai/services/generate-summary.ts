@@ -4,9 +4,9 @@ import type { GenerationAction, Prisma } from "@prisma/client";
 
 import { isAIError } from "@/lib/ai/errors";
 import { buildSummaryPrompt } from "@/lib/ai/prompt-builder";
-import { getAIProvider } from "@/lib/ai/registry";
 import { parseSummaryOutput } from "@/lib/ai/response-parser";
 import { getAiEnv, resolveSummaryModel } from "@/lib/env";
+import { generateTextCompat } from "@/lib/provider-router/v2/legacy-generate";
 
 export async function generateEpisodeSummaryText(params: {
   storyTitle: string;
@@ -25,14 +25,17 @@ export async function generateEpisodeSummaryText(params: {
       episodeContent: params.episodeContent,
     });
     const env = getAiEnv();
-    const provider = getAIProvider();
-    const result = await provider.generateText({
-      systemInstruction: built.systemInstruction,
-      prompt: built.prompt,
-      temperature: 0.4,
-      maxOutputTokens: 800,
-      model: resolveSummaryModel(env),
-      operation: "generate_episode_summary",
+    const result = await generateTextCompat({
+      modelKind: "agent",
+      input: {
+        systemInstruction: built.systemInstruction,
+        prompt: built.prompt,
+        temperature: 0.4,
+        maxOutputTokens: 800,
+        model: resolveSummaryModel(env),
+        operation: "generate_episode_summary",
+        outputMode: "text",
+      },
     });
     return { summary: parseSummaryOutput(result.text) };
   } catch (error) {
@@ -63,14 +66,17 @@ export async function generateRollingStorySummaryText(params: {
       initialPlot: params.initialPlot,
     });
     const env = getAiEnv();
-    const provider = getAIProvider();
-    const result = await provider.generateText({
-      systemInstruction: built.systemInstruction,
-      prompt: built.prompt,
-      temperature: 0.3,
-      maxOutputTokens: 900,
-      model: resolveSummaryModel(env),
-      operation: "generate_rolling_summary",
+    const result = await generateTextCompat({
+      modelKind: "agent",
+      input: {
+        systemInstruction: built.systemInstruction,
+        prompt: built.prompt,
+        temperature: 0.3,
+        maxOutputTokens: 900,
+        model: resolveSummaryModel(env),
+        operation: "generate_rolling_summary",
+        outputMode: "text",
+      },
     });
     return { summary: parseSummaryOutput(result.text) };
   } catch (error) {

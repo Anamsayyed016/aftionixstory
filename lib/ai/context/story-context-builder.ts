@@ -10,6 +10,12 @@ import {
   readLanguagePreferences,
   type LanguagePreferences,
 } from "@/lib/story-agent/language-preferences";
+import {
+  buildDynamicContext,
+  dynamicContextToCompactStoryContext,
+  isDynamicContextV2Enabled,
+} from "@/lib/context-builder/v2";
+import { getMemoryV2 } from "@/lib/story-agent/memory-patch";
 
 export { extractMentionedCharacters } from "@/lib/story-agent/entity-resolver";
 
@@ -113,6 +119,7 @@ function detectLanguageHint(message: string, memory: StoryMemory): string {
 /**
  * Builds a compact, operation-scoped context — never the entire DB.
  * Only uses the active conversation's memory + recent messages.
+ * Phase D: when AI_DYNAMIC_CONTEXT_V2_ENABLED, uses Dynamic Context Builder.
  */
 export function buildStoryContext(params: {
   operation: StoryOperation;
@@ -121,6 +128,14 @@ export function buildStoryContext(params: {
   recentMessages?: Array<{ role: string; content: string }>;
   conversationId?: string;
   storyId?: string | null;
+  /** Phase B/D intent hint for context profiles */
+  intent?: string;
+  entities?: {
+    characterNames?: string[];
+    episodeNumber?: number | null;
+    requestedTone?: string | null;
+    requestedLanguage?: string | null;
+  };
 }): CompactStoryContext {
   const { operation, memory, userMessage } = params;
 
@@ -134,6 +149,164 @@ export function buildStoryContext(params: {
     draftSource !== params.conversationId
   ) {
     throw new Error("CONTEXT_ISOLATION_ERROR");
+  }
+
+  // Phase D dynamic context (feature-flagged)
+  if (isDynamicContextV2Enabled()) {
+    try {
+      const resolved = resolveSceneRequest(userMessage, memory);
+      const mentioned = extractMentionedCharacters(userMessage);
+      const namedInRequest =
+        resolved.characterNames.length > 0
+          ? resolved.characterNames
+          : mentioned.map((c) => c.name);
+
+      const dyn = buildDynamicContext({
+        intent: params.intent || operation,
+        operation,
+        userMessage,
+        entities: {
+          characterNames:
+            params.entities?.characterNames?.length
+              ? params.entities.characterNames
+              : namedInRequest,
+          episodeNumber: params.entities?.episodeNumber ?? null,
+          requestedTone: params.entities?.requestedTone ?? null,
+          requestedLanguage: params.entities?.requestedLanguage ?? null,
+        },
+        memory: getMemoryV2(memory),
+        recentMessages: params.recentMessages ?? [],
+        conversationId: params.conversationId,
+        storyId: params.storyId,
+      });
+      const compact = dynamicContextToCompactStoryContext({
+        ctx: dyn,
+        operation,
+        userMessage,
+        conversationId: params.conversationId,
+        storyId: params.storyId,
+        fullMemory: memory,
+      });
+
+      // Preserve legacy request-scoped overrides from entity resolver
+      const isCreative =
+        operation === "write_scene" ||
+        operation === "start_story" ||
+        operation === "generate_episode" ||
+        operation === "continue_episode" ||
+        operation === "revise_draft";
+
+      // Prefer characters named in the current request (legacy cast isolation).
+      // Synthesize stubs for names not yet in memory (fresh scene requests).
+      let characters = compact.characters;
+      const memoryCast = memory.characters.map((c) => c.name.toLowerCase());
+      const requestCast = namedInRequest.map((n) => n.toLowerCase());
+      const castConflict =
+        requestCast.length > 0 &&
+        memoryCast.length > 0 &&
+        !requestCast.some((n) => memoryCast.includes(n));
+
+      if (isCreative && namedInRequest.length > 0) {
+        const byName = new Map<
+          string,
+          CompactStoryContext["characters"][number]
+        >();
+        for (const c of memory.characters) {
+          byName.set(c.name.toLowerCase(), {
+            name: c.name,
+            role: c.role,
+            personality: c.personality || [],
+            avoid: c.avoid || [],
+            notes: c.notes || [],
+          });
+        }
+        for (const c of compact.characters) {
+          const key = c.name.toLowerCase();
+          if (!byName.has(key)) byName.set(key, c);
+        }
+        for (const m of mentioned) {
+          const key = m.name.toLowerCase();
+          const existing = byName.get(key);
+          if (!existing) {
+            byName.set(key, {
+              name: m.name,
+              role: m.role,
+              personality: [],
+              avoid: [],
+              notes: [],
+            });
+          } else if (m.role && !existing.role) {
+            byName.set(key, { ...existing, role: m.role });
+          }
+        }
+        for (const name of namedInRequest) {
+          const key = name.toLowerCase();
+          if (!byName.has(key)) {
+            byName.set(key, {
+              name,
+              personality: [],
+              avoid: [],
+              notes: [],
+            });
+          }
+        }
+        const preferred = namedInRequest
+          .map((n) => byName.get(n.toLowerCase()))
+          .filter((c): c is CompactStoryContext["characters"][number] =>
+            Boolean(c)
+          );
+        if (preferred.length > 0) characters = preferred;
+      }
+
+      return {
+        ...compact,
+        characters,
+        namedInRequest,
+        settingOverride: resolved.settingOverride,
+        concept:
+          castConflict &&
+          (operation === "write_scene" ||
+            operation === "start_story" ||
+            operation === "generate_episode")
+            ? undefined
+            : compact.concept,
+        plot:
+          castConflict &&
+          (operation === "write_scene" ||
+            operation === "start_story" ||
+            operation === "generate_episode")
+            ? undefined
+            : compact.plot,
+        setting:
+          operation === "write_scene"
+            ? resolved.settingOverride || undefined
+            : resolved.settingOverride ||
+              (castConflict ? undefined : compact.setting),
+        actionHints: resolved.actionHints,
+        conflictHints: resolved.conflictHints,
+        // Fresh write_scene: do not leak prior title/draft (legacy isolation)
+        title:
+          operation === "write_scene" &&
+          (!compact.includeLatestDraft || castConflict)
+            ? undefined
+            : castConflict &&
+                (operation === "write_scene" ||
+                  operation === "start_story" ||
+                  operation === "generate_episode")
+              ? undefined
+              : compact.title,
+        includeLatestDraft:
+          operation === "revise_draft" || operation === "continue_episode"
+            ? compact.includeLatestDraft
+            : false,
+        latestDraftPreview:
+          operation === "revise_draft" || operation === "continue_episode"
+            ? compact.latestDraftPreview
+            : undefined,
+      };
+    } catch {
+      // Fall through to legacy builder on any DCB failure
+    }
   }
 
   const resolved = resolveSceneRequest(userMessage, memory);
