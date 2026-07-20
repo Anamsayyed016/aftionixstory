@@ -80,13 +80,13 @@ export type WizardState = {
   writingRules: WizardRule[];
 };
 
-function uid() {
-  return `tmp_${Math.random().toString(36).slice(2, 10)}`;
+function uid(prefix: string, index: number): string {
+  return `tmp_${prefix}_${index}`;
 }
 
-function emptyCharacter(): WizardCharacter {
+function emptyCharacter(index = 0): WizardCharacter {
   return {
-    clientId: uid(),
+    clientId: uid("char", index),
     name: "",
     age: "",
     gender: "",
@@ -139,10 +139,10 @@ export function createInitialWizardState(
     initialPlot: "",
     worldRules: "",
     contentBoundaries: "",
-    characters: [emptyCharacter()],
+    characters: [emptyCharacter(0)],
     relationships: [],
-    writingRules: DEFAULT_WRITING_RULES.map((rule) => ({
-      clientId: uid(),
+    writingRules: DEFAULT_WRITING_RULES.map((rule, index) => ({
+      clientId: uid("rule", index),
       rule,
       category: "Style",
       priority: 5,
@@ -616,7 +616,12 @@ export function StoryWizard({
             <Button
               type="button"
               variant="secondary"
-              onClick={() => update("characters", [...state.characters, emptyCharacter()])}
+              onClick={() =>
+                update("characters", [
+                  ...state.characters,
+                  emptyCharacter(state.characters.length),
+                ])
+              }
             >
               <Plus className="h-4 w-4" />
               Add character
@@ -721,7 +726,7 @@ export function StoryWizard({
                   update("relationships", [
                     ...state.relationships,
                     {
-                      clientId: uid(),
+                      clientId: uid("rel", state.relationships.length),
                       sourceClientId: state.characters[0]?.clientId || "",
                       targetClientId: state.characters[1]?.clientId || "",
                       relationshipType: "",
@@ -772,7 +777,7 @@ export function StoryWizard({
                   update("writingRules", [
                     ...state.writingRules,
                     {
-                      clientId: uid(),
+                      clientId: uid("rule", state.writingRules.length),
                       rule: "",
                       category: "Style",
                       priority: 5,

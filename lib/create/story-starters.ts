@@ -294,32 +294,14 @@ export function sanitizeStarterPrompt(
   if (raw == null) return "";
   let decoded = raw;
   try {
-    decoded = decodeURIComponent(raw);
+    // Only decode when the value still looks percent-encoded.
+    decoded = /%[0-9A-Fa-f]{2}/.test(raw)
+      ? decodeURIComponent(raw)
+      : raw;
   } catch {
     decoded = raw;
   }
   return decoded.replace(/\u0000/g, "").trim().slice(0, CREATE_PROMPT_MAX_CHARS);
-}
-
-/** In-memory sticky value so Strict Mode remounts keep the prefill once. */
-let stickyStarterPrompt: string | null = null;
-
-export function captureStarterPrompt(queryValue: string | null): string {
-  const fromQuery = sanitizeStarterPrompt(queryValue);
-  if (fromQuery) {
-    stickyStarterPrompt = fromQuery;
-    return fromQuery;
-  }
-  return stickyStarterPrompt ?? "";
-}
-
-export function releaseStarterPrompt(): void {
-  stickyStarterPrompt = null;
-}
-
-/** For tests only. */
-export function __resetStarterPromptForTests(): void {
-  stickyStarterPrompt = null;
 }
 
 export function buildStoryAssistantHref(prompt: string): string {

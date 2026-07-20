@@ -2,6 +2,7 @@
 
 import { Archive, MessageSquare } from "lucide-react";
 
+import { formatConversationWhenUtc } from "@/lib/chat/format-conversation-when";
 import { cn } from "@/lib/utils";
 
 export type ConversationHistoryItemData = {
@@ -21,19 +22,6 @@ type ConversationHistoryItemProps = {
   onArchive: (id: string) => void;
 };
 
-function formatWhen(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date(iso));
-  } catch {
-    return "";
-  }
-}
-
 export function ConversationHistoryItem({
   item,
   active,
@@ -50,10 +38,17 @@ export function ConversationHistoryItem({
           : "border-transparent hover:border-border hover:bg-white/5"
       )}
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => onOpen(item.id)}
-        className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac"
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpen(item.id);
+          }
+        }}
+        className="min-w-0 flex-1 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac"
         aria-current={active ? "true" : undefined}
       >
         <div className="flex items-center gap-1.5">
@@ -71,10 +66,10 @@ export function ConversationHistoryItem({
           {item.lastMessagePreview || "No messages yet"}
         </p>
         <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-          {formatWhen(item.lastMessageAt)}
+          {formatConversationWhenUtc(item.lastMessageAt)}
           {item.status === "ARCHIVED" ? " · Archived" : ""}
         </p>
-      </button>
+      </div>
       {item.status === "ACTIVE" ? (
         <button
           type="button"

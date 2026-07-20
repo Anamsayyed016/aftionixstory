@@ -1,44 +1,53 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { ChatModeToggle } from "@/components/app/chat/chat-mode-toggle";
 import { CreateStoryChat } from "@/components/app/chat/create-story-chat";
 import { StoryWizard } from "@/components/app/story-wizard";
 import type { NewStoryEntryMode } from "@/lib/chat/types";
-import { parseNewStoryEntryMode } from "@/lib/chat/utils";
-import { captureStarterPrompt } from "@/lib/create/story-starters";
 
 const ENTRY_OPTIONS = [
   { id: "wizard" as const, label: "Guided Wizard" },
   { id: "chat" as const, label: "Chat Assistant" },
 ] as const;
 
+type NewStoryEntryProps = {
+  /** Sanitized on the server from searchParams — source of truth for first paint. */
+  initialMode: NewStoryEntryMode;
+  /** Sanitized starter prompt from the server (may be empty). */
+  initialPrompt?: string;
+};
+
 /**
  * Chat shell height accounts for:
  * app header + page title + mode toggle + main padding + mobile nav (pb-24).
  * Inner CreateStoryChat uses flex + min-h-0 so the composer stays visible.
  */
-export function NewStoryEntry() {
+export function NewStoryEntry({
+  initialMode,
+  initialPrompt = "",
+}: NewStoryEntryProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialMode = parseNewStoryEntryMode(searchParams.get("mode"));
   const [entryMode, setEntryMode] = useState<NewStoryEntryMode>(initialMode);
-  const [starterPrompt] = useState(() =>
-    captureStarterPrompt(searchParams.get("prompt"))
-  );
+  const [starterPrompt] = useState(() => initialPrompt.trim());
 
+  // Strip prompt from the URL after mount so refresh does not re-prefill.
+  // Does not change first-paint markup (server already rendered with props).
   useEffect(() => {
-    if (!searchParams.has("prompt")) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("prompt");
-    if (!params.get("mode")) params.set("mode", "chat");
-    const query = params.toString();
-    router.replace(query ? `/stories/new?${query}` : "/stories/new", {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("prompt")) return;
+    url.searchParams.delete("prompt");
+    if (!url.searchParams.get("mode") && initialMode === "chat") {
+      url.searchParams.set("mode", "chat");
+    }
+    const query = url.searchParams.toString();
+    router.replace(query ? `${url.pathname}?${query}` : url.pathname, {
       scroll: false,
     });
-  }, [router, searchParams]);
+  }, [initialMode, router]);
 
   if (entryMode === "wizard") {
     return (

@@ -1,8 +1,17 @@
-import { Suspense } from "react";
-
 import { NewStoryEntry } from "@/components/app/new-story-entry";
+import {
+  parseNewStoryPageParams,
+  type NewStoryPageSearchParams,
+} from "@/lib/chat/new-story-page-params";
 
-export default function NewStoryPage() {
+export default async function NewStoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<NewStoryPageSearchParams>;
+}) {
+  const raw = await searchParams;
+  const { mode, prompt } = parseNewStoryPageParams(raw);
+
   return (
     <div className="space-y-3">
       <div>
@@ -14,13 +23,7 @@ export default function NewStoryPage() {
           Choose the guided wizard or chat with Story Assistant.
         </p>
       </div>
-      <Suspense
-        fallback={
-          <div className="h-40 animate-pulse rounded-2xl border border-border bg-panel/50" />
-        }
-      >
-        <NewStoryEntry />
-      </Suspense>
+      <NewStoryEntry initialMode={mode} initialPrompt={prompt} />
     </div>
   );
 }

@@ -1,24 +1,19 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   CREATE_CATEGORIES,
   STORY_STARTERS,
-  __resetStarterPromptForTests,
   buildStoryAssistantHref,
   canSubmitCreatePrompt,
-  captureStarterPrompt,
   filterStoryStarters,
   sanitizeStarterPrompt,
 } from "@/lib/create/story-starters";
 import { parseNewStoryEntryMode } from "@/lib/chat/utils";
+import { parseNewStoryPageParams } from "@/lib/chat/new-story-page-params";
 
 describe("Create hub starters", () => {
-  beforeEach(() => {
-    __resetStarterPromptForTests();
-  });
-
   it("defaults category list with All first", () => {
     expect(CREATE_CATEGORIES[0]).toBe("All");
   });
@@ -61,11 +56,14 @@ describe("Create hub starters", () => {
     expect(sanitizeStarterPrompt("%F0%9F%8C%9F idea")).toContain("idea");
   });
 
-  it("captures sticky starter for remount without auto-send semantics", () => {
-    const first = captureStarterPrompt("Prefill only");
-    expect(first).toBe("Prefill only");
-    const remount = captureStarterPrompt(null);
-    expect(remount).toBe("Prefill only");
+  it("server page params are the sole prefill source (no sticky remount cache)", () => {
+    expect(
+      parseNewStoryPageParams({
+        mode: "chat",
+        prompt: "Prefill only",
+      }).prompt
+    ).toBe("Prefill only");
+    expect(parseNewStoryPageParams({ mode: "chat" }).prompt).toBe("");
   });
 });
 
@@ -82,20 +80,23 @@ describe("Create → Story Assistant integration contracts", () => {
     );
     expect(source).toContain("initialComposerValue");
     expect(source).toContain(
-      "useState(() => initialComposerValue?.trim() ?? \"\")"
+      'useState(() => initialComposerValue?.trim() ?? "")'
     );
     expect(source).not.toMatch(
       /initialComposerValue[\s\S]{0,200}sendPrompt\(/
     );
   });
 
-  it("NewStoryEntry clears prompt query and opens chat mode", () => {
+  it("NewStoryEntry uses server props and clears prompt after mount", () => {
     const source = readFileSync(
       path.resolve("components/app/new-story-entry.tsx"),
       "utf8"
     );
-    expect(source).toContain('params.delete("prompt")');
-    expect(source).toContain("captureStarterPrompt");
+    expect(source).toContain("initialMode");
+    expect(source).toContain("initialPrompt");
+    expect(source).toContain('searchParams.delete("prompt")');
+    expect(source).not.toContain("useSearchParams");
+    expect(source).not.toContain("captureStarterPrompt");
     expect(source).toContain("initialComposerValue");
     expect(source).toContain("StoryWizard");
   });
