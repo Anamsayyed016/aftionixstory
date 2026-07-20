@@ -70,7 +70,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Link href="/stories/new">
+        <Link href="/create">
           <Button>
             <PenLine className="h-4 w-4" />
             Create New Story
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
             icon={PenLine}
             title="No stories yet"
             description="Create a story with characters and writing rules to fill this board."
-            actionHref="/stories/new"
+            actionHref="/create"
             actionLabel="Create Story"
           />
         ) : (

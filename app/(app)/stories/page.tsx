@@ -45,7 +45,7 @@ export default async function StoriesPage({
             {result.total} stor{result.total === 1 ? "y" : "ies"} in your workspace.
           </p>
         </div>
-        <Link href="/stories/new">
+        <Link href="/create">
           <Button>
             <Plus className="h-4 w-4" />
             Create Story
@@ -86,7 +86,7 @@ export default async function StoriesPage({
           icon={Library}
           title="No stories yet"
           description="Create your first story with characters, relationships, and writing rules. AI episodes come later."
-          actionHref="/stories/new"
+          actionHref="/create"
           actionLabel="Create Story"
         />
       ) : (

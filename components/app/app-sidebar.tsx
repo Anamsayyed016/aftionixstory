@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   Library,
   Settings,
-  PenLine,
+  Sparkles,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,8 +17,8 @@ import { Button } from "@/components/ui/button";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/create", label: "Create", icon: Sparkles },
   { href: "/stories", label: "My Stories", icon: Library },
-  { href: "/stories/new", label: "Create Story", icon: PenLine },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

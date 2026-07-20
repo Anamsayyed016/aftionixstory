@@ -78,13 +78,19 @@ function memoryToDraft(memory: StoryMemory): NormalizedChatStoryDraft | null {
 type CreateStoryChatProps = {
   className?: string;
   onClose?: () => void;
+  /** Prefill composer only — never auto-sends. */
+  initialComposerValue?: string;
 };
 
-export function CreateStoryChat({ className, onClose }: CreateStoryChatProps) {
+export function CreateStoryChat({
+  className,
+  onClose,
+  initialComposerValue,
+}: CreateStoryChatProps) {
   const router = useRouter();
   const copy = CHAT_SHELL_COPY.create;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(() => initialComposerValue?.trim() ?? "");
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [memory, setMemory] = useState<StoryMemory | null>(null);

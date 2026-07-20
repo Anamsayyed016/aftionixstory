@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Library, Settings } from "lucide-react";
+import { LayoutDashboard, Library, Settings, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+  { href: "/create", label: "Create", icon: Sparkles },
   { href: "/stories", label: "Stories", icon: Library },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -20,7 +21,12 @@ export function MobileNavigation() {
         {ITEMS.map((item) => {
           const Icon = item.icon;
           const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+            item.href === "/stories"
+              ? pathname === "/stories" ||
+                (pathname.startsWith("/stories/") &&
+                  !pathname.startsWith("/stories/new"))
+              : pathname === item.href ||
+                pathname.startsWith(`${item.href}/`);
           return (
             <li key={item.href} className="flex-1">
               <Link
