@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/constants";
 import { logoutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -58,6 +59,7 @@ export function AppHeader({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <ThemeToggle className="hidden sm:inline-flex" />
           {usage && (
             <p
               className="hidden font-mono text-[11px] text-ink-faint sm:block"

@@ -9,9 +9,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-gradient-to-r from-violet to-lilac text-white shadow-[0_0_0_1px_rgba(124,92,255,0.4),0_8px_24px_-8px_rgba(124,92,255,0.6)] hover:shadow-[0_0_0_1px_rgba(124,92,255,0.6),0_10px_30px_-6px_rgba(124,92,255,0.75)] hover:brightness-110 active:brightness-95",
+          "bg-violet text-white shadow-sm hover:brightness-105 active:scale-[0.98] active:brightness-95",
         secondary:
-          "bg-panel-raised text-ink border border-border-strong hover:border-violet-soft hover:bg-[#241b30]",
+          "bg-panel-raised text-ink border border-border-strong shadow-sm hover:border-violet-soft hover:bg-charcoal active:scale-[0.98]",
         outline:
           "border border-border text-ink-dim hover:text-ink hover:border-violet-soft bg-transparent",
         ghost: "text-ink-dim hover:text-ink hover:bg-white/5",

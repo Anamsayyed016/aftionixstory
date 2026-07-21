@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { NAV_LINKS, SITE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 function useScrolled(threshold = 8) {
   const [scrolled, setScrolled] = React.useState(false);
@@ -54,6 +55,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
+          <ThemeToggle />
           <Link href="/sign-in">
             <Button variant="ghost" size="sm">
               Sign In

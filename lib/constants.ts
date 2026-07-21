@@ -1,8 +1,8 @@
 export const SITE = {
-  name: "StoryVerse AI",
-  tagline: "Your stories remember everything.",
+  name: "AFTIONIX Studio",
+  tagline: "AI writing, made memorable.",
   description:
-    "Create long-form, episodic AI stories with persistent character and plot memory.",
+    "A premium AI writing studio for stories, scripts, characters, and worlds that stay in context.",
 };
 
 export const NAV_LINKS = [

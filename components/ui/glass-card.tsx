@@ -16,10 +16,10 @@ function GlassCard({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-panel",
+        "rounded-xl border border-border bg-panel shadow-[var(--sv-shadow-sm)]",
         manuscript && "sv-manuscript",
         hover &&
-          "transition-all duration-300 hover:border-violet-soft/40 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_-20px_rgba(124,92,255,0.35)]",
+          "transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-violet-soft/50 hover:shadow-[var(--sv-shadow-md)]",
         className
       )}
       {...props}

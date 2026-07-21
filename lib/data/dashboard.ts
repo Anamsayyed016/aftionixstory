@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Plan, Story, StoryStatus } from "@prisma/client";
+import type { Character, Plan, Story, StoryStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
 import {
@@ -26,6 +26,7 @@ export type DashboardStats = {
   generationLimit: number;
   plan: Plan | "FREE";
   recentStories: DashboardRecentStory[];
+  recentCharacters: Pick<Character, "id" | "name" | "role" | "storyId" | "updatedAt">[];
 };
 
 export async function getDashboardStats(
@@ -39,6 +40,7 @@ export async function getDashboardStats(
     activeWritingRules,
     user,
     recentStories,
+    recentCharacters,
   ] = await Promise.all([
     countUserStories(userId),
     countUserStoriesByStatus(userId, "ACTIVE" satisfies StoryStatus),
@@ -62,6 +64,12 @@ export async function getDashboardStats(
         _count: { select: { characters: true } },
       },
     }),
+    prisma.character.findMany({
+      where: { story: { userId }, status: "ACTIVE" },
+      orderBy: { updatedAt: "desc" },
+      take: 4,
+      select: { id: true, name: true, role: true, storyId: true, updatedAt: true },
+    }),
   ]);
 
   const period = user
@@ -84,5 +92,6 @@ export async function getDashboardStats(
     }),
     plan: user?.plan ?? "FREE",
     recentStories,
+    recentCharacters,
   };
 }
