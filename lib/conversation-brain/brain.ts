@@ -6,6 +6,7 @@ import "server-only";
 
 import { logAiEvent } from "@/lib/ai/logger";
 import { runStoryOperation } from "@/lib/ai/services/run-story-operation";
+import { hasUsableWritingContext } from "@/lib/ai/services/conversational-draft";
 import { extractMentionedCharacters } from "@/lib/ai/context/story-context-builder";
 import {
   DEFAULT_CONVERSATION_FLOW,
@@ -436,7 +437,7 @@ export async function runConversationTurn(
   // This deliberately stays after the deterministic executor so removals and
   // corrections are persisted before the creative context is built.
   if (
-    request.storyId &&
+    (request.storyId || hasUsableWritingContext(turn.memory)) &&
     turn.operation === "memory_update" &&
     turn.actionOk &&
     !flow.generationBlocked &&
@@ -447,8 +448,9 @@ export async function runConversationTurn(
       conversationId: request.conversationId,
       storyId: request.storyId,
       memory: turn.memory,
-      userMessage:
-        "Continue the story using the just-updated context. Rewrite the affected passage if needed, then move the story forward with live action and dialogue.",
+      userMessage: request.storyId
+        ? "Continue the story using the just-updated context. Rewrite the affected passage if needed, then move the story forward with live action and dialogue."
+        : "Start the story now using the just-updated context. Begin Episode 1, Scene 1 with live action and dialogue.",
       recentMessages: request.recentMessages,
       turnRequestId: request.turnRequestId,
       intent: "continue_story",
