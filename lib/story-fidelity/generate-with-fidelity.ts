@@ -85,6 +85,32 @@ export async function enforceInstructionFidelityOnDraft(params: {
   provider?: AIProvider;
   languagePrefs?: unknown;
   canonicalContext?: CanonicalStoryContext;
+  retrievedContext?: {
+    rawSynopsis: string;
+    normalizedSynopsis: string;
+    language: string;
+    latestInstruction: string;
+    requiredCharacters: Array<{
+      name: string;
+      role?: string;
+      traits?: string[];
+      currentState?: string;
+    }>;
+    relevantRelationships: Array<{
+      from: string;
+      to: string;
+      type: string;
+      currentStatus?: string;
+    }>;
+    relevantLocations: string[];
+    timelineFacts: string[];
+    relevantPlotFacts: string[];
+    lockedFacts: string[];
+    unresolvedThreads: string[];
+    previousSceneSummary?: string;
+    recentDialogueContext?: string;
+    currentEpisodeGoal?: string;
+  };
 }): Promise<{
   draft: FidelityDraft;
   memory: StoryMemory;
@@ -221,11 +247,35 @@ export async function enforceInstructionFidelityOnDraft(params: {
     }
 
     // Repair is still the existing bounded attempt, but it now receives the
-    // same raw canon as the first writer rather than only a reduced contract.
+    // same retrieved context bundle as the first writer rather than only a reduced contract.
     const canonicalBlock = params.canonicalContext
       ? serializeCanonicalStoryContext(params.canonicalContext)
       : "";
-    prompt = `Rewrite inside the established story universe. Preserve all canonical characters, relationships, timeline facts, locations, and locked facts. Do not rename or replace established leads. Do not treat style instructions, corrected words, UI labels, or keywords as characters.\n\n${canonicalBlock}\n\n${prompt}\n\nVIOLATIONS:\n${validation.violations
+    const retrievalBlock = params.retrievedContext
+      ? [
+          "[ORIGINAL STORY SYNOPSIS]",
+          params.retrievedContext.rawSynopsis || params.retrievedContext.normalizedSynopsis || "Not yet provided.",
+          "",
+          "[CANONICAL CHARACTERS]",
+          params.retrievedContext.requiredCharacters.map((character) => `${character.name}${character.role ? ` (${character.role})` : ""}`).join("\n") || "None.",
+          "",
+          "[RELATIONSHIPS]",
+          params.retrievedContext.relevantRelationships.map((relationship) => `${relationship.from} -> ${relationship.to}: ${relationship.type}`).join("\n") || "None.",
+          "",
+          "[TIMELINE]",
+          params.retrievedContext.timelineFacts.join("\n") || "Not yet resolved.",
+          "",
+          "[LOCKED FACTS]",
+          params.retrievedContext.lockedFacts.join("\n") || "None.",
+          "",
+          "[PREVIOUS SCENE]",
+          params.retrievedContext.previousSceneSummary || params.retrievedContext.recentDialogueContext || "No previous scene summary available.",
+          "",
+          "[CURRENT USER INSTRUCTION]",
+          params.retrievedContext.latestInstruction || "No explicit instruction.",
+        ].join("\n")
+      : "";
+    prompt = `Rewrite inside the established story universe. Preserve all canonical characters, relationships, timeline facts, locations, and locked facts. Do not rename or replace established leads. Do not treat style instructions, corrected words, UI labels, or keywords as characters.\n\n${retrievalBlock}\n\n${canonicalBlock}\n\n${prompt}\n\nVIOLATIONS:\n${validation.violations
       .map((v) => `- ${v.code}: ${v.message}`)
       .join("\n")}\n\n${serializeGenerationContract(contract)}`;
 

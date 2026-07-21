@@ -36,6 +36,12 @@ import {
   enforceInstructionFidelityOnDraft,
 } from "@/lib/story-fidelity/generate-with-fidelity";
 import { isInstructionFidelityEnabled } from "@/lib/story-fidelity/feature-flag";
+import {
+  buildSceneGenerationContract,
+  retrieveStoryContext,
+  serializeRetrievedStoryContext,
+  serializeSceneGenerationContract,
+} from "@/lib/story-agent/story-context-retriever";
 
 export type WriteSceneResult = {
   title: string;
@@ -141,6 +147,25 @@ export async function generateWriteScene(params: {
     recentMessages: params.recentMessages ?? [],
     latestInstruction: params.userMessage,
   });
+  const retrieval = retrieveStoryContext({
+    memory: params.memory,
+    userMessage: params.userMessage,
+    conversationId: params.conversationId,
+    storyId: params.storyId,
+    recentMessages: params.recentMessages,
+    mode:
+      params.mode === "revise"
+        ? "REWRITE"
+        : params.mode === "scene"
+          ? "SCENE_GENERATION"
+          : "OPENING",
+  });
+  const sceneContract = buildSceneGenerationContract(
+    retrieval,
+    params.userMessage
+  );
+  const retrievalBlock = serializeRetrievedStoryContext(retrieval);
+  const sceneContractBlock = serializeSceneGenerationContract(sceneContract);
   const strictLeads =
     resolved.characterNames.length > 0
       ? resolved.characterNames
@@ -178,7 +203,7 @@ export async function generateWriteScene(params: {
       if (!strict) {
         return {
           system: parts.system,
-          prompt: `${parts.prompt}\n\n${canonicalBlock}`,
+          prompt: `${parts.prompt}\n\n${retrievalBlock}\n\n${sceneContractBlock}\n\n${canonicalBlock}`,
           temperature: resolveTemperature(built.providerHints.temperatureProfile),
           maxOutputTokens: resolveMaxOutputTokens(
             built.providerHints.maxOutputTokensProfile
@@ -189,10 +214,15 @@ export async function generateWriteScene(params: {
         system: parts.system,
         prompt: `${parts.prompt}
 
+${retrievalBlock}
+
+${sceneContractBlock}
+
 STRICT RELEVANCE CORRECTION:
 - The previous attempt used the wrong characters or setup.
 - You MUST center the scene on: ${strictLeads.join(", ")}.
 - Do NOT use any other lead characters.
+- Do NOT replace the approved leads with any new lead names.
 - Honor the current request exactly: ${params.userMessage}
 - Resolve these grounding violations: ${violations.join(", ") || "context mismatch"}.
 
@@ -217,7 +247,7 @@ ${canonicalBlock}`,
     if (!strict) {
       return {
         system: base.system,
-        prompt: `${base.prompt}\n\n${serializeCanonicalStoryContext(canonical)}`,
+        prompt: `${base.prompt}\n\n${retrievalBlock}\n\n${sceneContractBlock}\n\n${serializeCanonicalStoryContext(canonical)}`,
         temperature: 0.85,
         maxOutputTokens: 8192,
       };
@@ -226,10 +256,15 @@ ${canonicalBlock}`,
       system: base.system,
       prompt: `${base.prompt}
 
+${retrievalBlock}
+
+${sceneContractBlock}
+
 STRICT RELEVANCE CORRECTION:
 - The previous attempt used the wrong characters or setup.
 - You MUST center the scene on: ${strictLeads.join(", ")}.
 - Do NOT use any other lead characters.
+- Do NOT replace the approved leads with any new lead names.
 - Honor the current request exactly: ${params.userMessage}
 - Resolve these grounding violations: ${violations.join(", ") || "context mismatch"}.
 
@@ -359,6 +394,7 @@ ${serializeCanonicalStoryContext(canonical)}`,
       provider: params.provider,
       languagePrefs: ctx.languagePrefs,
       canonicalContext: canonical,
+      retrievedContext: retrieval,
     });
     out = {
       ...out,
