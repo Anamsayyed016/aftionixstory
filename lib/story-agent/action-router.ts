@@ -3,10 +3,10 @@ import "server-only";
 import { createStoryAction } from "@/app/actions/stories";
 import { saveEpisodeAction } from "@/app/actions/episodes";
 import {
-  generateConversationalDraft,
   hasUsableWritingContext,
 } from "@/lib/ai/services/conversational-draft";
 import { generateEpisodeDraft } from "@/lib/ai/services/generate-episode";
+import { generateWriteScene } from "@/lib/ai/services/write-scene";
 import {
   getMissingCreateFields,
   memoryToWizardCandidate,
@@ -184,16 +184,19 @@ export async function routeStoryAgentAction(params: {
       }
 
       try {
-        const draft = await generateConversationalDraft({
+        // New-chat drafts must use the same Context Builder, Prompt Registry,
+        // Provider Router, and relevance guard as every other creative write.
+        // The legacy conversational draft path bypassed those layers entirely.
+        const draft = await generateWriteScene({
           userId: params.userId,
           memory,
-          userInstruction: instruction,
-          clientRequestId: `ep_${params.turnRequestId}`,
-          reviseExistingContent:
-            actionType === "revise_draft"
-              ? memory.latestDraft?.content ?? null
-              : null,
+          userMessage: instruction,
+          mode: actionType === "revise_draft" ? "revise" : "scene",
+          conversationId: params.conversationId,
+          storyId: null,
+          intent: actionType === "revise_draft" ? "rewrite" : "write_scene",
         });
+        const clientRequestId = `ep_${params.turnRequestId}`;
 
         memory = {
           ...memory,
@@ -201,8 +204,8 @@ export async function routeStoryAgentAction(params: {
             title: draft.title,
             content: draft.content,
             wordCount: draft.wordCount,
-            clientRequestId: draft.clientRequestId,
-            action: draft.action,
+            clientRequestId,
+            action: actionType === "revise_draft" ? "REGENERATE" : "NEW_EPISODE",
           },
           updatedAt: new Date().toISOString(),
         };
@@ -216,8 +219,8 @@ export async function routeStoryAgentAction(params: {
               title: draft.title,
               content: draft.content,
               wordCount: draft.wordCount,
-              clientRequestId: draft.clientRequestId,
-              action: draft.action,
+              clientRequestId,
+              action: actionType === "revise_draft" ? "REGENERATE" : "NEW_EPISODE",
             },
           },
         };

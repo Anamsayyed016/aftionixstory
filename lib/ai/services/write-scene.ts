@@ -45,6 +45,43 @@ export type WriteSceneResult = {
   relevanceRetry?: boolean;
 };
 
+function debugGroundingInput(params: {
+  userMessage: string;
+  memory: StoryMemory;
+  system: string;
+  prompt: string;
+  conversationId?: string;
+  storyId?: string | null;
+}) {
+  if (process.env.STORYVERSE_DEBUG_CONTEXT !== "true") return;
+  const v2 = getMemoryV2(params.memory);
+  console.info(
+    JSON.stringify({
+      event: "story_grounding.pre_provider",
+      conversationId: params.conversationId ?? null,
+      storyId: params.storyId ?? null,
+      rawUserMessage: params.userMessage,
+      storyFacts: {
+        title: params.memory.storyMemory.title,
+        concept: params.memory.storyMemory.concept,
+        setting: params.memory.storyMemory.setting,
+        plot: params.memory.storyMemory.plot,
+        genre: params.memory.storyMemory.genre,
+      },
+      characters: params.memory.characters.map((character) => ({
+        name: character.name,
+        role: character.role,
+        background: character.background,
+      })),
+      relationships: params.memory.relationships,
+      timeline: v2.timeline,
+      backstory: v2.story.concept,
+      systemPrompt: params.system,
+      userPrompt: params.prompt,
+    })
+  );
+}
+
 /**
  * Plain-text scene / revision writer. Does not require a Story DB row.
  * Does not parse JSON agent envelopes.
@@ -186,6 +223,14 @@ STRICT RELEVANCE CORRECTION:
       operation: params.mode === "revise" ? "revise_draft" : "write_scene",
     }));
   }
+  debugGroundingInput({
+    userMessage: params.userMessage,
+    memory: params.memory,
+    system,
+    prompt,
+    conversationId: params.conversationId,
+    storyId: params.storyId,
+  });
   let result = await generateCreativeText({
     systemInstruction: system,
     prompt,

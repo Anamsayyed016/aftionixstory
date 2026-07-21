@@ -185,12 +185,26 @@ export function resolveSceneRequest(
   }
 
   // Prefer memory casing for display
-  const characterNames = requested.map((r) => {
+  let characterNames = requested.map((r) => {
     const mem = memory?.characters.find(
       (c) => c.name.toLowerCase() === r.name.toLowerCase()
     );
     return mem?.name ?? r.name;
   });
+
+  // Continuation commands normally say only “continue” or “start now”. In
+  // that case the active cast must still reach both the prompt and the output
+  // relevance guard. Keep this intentionally small: an opening needs leads,
+  // not the whole ensemble in every scene.
+  if (characterNames.length === 0 && memory?.characters.length) {
+    characterNames = memory.characters
+      .filter((c) => c.name.trim())
+      .slice(0, 2)
+      .map((c) => c.name);
+    for (const name of characterNames) {
+      requested.push({ name, source: "memory_context" });
+    }
+  }
 
   const actionHints: string[] = [];
   if (/\bkiss\b/i.test(text)) actionHints.push("kiss / intimate closeness");
