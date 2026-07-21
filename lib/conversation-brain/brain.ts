@@ -419,7 +419,7 @@ export async function runConversationTurn(
   }
 
   // ---- Existing executor (deterministic prefs/memory, creative, chat) ----
-  const turn = await runStoryOperation({
+  let turn = await runStoryOperation({
     userId: request.userId,
     conversationId: request.conversationId,
     storyId: request.storyId,
@@ -429,6 +429,31 @@ export async function runConversationTurn(
     turnRequestId: request.turnRequestId,
     intent: workingPlan.storyIntent || workingPlan.intent,
   });
+
+  // A deterministic correction is valuable only if it changes what the story
+  // writes next. For an established project, keep the patched memory and run
+  // the existing continuation path instead of returning its "Got it" receipt.
+  // This deliberately stays after the deterministic executor so removals and
+  // corrections are persisted before the creative context is built.
+  if (
+    request.storyId &&
+    turn.operation === "memory_update" &&
+    turn.actionOk &&
+    !flow.generationBlocked &&
+    !turn.memory.userPreferences.doNotStartYet
+  ) {
+    turn = await runStoryOperation({
+      userId: request.userId,
+      conversationId: request.conversationId,
+      storyId: request.storyId,
+      memory: turn.memory,
+      userMessage:
+        "Continue the story using the just-updated context. Rewrite the affected passage if needed, then move the story forward with live action and dialogue.",
+      recentMessages: request.recentMessages,
+      turnRequestId: request.turnRequestId,
+      intent: "continue_story",
+    });
+  }
 
   // Sync flow flags from plan / memory prefs
   const blocked =
