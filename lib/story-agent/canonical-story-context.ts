@@ -1,5 +1,6 @@
 import { getMemoryV2 } from "@/lib/story-agent/memory-patch";
 import { isValidCanonicalEntityName } from "@/lib/story-agent/entity-guards";
+import { sanitizeStoryMemoryCanon } from "@/lib/story-agent/sanitize-memory";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import { readFidelityState } from "@/lib/story-fidelity/resolve-facts";
 
@@ -166,22 +167,28 @@ export function buildCanonicalStoryContext(params: {
   latestInstruction: string;
   previous?: CanonicalStoryContext | null;
 }): CanonicalStoryContext {
-  const v2 = getMemoryV2(params.memory);
+  const { memory } = sanitizeStoryMemoryCanon(params.memory);
+  const v2 = getMemoryV2(memory);
   const earliestSynopsis = params.recentMessages.find(
     (message) => message.role === "user" && isSubstantiveStoryMessage(message.content)
   )?.content;
   const rawSynopsis =
     params.previous?.rawSynopsis ||
     earliestSynopsis ||
-    params.memory.storyMemory.concept ||
-    params.memory.storyMemory.plot ||
+    memory.storyMemory.concept ||
+    memory.storyMemory.plot ||
     "";
+
+  // If legacy memory still carried pseudo-entities, rebuild cast from synopsis.
+  const previousCharacters = (params.previous?.characters ?? [])
+    .map((character) => character.name)
+    .filter(isValidCanonicalEntityName);
 
   const namesById = new Map(v2.characters.map((character) => [character.id, character.name]));
   const canonicalCharacters = unique([
-    ...(params.previous?.characters ?? []).map((character) => character.name),
+    ...previousCharacters,
     ...v2.characters.map((character) => character.name),
-    ...params.memory.characters.map((character) => character.name),
+    ...memory.characters.map((character) => character.name),
     ...extractCanonicalNamesFromSynopsis(rawSynopsis),
   ])
     .filter(isValidCanonicalEntityName)
@@ -189,7 +196,7 @@ export function buildCanonicalStoryContext(params: {
       const stored = v2.characters.find(
         (character) => character.name.toLowerCase() === name.toLowerCase()
       );
-      const legacy = params.memory.characters.find(
+      const legacy = memory.characters.find(
         (character) => character.name.toLowerCase() === name.toLowerCase()
       );
       return {
@@ -211,7 +218,7 @@ export function buildCanonicalStoryContext(params: {
       to: namesById.get(relationship.toCharacterId) ?? relationship.toCharacterId,
       type: relationship.type,
     })),
-    ...params.memory.relationships.map((relationship) => ({
+    ...memory.relationships.map((relationship) => ({
       from: relationship.from,
       to: relationship.to,
       type: relationship.type,
@@ -226,7 +233,7 @@ export function buildCanonicalStoryContext(params: {
   const locations = unique([
     ...(params.previous?.locations ?? []),
     ...v2.locations.map((location) => location.name),
-    params.memory.storyMemory.setting,
+    memory.storyMemory.setting,
     v2.story.setting,
     ...Array.from(rawSynopsis.matchAll(/\b(?:in|from|to|leaves?|left|return(?:ed|s)?\s+to)\s+([A-Z][A-Za-z'-]*(?:\s+[A-Z][A-Za-z'-]*)?)/g)).map(
       (match) => match[1]
@@ -235,8 +242,8 @@ export function buildCanonicalStoryContext(params: {
 
   const plotFacts = unique([
     ...(params.previous?.plotFacts ?? []),
-    params.memory.storyMemory.concept,
-    params.memory.storyMemory.plot,
+    memory.storyMemory.concept,
+    memory.storyMemory.plot,
     v2.story.concept,
     v2.story.plot,
     ...v2.events.flatMap((event) => [event.title, event.description]),
@@ -249,7 +256,7 @@ export function buildCanonicalStoryContext(params: {
     ...sentenceFacts(rawSynopsis).filter((fact) => /years?\s+later|before|after|then|later|left|return/i.test(fact)),
   ]);
 
-  const fidelity = readFidelityState(params.memory).resolvedFacts;
+  const fidelity = readFidelityState(memory).resolvedFacts;
   const lockedFacts = unique([
     ...(params.previous?.lockedFacts ?? []),
     ...(fidelity.metadata.lockedFields ?? []).map((field) => `Locked: ${field}`),
@@ -266,9 +273,9 @@ export function buildCanonicalStoryContext(params: {
     : /\b(?:hindi|urdu|english)\b/i.exec(params.latestInstruction)?.[0];
   const language =
     requestedLanguage ||
-    params.memory.userPreferences.dialogueLanguage ||
-    params.memory.userPreferences.narrationLanguage ||
-    params.memory.storyMemory.language ||
+    memory.userPreferences.dialogueLanguage ||
+    memory.userPreferences.narrationLanguage ||
+    memory.storyMemory.language ||
     v2.userPreferences.storyLanguage ||
     v2.story.language ||
     params.previous?.language ||

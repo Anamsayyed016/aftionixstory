@@ -16,6 +16,8 @@ import {
   summarizeCanonicalStoryContext,
   type CanonicalStoryContext,
 } from "@/lib/story-agent/canonical-story-context";
+import { logStoryGrounding } from "@/lib/story-agent/grounding-debug";
+import { sanitizeStoryMemoryCanon } from "@/lib/story-agent/sanitize-memory";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import { readStyleProfile } from "@/lib/story-agent/style-profile";
 import {
@@ -57,27 +59,19 @@ export type WriteSceneResult = {
   relevanceRetry?: boolean;
 };
 
-function debugGroundingInput(params: {
-  conversationId?: string;
-  storyId?: string | null;
-  canonical: CanonicalStoryContext;
-  promptId?: string;
-  provider?: string;
-}) {
-  if (
-    process.env.NODE_ENV !== "development" ||
-    process.env.STORYVERSE_DEBUG_CONTEXT !== "true"
-  ) return;
-  console.info(
-    JSON.stringify({
-      event: "story_grounding.pre_provider",
-      conversationId: params.conversationId ?? null,
-      storyId: params.storyId ?? null,
-      selectedPromptKey: params.promptId ?? "legacy",
-      selectedProvider: params.provider ?? "default",
-      canonical: summarizeCanonicalStoryContext(params.canonical),
-    })
-  );
+function pickRelevantLeads(
+  canonical: CanonicalStoryContext,
+  sceneRequired: string[],
+  softContext: string[]
+): string[] {
+  const fromContract = sceneRequired.filter(Boolean);
+  if (fromContract.length > 0) return fromContract.slice(0, 4);
+  const required = canonical.characters
+    .filter((character) => character.required)
+    .map((character) => character.name);
+  if (required.length > 0) return required.slice(0, 4);
+  if (softContext.length > 0) return softContext.slice(0, 4);
+  return canonical.characters.slice(0, 4).map((character) => character.name);
 }
 
 /**
@@ -101,11 +95,14 @@ export async function generateWriteScene(params: {
   await assertWithinGenerationLimit(params.userId);
   await assertGenerationRateLimit(params.userId);
 
+  const sanitized = sanitizeStoryMemoryCanon(params.memory);
+  const memory = sanitized.memory;
+
   let ctx;
   try {
     ctx = buildStoryContext({
       operation: params.mode === "revise" ? "revise_draft" : "write_scene",
-      memory: params.memory,
+      memory,
       userMessage: params.userMessage,
       recentMessages: params.recentMessages,
       conversationId: params.conversationId,
@@ -126,29 +123,31 @@ export async function generateWriteScene(params: {
   }
 
   const style = readStyleProfile({
-    formality: params.memory.userPreferences.formality,
-    dialogueStyle: params.memory.userPreferences.dialogueStyle,
-    narrationStyle: params.memory.userPreferences.narrationStyle,
-    emojiStyle: params.memory.userPreferences.emojiStyle,
+    formality: memory.userPreferences.formality,
+    dialogueStyle: memory.userPreferences.dialogueStyle,
+    narrationStyle: memory.userPreferences.narrationStyle,
+    emojiStyle: memory.userPreferences.emojiStyle,
     uppercaseForLoudDialogue:
-      params.memory.userPreferences.uppercaseForLoudDialogue,
-    episodeLength: params.memory.userPreferences.episodeLength,
-    avoidFormalHindi: params.memory.userPreferences.avoidFormalHindi,
-    preferShortDialogues: params.memory.userPreferences.preferShortDialogues,
-    pacingHint: params.memory.userPreferences.pacingHint,
-    avoid: params.memory.userPreferences.avoid,
+      memory.userPreferences.uppercaseForLoudDialogue,
+    episodeLength: memory.userPreferences.episodeLength,
+    avoidFormalHindi: memory.userPreferences.avoidFormalHindi,
+    preferShortDialogues: memory.userPreferences.preferShortDialogues,
+    pacingHint: memory.userPreferences.pacingHint,
+    avoid: memory.userPreferences.avoid,
   });
 
-  const resolved = resolveSceneRequest(params.userMessage, params.memory);
-  const canonical = params.canonicalContext ?? buildCanonicalStoryContext({
-    conversationId: params.conversationId ?? "unspecified",
-    storyId: params.storyId,
-    memory: params.memory,
-    recentMessages: params.recentMessages ?? [],
-    latestInstruction: params.userMessage,
-  });
+  const resolved = resolveSceneRequest(params.userMessage, memory);
+  const canonical =
+    params.canonicalContext ??
+    buildCanonicalStoryContext({
+      conversationId: params.conversationId ?? "unspecified",
+      storyId: params.storyId,
+      memory,
+      recentMessages: params.recentMessages ?? [],
+      latestInstruction: params.userMessage,
+    });
   const retrieval = retrieveStoryContext({
-    memory: params.memory,
+    memory,
     userMessage: params.userMessage,
     conversationId: params.conversationId,
     storyId: params.storyId,
@@ -166,17 +165,51 @@ export async function generateWriteScene(params: {
   );
   const retrievalBlock = serializeRetrievedStoryContext(retrieval);
   const sceneContractBlock = serializeSceneGenerationContract(sceneContract);
-  const strictLeads =
-    resolved.characterNames.length > 0
-      ? resolved.characterNames
-      : canonical.characters
-          .filter((character) => character.required)
-          .slice(0, 2)
-          .map((character) => character.name);
+  const relevantLeads = pickRelevantLeads(
+    canonical,
+    sceneContract.requiredCharacters,
+    resolved.softContextCharacters
+  );
 
   let promptMeta: { promptId?: string; promptVersion?: string } = {};
 
-  const buildPrompts = (strict: boolean, violations: string[] = []) => {
+  const buildPrompts = (
+    strict: boolean,
+    opts?: {
+      violations?: string[];
+      bannedNames?: string[];
+      failedDraftPreview?: string;
+    }
+  ) => {
+    const violations = opts?.violations ?? [];
+    const bannedNames = opts?.bannedNames ?? [];
+    const failedPreview = opts?.failedDraftPreview ?? "";
+    const repairExtra = strict
+      ? `
+STRICT GROUNDED REPAIR (one attempt):
+- ORIGINAL SYNOPSIS (authoritative):
+${canonical.rawSynopsis || "Not supplied."}
+
+- CANONICAL CHARACTERS: ${canonical.characters.map((c) => c.name).join(", ") || "None"}
+- CANONICAL RELATIONSHIPS: ${
+          canonical.relationships
+            .map((r) => `${r.from} → ${r.to} (${r.type})`)
+            .join("; ") || "None"
+        }
+- CONFLICT / PLOT ANCHORS: ${canonical.plotFacts.slice(0, 8).join(" | ") || "None"}
+- CURRENT INSTRUCTION: ${params.userMessage}
+- Center the live scene on at least one of: ${relevantLeads.join(", ") || "canonical leads"}.
+- You may use a valid subset of the cast (do NOT force every character into one scene).
+- Do NOT invent unrelated lead characters.
+- Do NOT use these banned unrelated names from the failed draft: ${
+          bannedNames.length > 0 ? bannedNames.join(", ") : "n/a"
+        }.
+- Do NOT use Business, Baat, Updated, Got, Hinglish, Liya, or Chahe as character names unless they are already canonical.
+- Resolve grounding violations: ${violations.join(", ") || "context mismatch"}.
+${failedPreview ? `- Failed draft preview (do not reuse):\n${failedPreview.slice(0, 400)}` : ""}
+`
+      : "";
+
     if (isPromptRegistryV2Enabled()) {
       const intent =
         params.intent ||
@@ -185,7 +218,7 @@ export async function generateWriteScene(params: {
         intent,
         operation: params.mode === "revise" ? "revise_draft" : "write_scene",
         userMessage: params.userMessage,
-        memory: getMemoryV2(params.memory),
+        memory: getMemoryV2(memory),
         recentMessages: params.recentMessages,
         conversationId: params.conversationId,
         storyId: params.storyId,
@@ -200,33 +233,9 @@ export async function generateWriteScene(params: {
       });
       const parts = promptResultToLegacyParts(built);
       const canonicalBlock = serializeCanonicalStoryContext(canonical);
-      if (!strict) {
-        return {
-          system: parts.system,
-          prompt: `${parts.prompt}\n\n${retrievalBlock}\n\n${sceneContractBlock}\n\n${canonicalBlock}`,
-          temperature: resolveTemperature(built.providerHints.temperatureProfile),
-          maxOutputTokens: resolveMaxOutputTokens(
-            built.providerHints.maxOutputTokensProfile
-          ),
-        };
-      }
       return {
         system: parts.system,
-        prompt: `${parts.prompt}
-
-${retrievalBlock}
-
-${sceneContractBlock}
-
-STRICT RELEVANCE CORRECTION:
-- The previous attempt used the wrong characters or setup.
-- You MUST center the scene on: ${strictLeads.join(", ")}.
-- Do NOT use any other lead characters.
-- Do NOT replace the approved leads with any new lead names.
-- Honor the current request exactly: ${params.userMessage}
-- Resolve these grounding violations: ${violations.join(", ") || "context mismatch"}.
-
-${canonicalBlock}`,
+        prompt: `${parts.prompt}\n\n${retrievalBlock}\n\n${sceneContractBlock}\n\n${canonicalBlock}${repairExtra}`,
         temperature: resolveTemperature(built.providerHints.temperatureProfile),
         maxOutputTokens: resolveMaxOutputTokens(
           built.providerHints.maxOutputTokensProfile
@@ -238,37 +247,15 @@ ${canonicalBlock}`,
       const base = buildReviseDraftPrompt(ctx, ctx.languagePrefs, style);
       return {
         system: base.system,
-        prompt: `${base.prompt}\n\n${serializeCanonicalStoryContext(canonical)}`,
+        prompt: `${base.prompt}\n\n${serializeCanonicalStoryContext(canonical)}${repairExtra}`,
         temperature: 0.85,
         maxOutputTokens: 8192,
       };
     }
     const base = buildWriteScenePrompt(ctx, style);
-    if (!strict) {
-      return {
-        system: base.system,
-        prompt: `${base.prompt}\n\n${retrievalBlock}\n\n${sceneContractBlock}\n\n${serializeCanonicalStoryContext(canonical)}`,
-        temperature: 0.85,
-        maxOutputTokens: 8192,
-      };
-    }
     return {
       system: base.system,
-      prompt: `${base.prompt}
-
-${retrievalBlock}
-
-${sceneContractBlock}
-
-STRICT RELEVANCE CORRECTION:
-- The previous attempt used the wrong characters or setup.
-- You MUST center the scene on: ${strictLeads.join(", ")}.
-- Do NOT use any other lead characters.
-- Do NOT replace the approved leads with any new lead names.
-- Honor the current request exactly: ${params.userMessage}
-- Resolve these grounding violations: ${violations.join(", ") || "context mismatch"}.
-
-${serializeCanonicalStoryContext(canonical)}`,
+      prompt: `${base.prompt}\n\n${retrievalBlock}\n\n${sceneContractBlock}\n\n${serializeCanonicalStoryContext(canonical)}${repairExtra}`,
       temperature: 0.85,
       maxOutputTokens: 8192,
     };
@@ -279,18 +266,26 @@ ${serializeCanonicalStoryContext(canonical)}`,
     ({ system, prompt } = appendContractToPrompt({
       system,
       prompt,
-      memory: params.memory,
+      memory,
       userMessage: params.userMessage,
       operation: params.mode === "revise" ? "revise_draft" : "write_scene",
     }));
   }
-  debugGroundingInput({
-    conversationId: params.conversationId,
-    storyId: params.storyId,
-    canonical,
-    promptId: promptMeta.promptId,
-    provider: params.provider?.name,
+
+  logStoryGrounding("story_grounding.pre_provider", {
+    conversationId: params.conversationId ?? null,
+    storyId: params.storyId ?? null,
+    rawSynopsisLength: canonical.rawSynopsis.length,
+    rawSynopsisPreview: canonical.rawSynopsis.slice(0, 300),
+    canonicalCharacterNames: canonical.characters.map((c) => c.name),
+    requiredSceneCharacters: relevantLeads,
+    relationships: canonical.relationships,
+    plotAnchors: canonical.plotFacts.slice(0, 8),
+    selectedGenerationMode: params.mode,
+    selectedPromptKey: promptMeta.promptId ?? "legacy",
+    removedPseudoEntities: sanitized.removedCharacterNames,
   });
+
   let result = await generateCreativeText({
     systemInstruction: system,
     prompt,
@@ -306,8 +301,12 @@ ${serializeCanonicalStoryContext(canonical)}`,
 
   let relevanceRetry = false;
   let contextMismatch = false;
-  const prevTitle = params.memory.latestDraft?.title;
-  const prevFp = params.memory.latestDraft?.content?.slice(0, 120) ?? null;
+  const prevTitle = memory.latestDraft?.title;
+  const prevFp = memory.latestDraft?.content?.slice(0, 120) ?? null;
+  let repairInvoked = false;
+  let finalBranch: "initial_ok" | "repair_ok" | "both_failed" = "initial_ok";
+  let initialViolations: string[] = [];
+  let repairViolations: string[] = [];
 
   if (params.mode === "scene") {
     let relevance = assessDraftRelevance({
@@ -320,21 +319,38 @@ ${serializeCanonicalStoryContext(canonical)}`,
       previousDraftFingerprint: prevFp,
     });
 
-    if (process.env.NODE_ENV === "development" && process.env.STORYVERSE_DEBUG_CONTEXT === "true") {
-      console.info(JSON.stringify({
-        event: "write_scene.relevance",
-        conversationId: params.conversationId ?? null,
-        selectedPromptKey: promptMeta.promptId ?? "legacy",
-        provider: result.provider,
-        violationCodes: relevance.violationCodes,
-        contextMismatch: !relevance.ok,
-      }));
-    }
+    logStoryGrounding("story_grounding.initial_validation", {
+      conversationId: params.conversationId ?? null,
+      initialProvider: result.provider,
+      initialOutputPreview: result.content.slice(0, 300),
+      initialValidationViolationCodes: relevance.violationCodes,
+      diagnostics: relevance.diagnostics,
+      ok: relevance.ok,
+    });
 
     if (!relevance.ok) {
       contextMismatch = true;
       relevanceRetry = true;
-      ({ system, prompt, temperature, maxOutputTokens } = buildPrompts(true, relevance.violationCodes));
+      repairInvoked = true;
+      initialViolations = relevance.violationCodes;
+      const bannedNames = relevance.foreignDominantNames.slice(0, 8);
+      ({ system, prompt, temperature, maxOutputTokens } = buildPrompts(true, {
+        violations: relevance.violationCodes,
+        bannedNames,
+        failedDraftPreview: `${result.title}\n${result.content}`,
+      }));
+
+      logStoryGrounding("story_grounding.repair_invoke", {
+        conversationId: params.conversationId ?? null,
+        repairPromptContextSummary: {
+          relevantLeads,
+          bannedNames,
+          violationCodes: relevance.violationCodes,
+          canonicalCharacterCount: canonical.characters.length,
+          rawSynopsisLength: canonical.rawSynopsis.length,
+        },
+      });
+
       result = await generateCreativeText({
         systemInstruction: system,
         prompt,
@@ -353,18 +369,38 @@ ${serializeCanonicalStoryContext(canonical)}`,
         previousDraftTitle: prevTitle,
         previousDraftFingerprint: prevFp,
       });
+      repairViolations = relevance.violationCodes;
+
+      logStoryGrounding("story_grounding.repair_validation", {
+        conversationId: params.conversationId ?? null,
+        repairProvider: result.provider,
+        repairedOutputPreview: result.content.slice(0, 300),
+        repairedValidationViolationCodes: relevance.violationCodes,
+        diagnostics: relevance.diagnostics,
+        ok: relevance.ok,
+      });
+
       if (!relevance.ok) {
+        finalBranch = "both_failed";
+        logStoryGrounding("story_grounding.final", {
+          conversationId: params.conversationId ?? null,
+          finalReturnBranch: finalBranch,
+          repairInvoked: true,
+          initialValidationViolationCodes: initialViolations,
+          repairedValidationViolationCodes: repairViolations,
+          draftPersisted: false,
+          creditConsumed: false,
+        });
         throw new StoryAgentError(
           "CONTEXT_MISMATCH",
           "Generated scene did not match the requested characters or conflict. Previous draft kept.",
           { retryable: true, operation: "write_scene" }
         );
       }
+      finalBranch = "repair_ok";
       contextMismatch = false;
     }
   }
-
-  await incrementSuccessfulGeneration(params.userId);
 
   let out = {
     title:
@@ -387,7 +423,7 @@ ${serializeCanonicalStoryContext(canonical)}`,
 
   if (isInstructionFidelityEnabled() && params.mode === "scene") {
     const enforced = await enforceInstructionFidelityOnDraft({
-      memory: params.memory,
+      memory,
       userMessage: params.userMessage,
       operation: "write_scene",
       draft: out,
@@ -411,6 +447,14 @@ ${serializeCanonicalStoryContext(canonical)}`,
       canonicalContext: canonical,
     });
     if (!repairedGrounding.ok) {
+      logStoryGrounding("story_grounding.final", {
+        conversationId: params.conversationId ?? null,
+        finalReturnBranch: "fidelity_grounding_failed",
+        repairInvoked,
+        repairedValidationViolationCodes: repairedGrounding.violationCodes,
+        draftPersisted: false,
+        creditConsumed: false,
+      });
       throw new StoryAgentError(
         "CONTEXT_MISMATCH",
         "Generated scene did not preserve the established story context. Previous draft kept.",
@@ -418,6 +462,21 @@ ${serializeCanonicalStoryContext(canonical)}`,
       );
     }
   }
+
+  // Credit only after a valid draft (initial or repaired) clears all gates.
+  await incrementSuccessfulGeneration(params.userId);
+
+  logStoryGrounding("story_grounding.final", {
+    conversationId: params.conversationId ?? null,
+    finalReturnBranch: finalBranch,
+    repairInvoked,
+    initialValidationViolationCodes: initialViolations,
+    repairedValidationViolationCodes: repairViolations,
+    draftPersisted: true,
+    creditConsumed: true,
+    outputPreview: out.content.slice(0, 300),
+    canonical: summarizeCanonicalStoryContext(canonical),
+  });
 
   return out;
 }

@@ -1,5 +1,11 @@
 /**
  * Lightweight creative-draft relevance checks against the current request.
+ *
+ * Grounding rules (intentionally subset-friendly):
+ * - Do NOT require every canonical character in every opening scene.
+ * - Pass when ≥1 relevant canonical lead appears AND the scene connects to a
+ *   canonical conflict/plot/location/relationship anchor.
+ * - Fail when the draft replaces the established universe with unrelated leads.
  */
 
 import type { ResolvedSceneRequest } from "@/lib/story-agent/entity-resolver";
@@ -14,6 +20,15 @@ export type DraftRelevanceResult = {
   generatedNameFingerprints: string[];
   conceptOk: boolean;
   violationCodes: string[];
+  /** Exact checks that rejected (or would have rejected) the draft. */
+  diagnostics: {
+    canonicalLeadsPresent: string[];
+    hardRequiredMissing: string[];
+    hasPlotAnchor: boolean;
+    hasRelationshipAnchor: boolean;
+    hasLocationAnchor: boolean;
+    rejectingChecks: string[];
+  };
 };
 
 const COMMON_WORDS = new Set(
@@ -82,6 +97,15 @@ export function extractGeneratedNameCandidates(
   return Array.from(found);
 }
 
+function namePresent(body: string, name: string): boolean {
+  const lower = body.toLowerCase();
+  const full = name.toLowerCase();
+  if (lower.includes(full)) return true;
+  // Allow first/last token of multi-word names ("Azar Sayyed" ↔ "Azar")
+  const parts = full.split(/\s+/).filter((part) => part.length >= 3);
+  return parts.some((part) => new RegExp(`\\b${part}\\b`, "i").test(body));
+}
+
 export function assessDraftRelevance(params: {
   userMessage: string;
   title: string;
@@ -105,82 +129,156 @@ export function assessDraftRelevance(params: {
       .flatMap((value) => value.toLowerCase().split(/\s+/))
       .filter(Boolean)
   );
-  const canonicalNamePresent = canonicalNames.some((name) =>
-    body.includes(name.toLowerCase())
-  );
 
-  const missingCharacters = resolved.characterNames.filter(
-    (name) => !body.includes(name.toLowerCase())
+  const hardRequired = resolved.characterNames;
+  const hardRequiredMissing = hardRequired.filter(
+    (name) => !namePresent(body, name)
   );
+  // Back-compat alias used by callers/tests
+  const missingCharacters = hardRequiredMissing;
 
   const requestedLower = new Set(
-    resolved.characterNames.map((n) => n.toLowerCase())
+    [
+      ...hardRequired,
+      ...(resolved.softContextCharacters ?? []),
+      ...canonicalNames,
+    ].map((n) => n.toLowerCase())
   );
   const foreignDominantNames = generated.filter(
     (n) =>
       !requestedLower.has(n.toLowerCase()) &&
-      !canonicalWords.has(n.toLowerCase())
+      !canonicalWords.has(n.toLowerCase()) &&
+      !isReservedPseudoEntityName(n)
   );
+
+  const canonicalLeadsPresent = canonicalNames.filter((name) =>
+    namePresent(body, name)
+  );
+  const canonicalNamePresent = canonicalLeadsPresent.length > 0;
+
+  const locationAnchor = canonicalLocations.some((location) =>
+    body.includes(location.toLowerCase())
+  );
+  const relationshipAnchor = (canonical?.relationships ?? []).some(
+    (relationship) =>
+      namePresent(body, relationship.from) && namePresent(body, relationship.to)
+  );
+  const plotTerms = (canonical?.plotFacts ?? [])
+    .flatMap((fact) => fact.toLowerCase().match(/[a-z]{4,}/g) ?? [])
+    .filter(
+      (word) =>
+        !["story", "their", "would", "about", "after", "before", "with", "from", "that", "this", "years", "later", "when", "then"].includes(
+          word
+        )
+    );
+  const plotAnchor =
+    plotTerms.some((word) => body.includes(word)) ||
+    /\b(nikah|marri|refus|slap|thappad|pregnan|paris|secret|partner|romance|love)\b/i.test(
+      body
+    );
+
   const violations: string[] = [];
+  const rejectingChecks: string[] = [];
+
   if (generated.some((name) => isReservedPseudoEntityName(name))) {
     violations.push("PSEUDO_ENTITY_AS_CHARACTER");
+    rejectingChecks.push("PSEUDO_ENTITY_AS_CHARACTER");
   }
-  if (canonical?.rawSynopsis && !canonicalNamePresent) {
-    violations.push("MISSING_REQUIRED_CHARACTER");
-  }
-  if (
-    canonical?.rawSynopsis &&
-    !canonicalNamePresent &&
-    foreignDominantNames.length >= 1
-  ) {
-    violations.push("UNKNOWN_LEAD_CHARACTER");
-  }
+
   if (canonical?.rawSynopsis) {
-    const locationAnchor = canonicalLocations.some((location) =>
-      body.includes(location.toLowerCase())
-    );
-    const relationshipAnchor = canonical.relationships.some(
-      (relationship) =>
-        body.includes(relationship.from.toLowerCase()) &&
-        body.includes(relationship.to.toLowerCase())
-    );
-    const plotTerms = canonical.plotFacts
-      .flatMap((fact) => fact.toLowerCase().match(/[a-z]{5,}/g) ?? [])
-      .filter(
-        (word) =>
-          !canonicalWords.has(word) &&
-          !["story", "their", "would", "about", "after", "before", "with", "from", "that", "this", "years"].includes(word)
-      );
-    const plotAnchor = plotTerms.some((word) => body.includes(word));
+    if (!canonicalNamePresent) {
+      violations.push("MISSING_REQUIRED_CHARACTER");
+      rejectingChecks.push("no_canonical_lead_present");
+    }
+
+    if (!canonicalNamePresent && foreignDominantNames.length >= 1) {
+      violations.push("UNKNOWN_LEAD_CHARACTER");
+      rejectingChecks.push("foreign_leads_without_canonical");
+    }
+
+    // Universe replacement: foreign leads dominate even if a token weakly matched
+    if (
+      foreignDominantNames.length >= 2 &&
+      canonicalLeadsPresent.length === 0
+    ) {
+      if (!violations.includes("UNKNOWN_LEAD_CHARACTER")) {
+        violations.push("UNKNOWN_LEAD_CHARACTER");
+      }
+      rejectingChecks.push("unrelated_universe_leads");
+    }
+
     if (!locationAnchor && !relationshipAnchor && !plotAnchor) {
       violations.push("MISSING_CANONICAL_PLOT_ANCHOR");
+      rejectingChecks.push("missing_plot_relationship_or_location_anchor");
     }
+
     if (
       /\b(strangers?|never\s+met|unrelated)\b/i.test(body) &&
-      canonical.relationships.length > 0
+      (canonical.relationships?.length ?? 0) > 0 &&
+      canonicalNamePresent
     ) {
       violations.push("RELATIONSHIP_CONTRADICTION");
+      rejectingChecks.push("relationship_contradiction");
     }
+
     if (
       /\b(?:harbor market|first ledger|token)\b/i.test(body) &&
-      !canonicalLocations.some((location) => body.includes(location.toLowerCase()))
+      !canonicalLocations.some((location) =>
+        body.includes(location.toLowerCase())
+      ) &&
+      !canonicalNamePresent
     ) {
       violations.push("LOCATION_DRIFT");
+      rejectingChecks.push("location_drift_unrelated_setting");
     }
+
     if (
       /hinglish/i.test(canonical.language) &&
       content.length >= 80 &&
-      !/\b(hai|hain|tha|thi|kya|nahi|tum|main|aur|se|ko|ka|ki|ke)\b/i.test(content)
+      !/\b(hai|hain|tha|thi|kya|nahi|tum|main|aur|se|ko|ka|ki|ke|ne|liye|toh|woh|yeh)\b/i.test(
+        content
+      )
     ) {
       violations.push("LANGUAGE_MISMATCH");
+      rejectingChecks.push("hinglish_markers_missing");
     }
-    if (content.trim().length < 80) violations.push("EMPTY_LIVE_SCENE");
+
+    if (content.trim().length < 80) {
+      violations.push("EMPTY_LIVE_SCENE");
+      rejectingChecks.push("scene_too_short");
+    }
+
     if (
       /\b(?:teaser|synopsis|backstory|prologue)\b/i.test(content) &&
       !/["“”]|\b(said|bol[ai]|kaha|asked|replied)\b/i.test(content)
     ) {
       violations.push("INTRO_ONLY_OUTPUT");
+      rejectingChecks.push("intro_only_no_live_dialogue");
     }
+  }
+
+  // Explicit hard-required names from the user message (not memory fallback)
+  if (
+    hardRequired.length >= 1 &&
+    hardRequiredMissing.length === hardRequired.length &&
+    foreignDominantNames.length > 0
+  ) {
+    violations.push("MISSING_REQUIRED_CHARACTER", "UNKNOWN_LEAD_CHARACTER");
+    rejectingChecks.push("explicit_requested_cast_missing_foreign_leads");
+  } else if (
+    hardRequired.length >= 2 &&
+    hardRequiredMissing.length === hardRequired.length
+  ) {
+    // Only fail all-missing when user named 2+ explicitly AND none appear
+    violations.push("MISSING_REQUIRED_CHARACTER");
+    rejectingChecks.push("all_explicit_requested_characters_missing");
+  } else if (
+    hardRequired.length >= 2 &&
+    hardRequiredMissing.length >= hardRequired.length &&
+    !canonicalNamePresent
+  ) {
+    violations.push("MISSING_REQUIRED_CHARACTER");
+    rejectingChecks.push("explicit_cast_and_canonical_missing");
   }
 
   // Concept signals (soft)
@@ -198,13 +296,22 @@ export function assessDraftRelevance(params: {
     conceptOk = conceptOk && conflictOk;
   }
 
+  const diagnostics = {
+    canonicalLeadsPresent,
+    hardRequiredMissing,
+    hasPlotAnchor: plotAnchor,
+    hasRelationshipAnchor: relationshipAnchor,
+    hasLocationAnchor: locationAnchor,
+    rejectingChecks: Array.from(new Set(rejectingChecks)),
+  };
+
   // Copy of unrelated previous draft title
   if (
     params.previousDraftTitle &&
     title.trim().length > 0 &&
     title.trim().toLowerCase() === params.previousDraftTitle.trim().toLowerCase() &&
-    resolved.characterNames.length > 0 &&
-    missingCharacters.length === resolved.characterNames.length
+    hardRequired.length > 0 &&
+    hardRequiredMissing.length === hardRequired.length
   ) {
     return {
       ok: false,
@@ -214,6 +321,13 @@ export function assessDraftRelevance(params: {
       generatedNameFingerprints,
       conceptOk: false,
       violationCodes: ["MISSING_REQUIRED_CHARACTER"],
+      diagnostics: {
+        ...diagnostics,
+        rejectingChecks: [
+          ...diagnostics.rejectingChecks,
+          "previous_draft_title_reuse",
+        ],
+      },
     };
   }
 
@@ -221,7 +335,7 @@ export function assessDraftRelevance(params: {
     params.previousDraftFingerprint &&
     content.slice(0, 120).toLowerCase() ===
       params.previousDraftFingerprint.toLowerCase() &&
-    missingCharacters.length > 0
+    (hardRequiredMissing.length > 0 || !canonicalNamePresent)
   ) {
     return {
       ok: false,
@@ -231,42 +345,17 @@ export function assessDraftRelevance(params: {
       generatedNameFingerprints,
       conceptOk: false,
       violationCodes: ["MISSING_REQUIRED_CHARACTER"],
+      diagnostics: {
+        ...diagnostics,
+        rejectingChecks: [
+          ...diagnostics.rejectingChecks,
+          "previous_draft_body_reuse",
+        ],
+      },
     };
   }
 
-  // Hard fail: requested leads missing AND foreign names dominate
-  if (
-    resolved.characterNames.length >= 1 &&
-    missingCharacters.length === resolved.characterNames.length &&
-    foreignDominantNames.length > 0
-  ) {
-    return {
-      ok: false,
-      reason: "requested_characters_missing_foreign_leads",
-      missingCharacters,
-      foreignDominantNames,
-      generatedNameFingerprints,
-      conceptOk,
-      violationCodes: ["MISSING_REQUIRED_CHARACTER", "UNKNOWN_LEAD_CHARACTER"],
-    };
-  }
-
-  if (
-    resolved.characterNames.length >= 2 &&
-    missingCharacters.length >= 2
-  ) {
-    return {
-      ok: false,
-      reason: "requested_characters_missing",
-      missingCharacters,
-      foreignDominantNames,
-      generatedNameFingerprints,
-      conceptOk,
-      violationCodes: ["MISSING_REQUIRED_CHARACTER"],
-    };
-  }
-
-  if (!conceptOk && resolved.characterNames.length > 0 && missingCharacters.length > 0) {
+  if (!conceptOk && hardRequired.length > 0 && hardRequiredMissing.length > 0) {
     return {
       ok: false,
       reason: "concept_and_characters_mismatch",
@@ -274,7 +363,16 @@ export function assessDraftRelevance(params: {
       foreignDominantNames,
       generatedNameFingerprints,
       conceptOk,
-      violationCodes: ["MISSING_REQUIRED_CHARACTER"],
+      violationCodes: Array.from(
+        new Set([...violations, "MISSING_REQUIRED_CHARACTER"])
+      ),
+      diagnostics: {
+        ...diagnostics,
+        rejectingChecks: [
+          ...diagnostics.rejectingChecks,
+          "concept_and_characters_mismatch",
+        ],
+      },
     };
   }
 
@@ -287,6 +385,7 @@ export function assessDraftRelevance(params: {
       generatedNameFingerprints,
       conceptOk,
       violationCodes: Array.from(new Set(violations)),
+      diagnostics,
     };
   }
 
@@ -297,5 +396,9 @@ export function assessDraftRelevance(params: {
     generatedNameFingerprints,
     conceptOk,
     violationCodes: [],
+    diagnostics: {
+      ...diagnostics,
+      rejectingChecks: [],
+    },
   };
 }

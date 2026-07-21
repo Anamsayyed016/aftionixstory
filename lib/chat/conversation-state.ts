@@ -31,6 +31,24 @@ export function emptyCreateState(): CreateConversationState {
   return {
     extractionStatus: "needs_more_info",
     missing: [],
+    // Explicit clean slate — never inherit cast / draft / canon from another chat.
+    characters: [],
+    relationships: [],
+    writingRules: [],
+    latestDraft: null,
+    storyMemory: {
+      genre: [],
+      tone: [],
+      themes: [],
+      storyStatus: "brainstorming",
+    },
+    userPreferences: {
+      avoid: [],
+    },
+    updatedAt: new Date().toISOString(),
+    agentVersion: "2",
+    canonicalStoryContext: null,
+    memoryVersion: 2,
   };
 }
 

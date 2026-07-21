@@ -15,6 +15,7 @@ import {
   emptyStoryMemory,
   parseStoryMemory,
 } from "@/lib/story-agent/memory-patch";
+import { sanitizeStoryMemoryCanon } from "@/lib/story-agent/sanitize-memory";
 import {
   storyAgentTurnResultSchema,
   type StoryAgentTurnResult,
@@ -202,6 +203,7 @@ export function mergeDecisionIntoMemory(
 export function readMemoryFromConversationState(state: unknown): StoryMemory {
   if (!state || typeof state !== "object") return emptyStoryMemory();
   const record = state as Record<string, unknown>;
+  let memory: StoryMemory;
   if (
     record.memoryVersion === 2 ||
     record.storyMemory ||
@@ -209,61 +211,64 @@ export function readMemoryFromConversationState(state: unknown): StoryMemory {
     record.userPreferences ||
     record.story
   ) {
-    return parseStoryMemory(record);
-  }
-  // Legacy create-state: seed lightly from draftForm/extraction if present
-  const draft = (record.draftForm ?? record.extraction) as
-    | Record<string, unknown>
-    | undefined;
-  if (!draft) return emptyStoryMemory();
+    memory = parseStoryMemory(record);
+  } else {
+    // Legacy create-state: seed lightly from draftForm/extraction if present
+    const draft = (record.draftForm ?? record.extraction) as
+      | Record<string, unknown>
+      | undefined;
+    if (!draft) return emptyStoryMemory();
 
-  return applyMemoryPatch(emptyStoryMemory(), {
-    story: {
-      title: typeof draft.title === "string" ? draft.title : undefined,
-      concept:
-        typeof draft.description === "string"
-          ? draft.description
-          : undefined,
-      genre:
-        typeof draft.genre === "string" ? [draft.genre] : undefined,
-      language: typeof draft.language === "string" ? draft.language : undefined,
-      tone: typeof draft.tone === "string" ? [draft.tone] : undefined,
-      setting: typeof draft.setting === "string" ? draft.setting : undefined,
-      plot:
-        typeof draft.initialPlot === "string"
-          ? draft.initialPlot
-          : typeof draft.plot === "string"
-            ? draft.plot
+    memory = applyMemoryPatch(emptyStoryMemory(), {
+      story: {
+        title: typeof draft.title === "string" ? draft.title : undefined,
+        concept:
+          typeof draft.description === "string"
+            ? draft.description
             : undefined,
-      pov:
-        typeof draft.pointOfView === "string"
-          ? draft.pointOfView
-          : typeof draft.pov === "string"
-            ? draft.pov
+        genre:
+          typeof draft.genre === "string" ? [draft.genre] : undefined,
+        language: typeof draft.language === "string" ? draft.language : undefined,
+        tone: typeof draft.tone === "string" ? [draft.tone] : undefined,
+        setting: typeof draft.setting === "string" ? draft.setting : undefined,
+        plot:
+          typeof draft.initialPlot === "string"
+            ? draft.initialPlot
+            : typeof draft.plot === "string"
+              ? draft.plot
+              : undefined,
+        pov:
+          typeof draft.pointOfView === "string"
+            ? draft.pointOfView
+            : typeof draft.pov === "string"
+              ? draft.pov
+              : undefined,
+        writingStyle:
+          typeof draft.writingStyle === "string"
+            ? draft.writingStyle
             : undefined,
-      writingStyle:
-        typeof draft.writingStyle === "string"
-          ? draft.writingStyle
-          : undefined,
-      pacing: typeof draft.pacing === "string" ? draft.pacing : undefined,
-    },
-    characters: Array.isArray(draft.characters)
-      ? draft.characters
-          .filter(
-            (c): c is Record<string, unknown> =>
-              typeof c === "object" &&
-              c !== null &&
-              typeof (c as { name?: unknown }).name === "string"
-          )
-          .map((c) => ({
-            tempId: typeof c.clientId === "string" ? c.clientId : undefined,
-            name: String(c.name),
-            role: typeof c.role === "string" ? c.role : undefined,
-            personality:
-              typeof c.personality === "string" ? [c.personality] : [],
-            background:
-              typeof c.background === "string" ? c.background : undefined,
-          }))
-      : [],
-  });
+        pacing: typeof draft.pacing === "string" ? draft.pacing : undefined,
+      },
+      characters: Array.isArray(draft.characters)
+        ? draft.characters
+            .filter(
+              (c): c is Record<string, unknown> =>
+                typeof c === "object" &&
+                c !== null &&
+                typeof (c as { name?: unknown }).name === "string"
+            )
+            .map((c) => ({
+              tempId: typeof c.clientId === "string" ? c.clientId : undefined,
+              name: String(c.name),
+              role: typeof c.role === "string" ? c.role : undefined,
+              personality:
+                typeof c.personality === "string" ? [c.personality] : [],
+              background:
+                typeof c.background === "string" ? c.background : undefined,
+            }))
+        : [],
+    });
+  }
+
+  return sanitizeStoryMemoryCanon(memory).memory;
 }

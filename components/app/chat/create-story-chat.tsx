@@ -356,6 +356,9 @@ export function CreateStoryChat({
         ]);
         return;
       }
+      // Bind the new id immediately so the next turn cannot reuse poisoned state.
+      activeConversationIdRef.current = created.data.conversationId;
+      setConversationId(created.data.conversationId);
       await refreshHistory();
       const loaded = await loadConversationAction({
         conversationId: created.data.conversationId,

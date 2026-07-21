@@ -107,6 +107,14 @@ function selectRelevantCharacters(
         ? leadCandidates
         : memory.characters.slice(0, 5);
 
+  if (preferred.length === 0 && names.length > 0) {
+    // Synopsis / soft-cast names are valid even before memory rows exist.
+    return names
+      .filter((name) => isValidCanonicalEntityName(name))
+      .slice(0, 4)
+      .map((name) => ({ name }));
+  }
+
   return preferred.slice(0, 5).map((character) => ({
     name: character.name,
     role: character.role,
@@ -253,7 +261,7 @@ export function retrieveStoryContext(params: {
     memory.storyMemory.setting,
     v2.story.setting,
     v2.locations.find((location) => location.id === v2.continuity.currentLocationId)?.name,
-    ...memory.characters.map((c) => c.name),
+    ...v2.locations.map((location) => location.name),
   ]).filter((name) => isValidCanonicalEntityName(name));
 
   const timelineFacts = unique([

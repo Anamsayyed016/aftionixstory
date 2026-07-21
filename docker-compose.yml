@@ -22,7 +22,11 @@ services:
   # Blue/green app slots for zero-downtime standalone deploys.
   # Only one should receive Nginx traffic at a time.
   web_blue:
-    build: .
+    build:
+      context: .
+      args:
+        STORYVERSE_BUILD_ID: ${STORYVERSE_BUILD_ID:-unknown}
+        STORYVERSE_BUILT_AT: ${STORYVERSE_BUILT_AT:-}
     image: storyverse-ai-web:latest
     container_name: storyverse-ai-blue
     restart: unless-stopped
@@ -38,13 +42,15 @@ services:
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       AUTH_TRUST_HOST: "true"
+      STORYVERSE_BUILD_ID: ${STORYVERSE_BUILD_ID:-unknown}
+      STORYVERSE_BUILT_AT: ${STORYVERSE_BUILT_AT:-}
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:3000/api/health').then(async r=>{const j=await r.json();process.exit(r.ok&&j.ok?0:1)}).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
@@ -52,7 +58,11 @@ services:
       start_period: 20s
 
   web_green:
-    build: .
+    build:
+      context: .
+      args:
+        STORYVERSE_BUILD_ID: ${STORYVERSE_BUILD_ID:-unknown}
+        STORYVERSE_BUILT_AT: ${STORYVERSE_BUILT_AT:-}
     image: storyverse-ai-web:latest
     container_name: storyverse-ai-green
     restart: unless-stopped
@@ -68,13 +78,15 @@ services:
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       AUTH_TRUST_HOST: "true"
+      STORYVERSE_BUILD_ID: ${STORYVERSE_BUILD_ID:-unknown}
+      STORYVERSE_BUILT_AT: ${STORYVERSE_BUILT_AT:-}
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:3000/api/health').then(async r=>{const j=await r.json();process.exit(r.ok&&j.ok?0:1)}).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s

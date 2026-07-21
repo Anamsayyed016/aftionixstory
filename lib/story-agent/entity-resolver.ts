@@ -8,8 +8,13 @@ import { isValidCanonicalEntityName } from "@/lib/story-agent/entity-guards";
 
 export type ResolvedSceneRequest = {
   requestedCharacters: Array<{ name: string; role?: string; source: string }>;
-  /** Canonical display names (prefer memory casing). */
+  /**
+   * Hard requirements — only names the user explicitly asked for in this turn.
+   * Memory fallback cast must NOT live here (that made valid subset scenes fail).
+   */
   characterNames: string[];
+  /** Soft cast hints from memory / synopsis — prompt guidance only. */
+  softContextCharacters: string[];
   actionHints: string[];
   conflictHints: string[];
   settingOverride?: string;
@@ -109,26 +114,23 @@ export function resolveSceneRequest(
   }
 
   // Prefer memory casing for display
-  let characterNames = requested.map((r) => {
+  const characterNames = requested.map((r) => {
     const mem = memory?.characters.find(
       (c) => c.name.toLowerCase() === r.name.toLowerCase()
     );
     return mem?.name ?? r.name;
   });
 
-  // Continuation commands normally say only “continue” or “start now”. In
-  // that case the active cast must still reach both the prompt and the output
-  // relevance guard. Keep this intentionally small: an opening needs leads,
-  // not the whole ensemble in every scene.
-  if (characterNames.length === 0 && memory?.characters.length) {
-    characterNames = memory.characters
-      .filter((c) => c.name.trim() && isPlausibleName(c.name))
-      .slice(0, 2)
-      .map((c) => c.name);
-    for (const name of characterNames) {
-      requested.push({ name, source: "memory_context" });
-    }
-  }
+  // Continuation commands ("hinglish", "continue", "start") usually name no cast.
+  // Keep memory names as soft prompt context only — never hard-require the
+  // first N characters in every opening scene (subset openings are valid).
+  const softContextCharacters =
+    characterNames.length === 0 && memory?.characters.length
+      ? memory.characters
+          .filter((c) => c.name.trim() && isPlausibleName(c.name))
+          .slice(0, 5)
+          .map((c) => c.name)
+      : [];
 
   const actionHints: string[] = [];
   if (/\bkiss\b/i.test(text)) actionHints.push("kiss / intimate closeness");
@@ -164,13 +166,15 @@ export function resolveSceneRequest(
     /\baage\s+likho\b/i.test(text) ||
     /\bmake\s+(it|the\s+previous)\b/i.test(text);
 
-  const fingerprints = characterNames.map(
-    (n) => `${n.length}:${n.slice(0, 12).toLowerCase()}`
-  );
+  const fingerprints = [
+    ...characterNames,
+    ...softContextCharacters,
+  ].map((n) => `${n.length}:${n.slice(0, 12).toLowerCase()}`);
 
   return {
     requestedCharacters: requested,
     characterNames,
+    softContextCharacters,
     actionHints,
     conflictHints,
     settingOverride,

@@ -82,6 +82,8 @@ export const createConversationStateSchema = z.object({
   latestDraft: z.unknown().optional(),
   updatedAt: z.string().optional(),
   agentVersion: z.string().optional(),
+  canonicalStoryContext: z.unknown().optional().nullable(),
+  memoryVersion: z.number().optional(),
 });
 
 export const continueConversationStateSchema = z.object({

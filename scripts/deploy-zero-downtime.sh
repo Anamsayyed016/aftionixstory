@@ -56,7 +56,11 @@ for _ in $(seq 1 40); do
   sleep 2
 done
 
-echo "==> Building standalone image"
+BUILD_ID="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+export STORYVERSE_BUILD_ID="$BUILD_ID"
+export STORYVERSE_BUILT_AT="$BUILT_AT"
+echo "==> Building standalone image (commit ${BUILD_ID})"
 docker compose build "web_${NEXT}"
 
 echo "==> Applying Prisma migrations (old app still serving)"
@@ -75,13 +79,16 @@ docker run --rm \
 echo "==> Starting ${NEXT} without stopping current traffic"
 docker compose up -d --no-deps --force-recreate "web_${NEXT}"
 
-echo "==> Health-checking http://127.0.0.1:${NEXT_PORT}/"
+echo "==> Health-checking http://127.0.0.1:${NEXT_PORT}/api/health"
 ok=0
 for i in $(seq 1 45); do
-  if curl -fsS -o /dev/null "http://127.0.0.1:${NEXT_PORT}/"; then
-    ok=1
-    echo "healthy after ${i} attempt(s)"
-    break
+  if health_json="$(curl -fsS "http://127.0.0.1:${NEXT_PORT}/api/health")"; then
+    echo "$health_json"
+    if echo "$health_json" | grep -q "\"ok\":true"; then
+      ok=1
+      echo "healthy after ${i} attempt(s)"
+      break
+    fi
   fi
   sleep 2
 done
