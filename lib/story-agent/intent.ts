@@ -1,4 +1,5 @@
 import type { StoryAgentIntent, StoryAgentTurnResult } from "@/lib/story-agent/schema";
+import { shouldAutoStartFromSetup } from "@/lib/story-agent/opening-rules";
 
 export type ControlDecision = {
   generationBlocked?: boolean;
@@ -67,6 +68,14 @@ export function resolveControlDecision(userMessage: string): ControlDecision {
       forceActionType: "none",
       forceReply:
         "Theek hai — abhi story start nahi karungi. Concept build karte rahenge. Jab ready ho, bas “start the story” bol dena.",
+    };
+  }
+
+  if (shouldAutoStartFromSetup(text)) {
+    return {
+      clearGenerationBlock: true,
+      forceIntent: "start_story",
+      forceActionType: "generate_episode",
     };
   }
 

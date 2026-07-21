@@ -14,6 +14,7 @@ import {
   incrementSuccessfulGeneration,
 } from "@/lib/usage/generation";
 import { generateCreativeText } from "@/lib/ai/services/creative-text";
+import { validateLiveOpening } from "@/lib/story-agent/opening-rules";
 
 export type ConversationalDraftResult = {
   title: string;
@@ -59,10 +60,12 @@ function buildOpeningPrompt(params: {
   });
   const languageBlock = formatLanguagePromptBlock(langPrefs);
 
-  const system = `You are StoryVerse's fiction writer. Write vivid serialized episode prose.
+  const system = `You are AFTIONIX Studio's fiction writer. Write vivid serialized episode prose.
 
 Rules:
-- Write the opening episode / scene the user asked for.
+- A teaser, synopsis, backstory, character introduction, world building, or prologue is context, not the finished story. Unless the user explicitly asks for only that material, transition from it directly into the actual story.
+- For a new opening, always include the labels "Episode 1" and "Scene 1", an active location, character action, dialogue, emotional movement, a scene ending, and a clear hook or transition to the next scene.
+- Start Scene 1 in live storytelling: a character must speak, interact, decide, face conflict, or enter a place. Never end after exposition alone.
 - Use only established facts from memory. Do not invent major new relationships without need.
 - Follow LANGUAGE REQUIREMENTS exactly.
 - Prefer third-person unless memory says otherwise.
@@ -167,6 +170,17 @@ export async function generateConversationalDraft(params: {
       "The story draft came back too short. Please try again.",
       true
     );
+  }
+
+  if (!params.reviseExistingContent) {
+    const openingIssues = validateLiveOpening(result.content);
+    if (openingIssues.length > 0) {
+      throw new AIError(
+        "AI_INVALID_RESPONSE",
+        "The opening draft did not reach a live Episode 1 scene. Please try again.",
+        true
+      );
+    }
   }
 
   await incrementSuccessfulGeneration(params.userId);
