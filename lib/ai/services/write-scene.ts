@@ -10,6 +10,12 @@ import { assessDraftRelevance } from "@/lib/story-agent/draft-relevance";
 import { resolveSceneRequest } from "@/lib/story-agent/entity-resolver";
 import { StoryAgentError } from "@/lib/story-agent/errors";
 import { getMemoryV2 } from "@/lib/story-agent/memory-patch";
+import {
+  buildCanonicalStoryContext,
+  serializeCanonicalStoryContext,
+  summarizeCanonicalStoryContext,
+  type CanonicalStoryContext,
+} from "@/lib/story-agent/canonical-story-context";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import { readStyleProfile } from "@/lib/story-agent/style-profile";
 import {
@@ -46,38 +52,24 @@ export type WriteSceneResult = {
 };
 
 function debugGroundingInput(params: {
-  userMessage: string;
-  memory: StoryMemory;
-  system: string;
-  prompt: string;
   conversationId?: string;
   storyId?: string | null;
+  canonical: CanonicalStoryContext;
+  promptId?: string;
+  provider?: string;
 }) {
-  if (process.env.STORYVERSE_DEBUG_CONTEXT !== "true") return;
-  const v2 = getMemoryV2(params.memory);
+  if (
+    process.env.NODE_ENV !== "development" ||
+    process.env.STORYVERSE_DEBUG_CONTEXT !== "true"
+  ) return;
   console.info(
     JSON.stringify({
       event: "story_grounding.pre_provider",
       conversationId: params.conversationId ?? null,
       storyId: params.storyId ?? null,
-      rawUserMessage: params.userMessage,
-      storyFacts: {
-        title: params.memory.storyMemory.title,
-        concept: params.memory.storyMemory.concept,
-        setting: params.memory.storyMemory.setting,
-        plot: params.memory.storyMemory.plot,
-        genre: params.memory.storyMemory.genre,
-      },
-      characters: params.memory.characters.map((character) => ({
-        name: character.name,
-        role: character.role,
-        background: character.background,
-      })),
-      relationships: params.memory.relationships,
-      timeline: v2.timeline,
-      backstory: v2.story.concept,
-      systemPrompt: params.system,
-      userPrompt: params.prompt,
+      selectedPromptKey: params.promptId ?? "legacy",
+      selectedProvider: params.provider ?? "default",
+      canonical: summarizeCanonicalStoryContext(params.canonical),
     })
   );
 }
@@ -97,6 +89,8 @@ export async function generateWriteScene(params: {
   provider?: AIProvider;
   /** Phase B/E intent for revision-specific prompts */
   intent?: string | null;
+  /** Authoritative raw canon preserved at the conversation boundary. */
+  canonicalContext?: CanonicalStoryContext;
 }): Promise<WriteSceneResult & { promptId?: string; promptVersion?: string }> {
   await assertWithinGenerationLimit(params.userId);
   await assertGenerationRateLimit(params.userId);
@@ -140,10 +134,24 @@ export async function generateWriteScene(params: {
   });
 
   const resolved = resolveSceneRequest(params.userMessage, params.memory);
+  const canonical = params.canonicalContext ?? buildCanonicalStoryContext({
+    conversationId: params.conversationId ?? "unspecified",
+    storyId: params.storyId,
+    memory: params.memory,
+    recentMessages: params.recentMessages ?? [],
+    latestInstruction: params.userMessage,
+  });
+  const strictLeads =
+    resolved.characterNames.length > 0
+      ? resolved.characterNames
+      : canonical.characters
+          .filter((character) => character.required)
+          .slice(0, 2)
+          .map((character) => character.name);
 
   let promptMeta: { promptId?: string; promptVersion?: string } = {};
 
-  const buildPrompts = (strict: boolean) => {
+  const buildPrompts = (strict: boolean, violations: string[] = []) => {
     if (isPromptRegistryV2Enabled()) {
       const intent =
         params.intent ||
@@ -166,9 +174,11 @@ export async function generateWriteScene(params: {
         conversationId: params.conversationId,
       });
       const parts = promptResultToLegacyParts(built);
-      if (!strict || resolved.characterNames.length === 0) {
+      const canonicalBlock = serializeCanonicalStoryContext(canonical);
+      if (!strict) {
         return {
-          ...parts,
+          system: parts.system,
+          prompt: `${parts.prompt}\n\n${canonicalBlock}`,
           temperature: resolveTemperature(built.providerHints.temperatureProfile),
           maxOutputTokens: resolveMaxOutputTokens(
             built.providerHints.maxOutputTokensProfile
@@ -181,9 +191,12 @@ export async function generateWriteScene(params: {
 
 STRICT RELEVANCE CORRECTION:
 - The previous attempt used the wrong characters or setup.
-- You MUST center the scene on: ${resolved.characterNames.join(", ")}.
+- You MUST center the scene on: ${strictLeads.join(", ")}.
 - Do NOT use any other lead characters.
-- Honor the current request exactly: ${params.userMessage}`,
+- Honor the current request exactly: ${params.userMessage}
+- Resolve these grounding violations: ${violations.join(", ") || "context mismatch"}.
+
+${canonicalBlock}`,
         temperature: resolveTemperature(built.providerHints.temperatureProfile),
         maxOutputTokens: resolveMaxOutputTokens(
           built.providerHints.maxOutputTokensProfile
@@ -193,11 +206,21 @@ STRICT RELEVANCE CORRECTION:
 
     if (params.mode === "revise") {
       const base = buildReviseDraftPrompt(ctx, ctx.languagePrefs, style);
-      return { ...base, temperature: 0.85, maxOutputTokens: 8192 };
+      return {
+        system: base.system,
+        prompt: `${base.prompt}\n\n${serializeCanonicalStoryContext(canonical)}`,
+        temperature: 0.85,
+        maxOutputTokens: 8192,
+      };
     }
     const base = buildWriteScenePrompt(ctx, style);
-    if (!strict || resolved.characterNames.length === 0) {
-      return { ...base, temperature: 0.85, maxOutputTokens: 8192 };
+    if (!strict) {
+      return {
+        system: base.system,
+        prompt: `${base.prompt}\n\n${serializeCanonicalStoryContext(canonical)}`,
+        temperature: 0.85,
+        maxOutputTokens: 8192,
+      };
     }
     return {
       system: base.system,
@@ -205,9 +228,12 @@ STRICT RELEVANCE CORRECTION:
 
 STRICT RELEVANCE CORRECTION:
 - The previous attempt used the wrong characters or setup.
-- You MUST center the scene on: ${resolved.characterNames.join(", ")}.
+- You MUST center the scene on: ${strictLeads.join(", ")}.
 - Do NOT use any other lead characters.
-- Honor the current request exactly: ${params.userMessage}`,
+- Honor the current request exactly: ${params.userMessage}
+- Resolve these grounding violations: ${violations.join(", ") || "context mismatch"}.
+
+${serializeCanonicalStoryContext(canonical)}`,
       temperature: 0.85,
       maxOutputTokens: 8192,
     };
@@ -224,12 +250,11 @@ STRICT RELEVANCE CORRECTION:
     }));
   }
   debugGroundingInput({
-    userMessage: params.userMessage,
-    memory: params.memory,
-    system,
-    prompt,
     conversationId: params.conversationId,
     storyId: params.storyId,
+    canonical,
+    promptId: promptMeta.promptId,
+    provider: params.provider?.name,
   });
   let result = await generateCreativeText({
     systemInstruction: system,
@@ -255,29 +280,26 @@ STRICT RELEVANCE CORRECTION:
       title: result.title,
       content: result.content,
       resolved,
+      canonicalContext: canonical,
       previousDraftTitle: prevTitle,
       previousDraftFingerprint: prevFp,
     });
 
-    console.info(
-      JSON.stringify({
+    if (process.env.NODE_ENV === "development" && process.env.STORYVERSE_DEBUG_CONTEXT === "true") {
+      console.info(JSON.stringify({
         event: "write_scene.relevance",
         conversationId: params.conversationId ?? null,
-        operation: "write_scene",
-        requestedEntityFingerprints: resolved.fingerprints,
-        generatedEntityFingerprints: relevance.generatedNameFingerprints,
-        contextMismatch: !relevance.ok,
-        reason: relevance.reason ?? null,
-        promptSections: ctx.promptSectionNames,
+        selectedPromptKey: promptMeta.promptId ?? "legacy",
         provider: result.provider,
-        model: result.model,
-      })
-    );
+        violationCodes: relevance.violationCodes,
+        contextMismatch: !relevance.ok,
+      }));
+    }
 
     if (!relevance.ok) {
       contextMismatch = true;
       relevanceRetry = true;
-      ({ system, prompt, temperature, maxOutputTokens } = buildPrompts(true));
+      ({ system, prompt, temperature, maxOutputTokens } = buildPrompts(true, relevance.violationCodes));
       result = await generateCreativeText({
         systemInstruction: system,
         prompt,
@@ -292,6 +314,7 @@ STRICT RELEVANCE CORRECTION:
         title: result.title,
         content: result.content,
         resolved,
+        canonicalContext: canonical,
         previousDraftTitle: prevTitle,
         previousDraftFingerprint: prevFp,
       });
@@ -335,12 +358,29 @@ STRICT RELEVANCE CORRECTION:
       draft: out,
       provider: params.provider,
       languagePrefs: ctx.languagePrefs,
+      canonicalContext: canonical,
     });
     out = {
       ...out,
       ...enforced.draft,
       draftKind: out.draftKind,
     };
+    const repairedGrounding = assessDraftRelevance({
+      userMessage: params.userMessage,
+      title: out.title,
+      content: out.content,
+      resolved,
+      previousDraftTitle: prevTitle,
+      previousDraftFingerprint: prevFp,
+      canonicalContext: canonical,
+    });
+    if (!repairedGrounding.ok) {
+      throw new StoryAgentError(
+        "CONTEXT_MISMATCH",
+        "Generated scene did not preserve the established story context. Previous draft kept.",
+        { retryable: true, operation: "write_scene" }
+      );
+    }
   }
 
   return out;

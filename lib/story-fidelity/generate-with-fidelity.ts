@@ -29,6 +29,10 @@ import {
   promptResultToLegacyParts,
 } from "@/lib/prompt-registry";
 import { getMemoryV2 } from "@/lib/story-agent/memory-patch";
+import {
+  serializeCanonicalStoryContext,
+  type CanonicalStoryContext,
+} from "@/lib/story-agent/canonical-story-context";
 
 export type FidelityDraft = {
   title: string;
@@ -80,6 +84,7 @@ export async function enforceInstructionFidelityOnDraft(params: {
   draft: FidelityDraft;
   provider?: AIProvider;
   languagePrefs?: unknown;
+  canonicalContext?: CanonicalStoryContext;
 }): Promise<{
   draft: FidelityDraft;
   memory: StoryMemory;
@@ -215,8 +220,12 @@ export async function enforceInstructionFidelityOnDraft(params: {
       prompt = parts.user;
     }
 
-    // Always append exact violations
-    prompt = `${prompt}\n\nVIOLATIONS:\n${validation.violations
+    // Repair is still the existing bounded attempt, but it now receives the
+    // same raw canon as the first writer rather than only a reduced contract.
+    const canonicalBlock = params.canonicalContext
+      ? serializeCanonicalStoryContext(params.canonicalContext)
+      : "";
+    prompt = `Rewrite inside the established story universe. Preserve all canonical characters, relationships, timeline facts, locations, and locked facts. Do not rename or replace established leads. Do not treat style instructions, corrected words, UI labels, or keywords as characters.\n\n${canonicalBlock}\n\n${prompt}\n\nVIOLATIONS:\n${validation.violations
       .map((v) => `- ${v.code}: ${v.message}`)
       .join("\n")}\n\n${serializeGenerationContract(contract)}`;
 
@@ -248,6 +257,14 @@ export async function enforceInstructionFidelityOnDraft(params: {
       });
       draft.fidelityValid = validation.valid;
       draft.fidelityScore = validation.score;
+      if (process.env.NODE_ENV === "development" && process.env.STORYVERSE_DEBUG_CONTEXT === "true") {
+        console.info(JSON.stringify({
+          event: "story_grounding.repair",
+          repairAttempted: true,
+          valid: validation.valid,
+          violationCodes: validation.violations.map((violation) => violation.code),
+        }));
+      }
     } catch {
       // fall through to safe failure
     }

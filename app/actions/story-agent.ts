@@ -32,6 +32,11 @@ import {
 } from "@/lib/story-agent/errors";
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import { getMemoryV2 } from "@/lib/story-agent/memory-patch";
+import {
+  buildCanonicalStoryContext,
+  readCanonicalStoryContext,
+  type CanonicalStoryContext,
+} from "@/lib/story-agent/canonical-story-context";
 import { memoryV2ToPersistedState } from "@/lib/story-memory/v2";
 import type { StoryOperation } from "@/lib/story-agent/operations";
 import {
@@ -150,6 +155,7 @@ function buildPersistedState(params: {
   memory: StoryMemory;
   storyId: string | null;
   conversationFlow?: unknown;
+  canonicalStoryContext: CanonicalStoryContext;
 }) {
   const previous =
     params.previous && typeof params.previous === "object"
@@ -168,6 +174,7 @@ function buildPersistedState(params: {
     memoryVersion: 2,
     conversationFlow:
       params.conversationFlow ?? previous.conversationFlow ?? undefined,
+    canonicalStoryContext: params.canonicalStoryContext,
     draftForm: previous.draftForm,
     extraction: previous.extraction,
   };
@@ -310,6 +317,20 @@ export async function storyAgentTurnAction(
             : ("user" as const),
         content: m.content,
       }));
+    const allMessages = existingMessages
+      .concat(appendedUser.duplicated ? [] : [appendedUser.message])
+      .map((m) => ({
+        role: m.role === "ASSISTANT" ? "assistant" : "user",
+        content: m.content,
+      }));
+    const canonicalStoryContext = buildCanonicalStoryContext({
+      conversationId,
+      storyId: conversation.storyId,
+      memory,
+      recentMessages: allMessages,
+      latestInstruction: message,
+      previous: readCanonicalStoryContext(stateSource),
+    });
 
     let turn!: Awaited<ReturnType<typeof runConversationTurn>>;
     let turnState: "ROUTED" | "PROCESSING" | "COMPLETED" | "FAILED" =
@@ -325,6 +346,7 @@ export async function storyAgentTurnAction(
         recentMessages: recent,
         turnRequestId,
         conversationFlow,
+        canonicalStoryContext,
       });
       turnState = turn.resultType === "error" ? "FAILED" : "COMPLETED";
     } catch (error) {
@@ -367,6 +389,14 @@ export async function storyAgentTurnAction(
       memory: turn.memory,
       storyId: nextStoryId,
       conversationFlow: turn.conversationFlow,
+      canonicalStoryContext: buildCanonicalStoryContext({
+        conversationId,
+        storyId: nextStoryId,
+        memory: turn.memory,
+        recentMessages: allMessages,
+        latestInstruction: message,
+        previous: canonicalStoryContext,
+      }),
     });
 
     await updateOwnedConversationState({

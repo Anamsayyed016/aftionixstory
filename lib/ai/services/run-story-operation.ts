@@ -64,6 +64,7 @@ import {
   describeMemoryStatus,
   getMemoryV2,
 } from "@/lib/story-agent/memory-patch";
+import type { CanonicalStoryContext } from "@/lib/story-agent/canonical-story-context";
 import type { NormalizedTurnResult } from "@/lib/story-agent/operation-result";
 import {
   OPERATION_PROFILES,
@@ -363,6 +364,7 @@ export async function runStoryOperation(params: {
   turnRequestId: string;
   /** Phase B/E canonical intent when available from Conversation Brain */
   intent?: string | null;
+  canonicalStoryContext?: CanonicalStoryContext;
 }): Promise<NormalizedTurnResult> {
   const started = Date.now();
   let memory = seedMemoryFromMessage(params.memory, params.userMessage);
@@ -805,6 +807,7 @@ STRICT: Answer this exact request with 3–5 concrete, distinct story concepts o
         intent:
           params.intent ||
           (operation === "revise_draft" ? "rewrite" : "write_scene"),
+        canonicalContext: params.canonicalStoryContext,
       });
 
       const clientRequestId = `ep_${params.turnRequestId}`;
@@ -1002,6 +1005,7 @@ STRICT: Answer this exact request with 3–5 concrete, distinct story concepts o
           storyId: params.storyId,
           recentMessages: params.recentMessages,
           intent: params.intent || "write_scene",
+          canonicalContext: params.canonicalStoryContext,
         });
         const clientRequestId = `ep_${params.turnRequestId}`;
         memory = {
@@ -1061,6 +1065,7 @@ STRICT: Answer this exact request with 3–5 concrete, distinct story concepts o
         generationBlocked &&
         (decision.action.type === "generate_episode" ||
           decision.action.type === "revise_draft"),
+      canonicalStoryContext: params.canonicalStoryContext,
     });
     memory = routed.memory;
 
@@ -1249,6 +1254,7 @@ STRICT: Answer this exact request with 3–5 concrete, distinct story concepts o
           intent:
             params.intent ||
             (creativeOp === "revise_draft" ? "rewrite" : "write_scene"),
+          canonicalContext: params.canonicalStoryContext,
         });
         memory = mergeDecisionIntoMemory(memory, agent.decision);
         const clientRequestId = `ep_${params.turnRequestId}`;
@@ -1370,6 +1376,7 @@ STRICT: Answer this exact request with 3–5 concrete, distinct story concepts o
     userMessage: params.userMessage,
     turnRequestId: params.turnRequestId,
     generationBlocked: Boolean(memory.userPreferences.doNotStartYet),
+    canonicalStoryContext: params.canonicalStoryContext,
   });
   memory = routed.memory;
 

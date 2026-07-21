@@ -12,6 +12,7 @@ import type {
   OfferResolution,
 } from "@/lib/conversation-brain/offer-resolver";
 import type { OpenConceptDetection } from "@/lib/conversation-brain/open-concept";
+import type { CanonicalStoryContext } from "@/lib/story-agent/canonical-story-context";
 
 export const BRAIN_INTENTS = [
   "greeting",
@@ -97,6 +98,8 @@ export type ConversationTurnRequest = {
   recentMessages: Array<{ role: "user" | "assistant"; content: string }>;
   turnRequestId: string;
   conversationFlow?: ConversationFlow;
+  /** Persisted raw canon, reconstructed for older conversations when absent. */
+  canonicalStoryContext?: CanonicalStoryContext;
 };
 
 export type ConversationTurnResult = NormalizedTurnResult & {

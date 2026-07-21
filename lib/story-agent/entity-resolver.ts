@@ -4,71 +4,7 @@
  */
 
 import type { StoryMemory } from "@/lib/story-agent/schema";
-
-const NAME_STOPWORDS = new Set(
-  [
-    "build",
-    "the",
-    "a",
-    "an",
-    "help",
-    "me",
-    "create",
-    "write",
-    "make",
-    "scene",
-    "kiss",
-    "around",
-    "internal",
-    "external",
-    "conflict",
-    "with",
-    "and",
-    "between",
-    "previous",
-    "draft",
-    "rewrite",
-    "continue",
-    "more",
-    "emotional",
-    "about",
-    "from",
-    "their",
-    "this",
-    "that",
-    "story",
-    "episode",
-    "opening",
-    "focus",
-    "suggest",
-    "unique",
-    "short",
-    "romantic",
-    "horror",
-    "fantasy",
-    "thriller",
-    "drama",
-    "comedy",
-    "please",
-    "just",
-    "only",
-    "using",
-    "hinglish",
-    "english",
-    "hindi",
-    "office",
-    "rooftop",
-    "college",
-    "family",
-    "secret",
-    "past",
-    "status",
-    "gap",
-    "type",
-    "core",
-    "main",
-  ].map((s) => s.toLowerCase())
-);
+import { isValidCanonicalEntityName } from "@/lib/story-agent/entity-guards";
 
 export type ResolvedSceneRequest = {
   requestedCharacters: Array<{ name: string; role?: string; source: string }>;
@@ -88,11 +24,7 @@ function titleCaseName(raw: string): string {
 }
 
 function isPlausibleName(raw: string): boolean {
-  const s = raw.trim();
-  if (s.length < 2 || s.length > 32) return false;
-  if (NAME_STOPWORDS.has(s.toLowerCase())) return false;
-  if (!/^[A-Za-z][A-Za-z'-]*$/.test(s)) return false;
-  return true;
+  return isValidCanonicalEntityName(raw);
 }
 
 function pushUnique(
@@ -148,14 +80,6 @@ export function extractMentionedCharacters(
     pushUnique(found, actionPair[2], undefined, "action_pair");
   }
 
-  const buildPair = text.match(
-    /\bbuild\s+(?:the\s+)?([A-Za-z][A-Za-z'-]{1,30})\b[\s\S]{0,40}?\b([A-Za-z][A-Za-z'-]{1,30})\b/i
-  );
-  if (buildPair) {
-    pushUnique(found, buildPair[1], undefined, "build_pair");
-    pushUnique(found, buildPair[2], undefined, "build_pair");
-  }
-
   return found.map(({ name, role }) => ({ name, role }));
 }
 
@@ -174,7 +98,7 @@ export function resolveSceneRequest(
 
   // Match known memory characters mentioned anywhere in the message
   for (const c of memory?.characters ?? []) {
-    if (!c.name?.trim()) continue;
+    if (!c.name?.trim() || !isPlausibleName(c.name)) continue;
     const re = new RegExp(
       `\\b${c.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
       "i"
@@ -198,7 +122,7 @@ export function resolveSceneRequest(
   // not the whole ensemble in every scene.
   if (characterNames.length === 0 && memory?.characters.length) {
     characterNames = memory.characters
-      .filter((c) => c.name.trim())
+      .filter((c) => c.name.trim() && isPlausibleName(c.name))
       .slice(0, 2)
       .map((c) => c.name);
     for (const name of characterNames) {

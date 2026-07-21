@@ -7,6 +7,7 @@ import {
 } from "@/lib/ai/services/conversational-draft";
 import { generateEpisodeDraft } from "@/lib/ai/services/generate-episode";
 import { generateWriteScene } from "@/lib/ai/services/write-scene";
+import type { CanonicalStoryContext } from "@/lib/story-agent/canonical-story-context";
 import {
   getMissingCreateFields,
   memoryToWizardCandidate,
@@ -46,6 +47,7 @@ export async function routeStoryAgentAction(params: {
   userMessage: string;
   turnRequestId: string;
   generationBlocked: boolean;
+  canonicalStoryContext?: CanonicalStoryContext;
 }): Promise<{ memory: StoryMemory; result: ActionRouterResult }> {
   const actionType = params.decision.action?.type ?? "none";
   let memory = params.memory;
@@ -170,7 +172,10 @@ export async function routeStoryAgentAction(params: {
 
     // Path A: no Story yet — conversational opening draft into latestDraft
     if (!params.storyId) {
-      if (!hasUsableWritingContext(memory)) {
+      if (
+        !hasUsableWritingContext(memory) &&
+        !params.canonicalStoryContext?.characters.length
+      ) {
         return {
           memory,
           result: {
@@ -195,6 +200,7 @@ export async function routeStoryAgentAction(params: {
           conversationId: params.conversationId,
           storyId: null,
           intent: actionType === "revise_draft" ? "rewrite" : "write_scene",
+          canonicalContext: params.canonicalStoryContext,
         });
         const clientRequestId = `ep_${params.turnRequestId}`;
 

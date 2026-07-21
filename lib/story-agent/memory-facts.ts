@@ -4,51 +4,10 @@
  */
 
 import type { MemoryPatch, StoryMemory } from "@/lib/story-agent/schema";
-
-const NAME_STOP = new Set(
-  [
-    "the",
-    "a",
-    "an",
-    "and",
-    "or",
-    "male",
-    "female",
-    "lead",
-    "hero",
-    "heroine",
-    "protagonist",
-    "antagonist",
-    "father",
-    "mother",
-    "uncle",
-    "aunt",
-    "daughter",
-    "son",
-    "brother",
-    "sister",
-    "friend",
-    "remove",
-    "hata",
-    "do",
-    "hai",
-    "hain",
-    "nahi",
-    "but",
-    "with",
-    "from",
-    "to",
-    "ka",
-    "ki",
-    "ke",
-    "main",
-    "mera",
-    "meri",
-    "story",
-    "character",
-    "role",
-  ].map((s) => s.toLowerCase())
-);
+import {
+  isReservedPseudoEntityName,
+  isValidCanonicalEntityName,
+} from "@/lib/story-agent/entity-guards";
 
 export type MemoryFactExtraction = {
   matched: boolean;
@@ -65,10 +24,7 @@ function titleCase(name: string): string {
 }
 
 function isName(raw: string): boolean {
-  const s = raw.trim();
-  if (s.length < 2 || s.length > 32) return false;
-  if (NAME_STOP.has(s.toLowerCase())) return false;
-  return /^[A-Za-z][A-Za-z'-]*$/.test(s);
+  return isValidCanonicalEntityName(raw);
 }
 
 function emptyPatch(): MemoryPatch {
@@ -170,7 +126,7 @@ export function extractMemoryFacts(
   const avoidTrait =
     /\b([A-Za-z][A-Za-z'-]{1,30})\s+(\w+)\s+nahi\b/gi;
   while ((m = avoidTrait.exec(text)) !== null) {
-    if (isName(m[1]) && !NAME_STOP.has(m[2].toLowerCase())) {
+    if (isName(m[1]) && !isReservedPseudoEntityName(m[2])) {
       upsertChar(m[1], { avoidAdd: [m[2].toLowerCase()] });
       signals.push("trait_negation");
     }

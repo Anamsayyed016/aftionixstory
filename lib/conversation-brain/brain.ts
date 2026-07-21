@@ -39,6 +39,10 @@ import { runToolFrameworkTurn } from "@/lib/tools/brain-adapter";
 import { isStoryToolFrameworkEnabled } from "@/lib/tools/feature-flag";
 import { applyInstructionFidelityPreTurn } from "@/lib/story-fidelity/brain-adapter";
 import { isInstructionFidelityEnabled } from "@/lib/story-fidelity/feature-flag";
+import {
+  isStoryContinuationModifier,
+  summarizeCanonicalStoryContext,
+} from "@/lib/story-agent/canonical-story-context";
 
 function baseFlow(request: ConversationTurnRequest): ConversationFlow {
   return request.conversationFlow ?? { ...DEFAULT_CONVERSATION_FLOW, lastOffers: [] };
@@ -67,6 +71,22 @@ export async function runConversationTurn(
   let workingMemory = request.memory;
   let workingPlan = plan;
   let workingRequest = request;
+
+  if (
+    process.env.NODE_ENV === "development" &&
+    process.env.STORYVERSE_DEBUG_CONTEXT === "true"
+  ) {
+    console.info(
+      JSON.stringify({
+        event: "story_grounding.context",
+        conversationId: request.conversationId,
+        detectedIntent: plan.intent,
+        canonical: request.canonicalStoryContext
+          ? summarizeCanonicalStoryContext(request.canonicalStoryContext)
+          : null,
+      })
+    );
+  }
 
   // ---- Phase G.5: resolve/lock facts + readiness before clarification/tools ----
   if (isInstructionFidelityEnabled()) {
@@ -429,6 +449,7 @@ export async function runConversationTurn(
     recentMessages: request.recentMessages,
     turnRequestId: request.turnRequestId,
     intent: workingPlan.storyIntent || workingPlan.intent,
+    canonicalStoryContext: request.canonicalStoryContext,
   });
 
   // A deterministic correction is valuable only if it changes what the story
@@ -436,10 +457,16 @@ export async function runConversationTurn(
   // the existing continuation path instead of returning its "Got it" receipt.
   // This deliberately stays after the deterministic executor so removals and
   // corrections are persisted before the creative context is built.
+  const needsCanonicalContinuation =
+    Boolean(request.canonicalStoryContext?.rawSynopsis) &&
+    isStoryContinuationModifier(request.userMessage);
   if (
-    (request.storyId || hasUsableWritingContext(turn.memory)) &&
-    turn.operation === "memory_update" &&
+    (request.storyId ||
+      hasUsableWritingContext(turn.memory) ||
+      Boolean(request.canonicalStoryContext?.characters.length)) &&
+    (turn.operation === "memory_update" || needsCanonicalContinuation) &&
     turn.actionOk &&
+    turn.resultType !== "creative_draft" &&
     !flow.generationBlocked &&
     !turn.memory.userPreferences.doNotStartYet
   ) {
@@ -454,6 +481,7 @@ export async function runConversationTurn(
       recentMessages: request.recentMessages,
       turnRequestId: request.turnRequestId,
       intent: "continue_story",
+      canonicalStoryContext: request.canonicalStoryContext,
     });
   }
 

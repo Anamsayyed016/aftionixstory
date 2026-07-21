@@ -35,6 +35,7 @@ import {
   parseStoryMemory,
 } from "@/lib/story-agent/memory-patch";
 import type { StoryMemory } from "@/lib/story-agent/schema";
+import { isValidCanonicalEntityName } from "@/lib/story-agent/entity-guards";
 import type { ChatMessage, ChatSuggestion } from "@/lib/chat/types";
 import { buildChatMessage, canSendMessage, isComposerInteractionLocked } from "@/lib/chat/utils";
 import { cn } from "@/lib/utils";
@@ -548,7 +549,7 @@ export function CreateStoryChat({
           });
           const names = (result.data.memory.characters ?? [])
             .map((c) => c.name)
-            .filter(Boolean)
+            .filter((name): name is string => Boolean(name && isValidCanonicalEntityName(name)))
             .slice(0, 4);
           const lang =
             result.data.memory.userPreferences.dialogueLanguage ||

@@ -7,6 +7,7 @@ import {
   buildMemoryConfirmReply,
   extractMemoryFacts,
 } from "@/lib/story-agent/memory-facts";
+import { isReservedPseudoEntityName } from "@/lib/story-agent/entity-guards";
 import type { MemoryPatch, StoryMemory } from "@/lib/story-agent/schema";
 
 export type DeterministicParseKind =
@@ -92,7 +93,8 @@ function titleCaseRole(role: string): string {
 }
 
 function isRoleWord(raw: string): boolean {
-  return ROLE_PAIR_WORDS.has(raw.trim().toLowerCase());
+  const value = raw.trim().toLowerCase();
+  return !isReservedPseudoEntityName(value) && ROLE_PAIR_WORDS.has(value);
 }
 
 function entitiesFromPatch(patch: MemoryPatch): DeterministicParseResult["entities"] {
