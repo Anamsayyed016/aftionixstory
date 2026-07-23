@@ -10,7 +10,10 @@
 
 import type { ResolvedSceneRequest } from "@/lib/story-agent/entity-resolver";
 import type { CanonicalStoryContext } from "@/lib/story-agent/canonical-story-context";
-import { isReservedPseudoEntityName } from "@/lib/story-agent/entity-guards";
+import {
+  isHinglishFunctionWord,
+  isReservedPseudoEntityName,
+} from "@/lib/story-agent/entity-guards";
 
 export type DraftRelevanceResult = {
   ok: boolean;
@@ -92,6 +95,9 @@ export function extractGeneratedNameCandidates(
   while ((m = re.exec(text)) !== null) {
     const name = m[1];
     if (COMMON_WORDS.has(name.toLowerCase())) continue;
+    if (isReservedPseudoEntityName(name) || isHinglishFunctionWord(name)) {
+      continue;
+    }
     found.add(name);
   }
   return Array.from(found);

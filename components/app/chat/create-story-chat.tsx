@@ -521,8 +521,13 @@ export function CreateStoryChat({
         });
         const names = (data.memory.characters ?? [])
           .map((c) => c.name)
-          .filter((name): name is string => Boolean(name && isValidCanonicalEntityName(name)))
-          .slice(0, 4);
+          .filter(
+            (name): name is string =>
+              Boolean(name && isValidCanonicalEntityName(name))
+          )
+          // Prefer established leads; drop leftover stopword casing slips
+          .filter((name) => name.length > 2)
+          .slice(0, 5);
         const lang =
           data.memory.userPreferences.dialogueLanguage ||
           data.memory.storyMemory.language ||

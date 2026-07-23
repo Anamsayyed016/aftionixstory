@@ -10,6 +10,7 @@ import type {
   StoryIntent,
 } from "@/lib/conversation-brain/intents";
 import { isCreativeStoryIntent } from "@/lib/conversation-brain/intents";
+import { isValidCanonicalEntityName } from "@/lib/story-agent/entity-guards";
 
 export type IntentRuleMatch = {
   intent: StoryIntent;
@@ -389,7 +390,7 @@ function extractLikelyNames(text: string): string[] {
   const re = /\b([A-Z][a-z]{2,20})\b/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    if (!/^(The|She|He|His|Her|Not|And)$/i.test(m[1])) names.push(m[1]);
+    if (isValidCanonicalEntityName(m[1])) names.push(m[1]);
   }
   return [...new Set(names)].slice(0, 4);
 }

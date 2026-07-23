@@ -5,6 +5,11 @@ import {
   resolveSceneRequest,
 } from "@/lib/story-agent/entity-resolver";
 import {
+  extractCanonicalNamesFromSynopsis,
+  isSubstantiveStoryMessage,
+} from "@/lib/story-agent/canonical-story-context";
+import { isValidCanonicalEntityName } from "@/lib/story-agent/entity-guards";
+import {
   detectLanguageInstruction,
   languagePrefsToStoryLanguageLabel,
   readLanguagePreferences,
@@ -501,10 +506,45 @@ export function seedMemoryFromMessage(
   userMessage: string
 ): StoryMemory {
   const mentioned = extractMentionedCharacters(userMessage);
-  if (mentioned.length === 0) return memory;
+  const fromSynopsis = isSubstantiveStoryMessage(userMessage)
+    ? extractCanonicalNamesFromSynopsis(userMessage)
+    : [];
 
-  const characters = [...memory.characters];
-  for (const m of mentioned) {
+  const toMerge: Array<{ name: string; role?: string }> = [
+    ...mentioned,
+    ...fromSynopsis.map((name) => ({ name })),
+  ];
+
+  // Always re-assert existing memory characters that appear in this message
+  // (case-insensitive), so "azar"/"anaya" stay prioritized over false NER hits.
+  for (const existing of memory.characters) {
+    if (!existing.name?.trim() || !isValidCanonicalEntityName(existing.name)) {
+      continue;
+    }
+    const re = new RegExp(
+      `\\b${existing.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+      "i"
+    );
+    if (re.test(userMessage)) {
+      toMerge.unshift({ name: existing.name, role: existing.role });
+    }
+  }
+
+  if (toMerge.length === 0) {
+    // Still scrub any poisoned pseudo-entities already in memory.
+    const cleaned = memory.characters.filter((c) =>
+      isValidCanonicalEntityName(c.name)
+    );
+    if (cleaned.length === memory.characters.length) return memory;
+    return { ...memory, characters: cleaned, updatedAt: new Date().toISOString() };
+  }
+
+  const characters = memory.characters.filter((c) =>
+    isValidCanonicalEntityName(c.name)
+  );
+
+  for (const m of toMerge) {
+    if (!isValidCanonicalEntityName(m.name)) continue;
     const idx = characters.findIndex(
       (c) => c.name.toLowerCase() === m.name.toLowerCase()
     );
@@ -518,8 +558,16 @@ export function seedMemoryFromMessage(
         notes: [],
         avoid: [],
       });
-    } else if (m.role && !characters[idx].role) {
-      characters[idx] = { ...characters[idx], role: m.role };
+    } else {
+      // Prefer better casing from the new prose (Azar over azar)
+      const preferNewCasing =
+        /[A-Z]/.test(m.name[0] || "") &&
+        characters[idx].name === characters[idx].name.toLowerCase();
+      characters[idx] = {
+        ...characters[idx],
+        name: preferNewCasing ? m.name : characters[idx].name,
+        role: m.role && !characters[idx].role ? m.role : characters[idx].role,
+      };
     }
   }
 
@@ -532,6 +580,12 @@ export function seedMemoryFromMessage(
     if (toneMatch) {
       concept = `${toneMatch[1]} scene request`;
     }
+  }
+  if (
+    (!concept || concept.length < 40) &&
+    isSubstantiveStoryMessage(userMessage)
+  ) {
+    concept = userMessage.slice(0, 2000);
   }
 
   const langDetect = detectLanguageInstruction(
@@ -551,6 +605,11 @@ export function seedMemoryFromMessage(
     storyMemory: {
       ...memory.storyMemory,
       concept: concept ?? memory.storyMemory.concept,
+      plot:
+        memory.storyMemory.plot ||
+        (isSubstantiveStoryMessage(userMessage)
+          ? userMessage.slice(0, 2000)
+          : memory.storyMemory.plot),
       language: langDetect.matched
         ? languagePrefsToStoryLanguageLabel(langDetect.resolved)
         : memory.storyMemory.language,

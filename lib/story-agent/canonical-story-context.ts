@@ -58,6 +58,10 @@ function sentenceFacts(text: string): string[] {
 /**
  * Capitalization is only accepted when the name has a real person signal:
  * title, a multi-word proper name, relationship/action context, or repetition.
+ *
+ * Hinglish note: do NOT treat ka/ki/ko/ne alone as person context — those are
+ * ubiquitous postpositions/particles and turn verbs like "Liya"/"Chahe" into
+ * false character names.
  */
 export function extractCanonicalNamesFromSynopsis(text: string): string[] {
   const counts = new Map<string, { name: string; count: number; strong: boolean }>();
@@ -68,28 +72,63 @@ export function extractCanonicalNamesFromSynopsis(text: string): string[] {
     const current = counts.get(key) ?? { name: trimmed, count: 0, strong: false };
     current.count += 1;
     current.strong ||= strong;
+    // Prefer title-case / multi-word display forms when seen later
+    if (trimmed.length > current.name.length || /[A-Z]/.test(trimmed[0] || "")) {
+      current.name = trimmed;
+    }
     counts.set(key, current);
   };
 
-  const titled = /\b(?:Dr|Mr|Mrs|Miss|Ms|Sir|Begum)\.?(?:\s+)([A-Z][A-Za-z'.-]*(?:\s+[A-Z][A-Za-z'.-]*)?)/g;
+  const titled =
+    /\b(?:Dr|Mr|Mrs|Miss|Ms|Sir|Begum)\.?(?:\s+)([A-Z][A-Za-z'.-]*(?:\s+[A-Z][A-Za-z'.-]*)?)/g;
   let match: RegExpExecArray | null;
   while ((match = titled.exec(text)) !== null) add(match[0], true);
 
   const fullName = /\b([A-Z][A-Za-z'.-]*\s+[A-Z][A-Za-z'.-]*)\b/g;
   while ((match = fullName.exec(text)) !== null) add(match[1], true);
 
-  const single = /\b([A-Z][a-z]{1,30})\b/g;
+  // Relationship / kinship phrases common in Hinglish story seeds
+  const kinship =
+    /\b([A-Z][a-z]{1,30})\s+(?:(?:is|as|=)\s+)?(?:(?:[A-Z][a-z]{1,30}(?:['’]s)?)\s+)?(?:father|mother|uncle|aunt|daughter|son|brother|sister|friend|partner|wife|husband|beta|beti|papa|mummy|abb[uú]|ammi)\b/gi;
+  while ((match = kinship.exec(text)) !== null) add(match[1], true);
+
+  const kinshipRev =
+    /\b([A-Z][a-z]{1,30})(?:['’]s)?\s+(?:father|mother|uncle|aunt|daughter|son|brother|sister|friend|partner|wife|husband|beti|beta)\b/gi;
+  while ((match = kinshipRev.exec(text)) !== null) add(match[1], true);
+
+  const hinglishKin =
+    /\b([A-Za-z][A-Za-z'-]{1,30})\s+([A-Za-z][A-Za-z'-]{1,30})\s+k[ai]\s+(father|mother|uncle|aunt|daughter|son|brother|sister|friend|partner|beti|beta|dost)\b/gi;
+  while ((match = hinglishKin.exec(text)) !== null) {
+    add(match[1].charAt(0).toUpperCase() + match[1].slice(1), true);
+    add(match[2].charAt(0).toUpperCase() + match[2].slice(1), true);
+  }
+
+  const single = /\b([A-Z][a-z]{2,30})\b/g;
   while ((match = single.exec(text)) !== null) {
     const before = text.slice(Math.max(0, match.index - 40), match.index);
     const after = text.slice(match.index + match[0].length, match.index + 48);
+    // Strong person signals only.
+    // - Never use bare ka/ki/ke (possessive) — "Dil Ka" false positives.
+    // - Never use ne/ko BEFORE the token — "usne Liya" marks the verb Liya.
+    // - ne/ko AFTER a name are Hinglish case markers ("Azar ne", "Anaya ko").
     const personContext =
-      /\b(?:with|and|aur|ka|ki|ko|ne|is|was|said|calls?|asked|told|slapped|refused|left|returns?)\s*$/i.test(
+      /\b(?:with|and|aur|is|was|said|says|calls?|asked|told|slapped|refused|left|returns?|met|meets|loves?|hates?|named|called)\s*$/i.test(
         before
       ) ||
-      /^\s+(?:and|aur|is|was|said|calls?|asked|told|slapped|refused|left|returns?|ki|ka|ko)\b/i.test(
+      /^\s+(?:and|aur|is|was|said|says|calls?|asked|told|slapped|refused|left|returns?|met|loves?|who|whose)\b/i.test(
         after
-      );
+      ) ||
+      /^\s+(?:ne|ko)\b/i.test(after);
     add(match[1], personContext);
+  }
+
+  // Also accept clearly repeated lowercase / mixed names that already look like people
+  // when they appear with kinship words (covers memory-style "azar"/"anaya").
+  const looseKin =
+    /\b([A-Za-z][A-Za-z'-]{2,30})\s+(?:(?:is|as)\s+)?(?:[A-Za-z][A-Za-z'-]+(?:['’]s)?\s+)?(?:father|mother|uncle|aunt|daughter|son|brother|sister|friend|partner|beti|beta)\b/gi;
+  while ((match = looseKin.exec(text)) !== null) {
+    const raw = match[1];
+    add(raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase(), true);
   }
 
   return Array.from(counts.values())
@@ -172,9 +211,16 @@ export function buildCanonicalStoryContext(params: {
   const earliestSynopsis = params.recentMessages.find(
     (message) => message.role === "user" && isSubstantiveStoryMessage(message.content)
   )?.content;
+  const latestLong =
+    params.latestInstruction.trim().length >= 80
+      ? params.latestInstruction.trim()
+      : "";
   const rawSynopsis =
     params.previous?.rawSynopsis ||
     earliestSynopsis ||
+    (latestLong && extractCanonicalNamesFromSynopsis(latestLong).length > 0
+      ? latestLong
+      : "") ||
     memory.storyMemory.concept ||
     memory.storyMemory.plot ||
     "";

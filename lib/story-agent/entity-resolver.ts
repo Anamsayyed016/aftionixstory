@@ -5,6 +5,10 @@
 
 import type { StoryMemory } from "@/lib/story-agent/schema";
 import { isValidCanonicalEntityName } from "@/lib/story-agent/entity-guards";
+import {
+  extractCanonicalNamesFromSynopsis,
+  isSubstantiveStoryMessage,
+} from "@/lib/story-agent/canonical-story-context";
 
 export type ResolvedSceneRequest = {
   requestedCharacters: Array<{ name: string; role?: string; source: string }>;
@@ -122,15 +126,25 @@ export function resolveSceneRequest(
   });
 
   // Continuation commands ("hinglish", "continue", "start") usually name no cast.
-  // Keep memory names as soft prompt context only — never hard-require the
-  // first N characters in every opening scene (subset openings are valid).
-  const softContextCharacters =
-    characterNames.length === 0 && memory?.characters.length
-      ? memory.characters
-          .filter((c) => c.name.trim() && isPlausibleName(c.name))
-          .slice(0, 5)
-          .map((c) => c.name)
+  // Keep memory names + synopsis-extracted leads as soft prompt context only.
+  let softContextCharacters: string[] = [];
+  if (characterNames.length === 0) {
+    const fromMemory = (memory?.characters ?? [])
+      .filter((c) => c.name.trim() && isPlausibleName(c.name))
+      .map((c) => c.name);
+    const fromSynopsis = isSubstantiveStoryMessage(text)
+      ? extractCanonicalNamesFromSynopsis(text)
       : [];
+    const seen = new Set<string>();
+    softContextCharacters = [...fromMemory, ...fromSynopsis]
+      .filter((name) => {
+        const key = name.toLowerCase();
+        if (seen.has(key) || !isPlausibleName(name)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 6);
+  }
 
   const actionHints: string[] = [];
   if (/\bkiss\b/i.test(text)) actionHints.push("kiss / intimate closeness");
