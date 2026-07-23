@@ -228,12 +228,24 @@ describe("UI / action wiring", () => {
   });
 
   it("storyAgentTurnAction delegates to Conversation Brain", () => {
-    const source = readFileSync(
+    // storyAgentTurnAction (app/actions/story-agent.ts) delegates its turn
+    // orchestration to runStoryAgentTurn (lib/story-agent/run-turn.ts), which
+    // is also reused by the streaming route (app/api/chat/stream/route.ts) —
+    // that's where the Conversation Brain call now lives.
+    const actionSource = readFileSync(
       path.resolve("app/actions/story-agent.ts"),
       "utf8"
     );
-    expect(source).toContain("runConversationTurn");
-    expect(source).toContain("@/lib/conversation-brain/server");
-    expect(source).not.toContain("runStoryAgentDecision");
+    expect(actionSource).toContain("runStoryAgentTurn");
+    expect(actionSource).toContain("@/lib/story-agent/run-turn");
+    expect(actionSource).not.toContain("runStoryAgentDecision");
+
+    const turnSource = readFileSync(
+      path.resolve("lib/story-agent/run-turn.ts"),
+      "utf8"
+    );
+    expect(turnSource).toContain("runConversationTurn");
+    expect(turnSource).toContain("@/lib/conversation-brain/server");
+    expect(turnSource).not.toContain("runStoryAgentDecision");
   });
 });

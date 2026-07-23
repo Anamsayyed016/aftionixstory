@@ -112,13 +112,24 @@ describe("Conversation Brain Phase 0 — wiring", () => {
   });
 
   it("storyAgentTurnAction uses Conversation Brain, not direct runStoryOperation", () => {
-    const source = readFileSync(
+    // storyAgentTurnAction (app/actions/story-agent.ts) delegates its turn
+    // orchestration to runStoryAgentTurn (lib/story-agent/run-turn.ts), which
+    // is also reused by the streaming route (app/api/chat/stream/route.ts) —
+    // that's where the Conversation Brain call now lives.
+    const actionSource = readFileSync(
       path.resolve("app/actions/story-agent.ts"),
       "utf8"
     );
-    expect(source).toContain("runConversationTurn");
-    expect(source).toContain("@/lib/conversation-brain/server");
-    expect(source).not.toMatch(
+    expect(actionSource).toContain("runStoryAgentTurn");
+    expect(actionSource).toContain("@/lib/story-agent/run-turn");
+
+    const turnSource = readFileSync(
+      path.resolve("lib/story-agent/run-turn.ts"),
+      "utf8"
+    );
+    expect(turnSource).toContain("runConversationTurn");
+    expect(turnSource).toContain("@/lib/conversation-brain/server");
+    expect(turnSource).not.toMatch(
       /from\s+"@\/lib\/ai\/services\/run-story-operation"/
     );
   });

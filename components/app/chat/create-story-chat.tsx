@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { History, PanelRightOpen, Plus, Sparkles } from "lucide-react";
 
-import { storyAgentTurnAction } from "@/app/actions/story-agent";
+import {
+  storyAgentTurnAction,
+  type StoryAgentTurnActionData,
+} from "@/app/actions/story-agent";
 import { submitChatFeedbackAction } from "@/app/actions/feedback";
 import {
   archiveConversationAction,
@@ -50,6 +53,61 @@ function newRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+type StreamOutcome =
+  | { type: "done"; payload: StoryAgentTurnActionData }
+  | { type: "error"; message: string };
+
+/** Parses the `/api/chat/stream` SSE body: `token` frames drip text, `done` carries the full turn result. */
+async function streamStoryAgentTurn(
+  response: Response,
+  onToken: (text: string) => void
+): Promise<StreamOutcome> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("NO_STREAM_BODY");
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let separatorIndex = buffer.indexOf("\n\n");
+    while (separatorIndex !== -1) {
+      const rawFrame = buffer.slice(0, separatorIndex);
+      buffer = buffer.slice(separatorIndex + 2);
+      const line = rawFrame.startsWith("data: ") ? rawFrame.slice(6) : rawFrame;
+      if (line.trim()) {
+        try {
+          const parsed = JSON.parse(line) as {
+            type?: string;
+            text?: string;
+            payload?: StoryAgentTurnActionData;
+            message?: string;
+          };
+          if (parsed.type === "token" && typeof parsed.text === "string") {
+            onToken(parsed.text);
+          } else if (parsed.type === "done" && parsed.payload) {
+            return { type: "done", payload: parsed.payload };
+          } else if (parsed.type === "error") {
+            return {
+              type: "error",
+              message: parsed.message || "The story assistant hit an error.",
+            };
+          }
+        } catch {
+          // Ignore malformed frames — keep reading.
+        }
+      }
+      separatorIndex = buffer.indexOf("\n\n");
+    }
+  }
+
+  throw new Error("STREAM_ENDED_WITHOUT_DONE");
+}
+
 function memoryToDraft(memory: StoryMemory): NormalizedChatStoryDraft | null {
   if (
     !memory.storyMemory.title &&
@@ -93,6 +151,8 @@ export function CreateStoryChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState(() => initialComposerValue?.trim() ?? "");
   const [busy, setBusy] = useState(false);
+  /** True once the first streamed token has appeared — hides the typing indicator. */
+  const [streamingActive, setStreamingActive] = useState(false);
   const [creating, setCreating] = useState(false);
   const [memory, setMemory] = useState<StoryMemory | null>(null);
   const [storyDraft, setStoryDraft] = useState<NormalizedChatStoryDraft | null>(
@@ -426,6 +486,66 @@ export function CreateStoryChat({
     }
   }
 
+  /** Finalizes shared UI state from a completed turn — used by both the streaming and fallback paths. */
+  const applyTurnResult = useCallback(
+    (
+      data: StoryAgentTurnActionData,
+      guard: { conversationAtSend: string; myTurn: number }
+    ) => {
+      if (
+        guard.myTurn !== turnSeqRef.current ||
+        activeConversationIdRef.current !== guard.conversationAtSend
+      ) {
+        return;
+      }
+      setMemory(data.memory);
+      setStoryDraft(memoryToDraft(data.memory));
+      setMemoryStatus(data.memoryStatus);
+      setLinkedStoryId(data.storyId);
+      setLastOperation(data.operation);
+      setFeedbackHint(null);
+      setSuggestions(
+        data.suggestions.map((s, index) => ({
+          id: `ctx-${index}-${s.label}`,
+          label: s.label,
+          prompt: s.prompt,
+        }))
+      );
+      // Only replace draft panel when this turn produced a creative draft
+      if (data.resultType === "creative_draft" && data.draft) {
+        setEpisodePreview({
+          title: data.draft.title,
+          content: data.draft.content,
+          wordCount: data.draft.wordCount,
+          draftKind: data.draft.draftKind,
+        });
+        const names = (data.memory.characters ?? [])
+          .map((c) => c.name)
+          .filter((name): name is string => Boolean(name && isValidCanonicalEntityName(name)))
+          .slice(0, 4);
+        const lang =
+          data.memory.userPreferences.dialogueLanguage ||
+          data.memory.storyMemory.language ||
+          "";
+        setContextHint(
+          [
+            names.length ? names.join(", ") : null,
+            data.operation === "write_scene" ? "Scene request" : null,
+            lang || null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || null
+        );
+      }
+      // conversational turns: do not echo stale latestDraft into the preview
+      if (data.showReview) setReviewOpen(true);
+      if (data.actionType === "create_story" && data.actionOk) {
+        setReviewOpen(false);
+      }
+    },
+    []
+  );
+
   const sendPrompt = useCallback(
     async (raw: string, opts?: { isRetry?: boolean }) => {
       const content = raw.trim();
@@ -494,120 +614,168 @@ export function CreateStoryChat({
         ]);
       }
 
-      try {
-        const result = await storyAgentTurnAction({
-          conversationId: conversationAtSend,
-          message: content,
-          turnRequestId,
-          reuseLastUserMessage: isRetry,
-        });
+      const isStale = () =>
+        myTurn !== turnSeqRef.current ||
+        activeConversationIdRef.current !== conversationAtSend;
 
-        // Stale turn or user switched conversation — do not clobber UI
-        if (
-          myTurn !== turnSeqRef.current ||
-          activeConversationIdRef.current !== conversationAtSend
-        ) {
+      let streamingMessageId: string | null = null;
+      let response: Response | null = null;
+      try {
+        response = await fetch("/api/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId: conversationAtSend,
+            message: content,
+            turnRequestId,
+            reuseLastUserMessage: isRetry,
+          }),
+        });
+      } catch {
+        response = null;
+      }
+
+      try {
+        if (!response) {
+          // Streaming endpoint unreachable (offline/network) — fall back once.
+          const fallback = await storyAgentTurnAction({
+            conversationId: conversationAtSend,
+            message: content,
+            turnRequestId,
+            reuseLastUserMessage: isRetry,
+          });
+          if (isStale()) return;
+
+          if (!fallback.success) {
+            setMessages((prev) => [
+              ...prev,
+              buildChatMessage("assistant", fallback.error.message, "error"),
+            ]);
+            return;
+          }
+
+          lastFailedPromptRef.current = null;
+          const isError = fallback.data.resultType === "error";
+          setMessages((prev) => [
+            ...prev,
+            buildChatMessage(
+              "assistant",
+              fallback.data.assistantReply,
+              isError ? "error" : "sent"
+            ),
+          ]);
+          applyTurnResult(fallback.data, { conversationAtSend, myTurn });
+          await refreshHistory();
+          if (isStale()) return;
+          setPersistHint(
+            fallback.data.resultType === "creative_draft" ? "Draft ready" : "Saved"
+          );
           return;
         }
 
-        if (!result.success) {
-          const errMsg = result.error.message;
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as {
+            error?: { message?: string };
+          } | null;
+          const message =
+            body?.error?.message ||
+            "I couldn’t finish that reply. Please try once more. 🙂";
+          if (!isStale()) {
+            setMessages((prev) => [
+              ...prev,
+              buildChatMessage("assistant", message, "error"),
+            ]);
+          }
+          return;
+        }
+
+        const outcome = await streamStoryAgentTurn(response, (text) => {
+          if (isStale()) return;
+          if (!streamingMessageId) {
+            const placeholder = buildChatMessage("assistant", text, "sent");
+            streamingMessageId = placeholder.id;
+            setStreamingActive(true);
+            setMessages((prev) => [...prev, placeholder]);
+          } else {
+            const id = streamingMessageId;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === id ? { ...m, content: m.content + text } : m
+              )
+            );
+          }
+        });
+
+        if (isStale()) return;
+
+        if (outcome.type === "error") {
+          if (streamingMessageId) {
+            const id = streamingMessageId;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === id ? { ...m, content: outcome.message, status: "error" } : m
+              )
+            );
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              buildChatMessage("assistant", outcome.message, "error"),
+            ]);
+          }
+          return;
+        }
+
+        const data = outcome.payload;
+        const isError = data.resultType === "error";
+        if (streamingMessageId) {
+          const id = streamingMessageId;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === id
+                ? { ...m, content: data.assistantReply, status: isError ? "error" : "sent" }
+                : m
+            )
+          );
+        } else {
+          // No visible token chunks arrived (e.g. empty reply) — still show it.
+          setMessages((prev) => [
+            ...prev,
+            buildChatMessage(
+              "assistant",
+              data.assistantReply,
+              isError ? "error" : "sent"
+            ),
+          ]);
+        }
+
+        lastFailedPromptRef.current = null;
+        applyTurnResult(data, { conversationAtSend, myTurn });
+        await refreshHistory();
+        if (isStale()) return;
+        setPersistHint(data.resultType === "creative_draft" ? "Draft ready" : "Saved");
+      } catch {
+        if (isStale()) return;
+        const errMsg = "I couldn’t finish that reply. Please try once more. 🙂";
+        if (streamingMessageId) {
+          const id = streamingMessageId;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, content: errMsg, status: "error" } : m))
+          );
+        } else {
           setMessages((prev) => [
             ...prev,
             buildChatMessage("assistant", errMsg, "error"),
           ]);
-          return;
         }
-
-        lastFailedPromptRef.current = null;
-        const isError = result.data.resultType === "error";
-        setMessages((prev) => [
-          ...prev,
-          buildChatMessage(
-            "assistant",
-            result.data.assistantReply,
-            isError ? "error" : "sent"
-          ),
-        ]);
-        setMemory(result.data.memory);
-        setStoryDraft(memoryToDraft(result.data.memory));
-        setMemoryStatus(result.data.memoryStatus);
-        setLinkedStoryId(result.data.storyId);
-        setLastOperation(result.data.operation);
-        setFeedbackHint(null);
-        setSuggestions(
-          result.data.suggestions.map((s, index) => ({
-            id: `ctx-${index}-${s.label}`,
-            label: s.label,
-            prompt: s.prompt,
-          }))
-        );
-        // Only replace draft panel when this turn produced a creative draft
-        if (result.data.resultType === "creative_draft" && result.data.draft) {
-          setEpisodePreview({
-            title: result.data.draft.title,
-            content: result.data.draft.content,
-            wordCount: result.data.draft.wordCount,
-            draftKind: result.data.draft.draftKind,
-          });
-          const names = (result.data.memory.characters ?? [])
-            .map((c) => c.name)
-            .filter((name): name is string => Boolean(name && isValidCanonicalEntityName(name)))
-            .slice(0, 4);
-          const lang =
-            result.data.memory.userPreferences.dialogueLanguage ||
-            result.data.memory.storyMemory.language ||
-            "";
-          setContextHint(
-            [
-              names.length ? names.join(", ") : null,
-              result.data.operation === "write_scene"
-                ? "Scene request"
-                : null,
-              lang || null,
-            ]
-              .filter(Boolean)
-              .join(" · ") || null
-          );
-        } else if (result.data.resultType === "error") {
-          // Keep prior draft visible; do not paint unrelated draft from chat turns
-        }
-        // conversational turns: do not echo stale latestDraft into the preview
-        if (result.data.showReview) setReviewOpen(true);
-        if (result.data.actionType === "create_story" && result.data.actionOk) {
-          setReviewOpen(false);
-        }
-        await refreshHistory();
-        if (
-          myTurn !== turnSeqRef.current ||
-          activeConversationIdRef.current !== conversationAtSend
-        ) {
-          return;
-        }
-        setPersistHint(
-          result.data.resultType === "creative_draft" ? "Draft ready" : "Saved"
-        );
-      } catch {
-        if (
-          myTurn !== turnSeqRef.current ||
-          activeConversationIdRef.current !== conversationAtSend
-        ) {
-          return;
-        }
-        const errMsg =
-          "I couldn’t finish that reply. Please try once more. 🙂";
-        setMessages((prev) => [
-          ...prev,
-          buildChatMessage("assistant", errMsg, "error"),
-        ]);
       } finally {
+        setStreamingActive(false);
         if (myTurn === turnSeqRef.current) {
           setBusy(false);
           sendingLockRef.current = false;
         }
       }
     },
-    [archivedConversation, conversationId, refreshHistory]
+    [archivedConversation, conversationId, refreshHistory, applyTurnResult]
   );
 
   function handleSend() {
@@ -778,7 +946,7 @@ export function CreateStoryChat({
               suggestions={CREATE_SUGGESTIONS}
               onSelectSuggestion={handleSelectSuggestion}
               disabled={composerLocked}
-              busy={busy && !restoring}
+              busy={busy && !restoring && !streamingActive}
               onRetryError={handleRetry}
               className="h-auto min-h-0 overflow-visible"
             />

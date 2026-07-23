@@ -1,6 +1,6 @@
 /**
  * Server-only Conversation Brain entry.
- * Import this from Server Actions — never from client components.
+ * Import this from Server Actions or Route Handlers — never from client components.
  */
 
 import "server-only";
