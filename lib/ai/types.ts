@@ -21,6 +21,11 @@ export type GenerateTextInput = {
    * episode/summary writing unless explicitly intended.
    */
   reasoningEffort?: ReasoningEffort;
+  /**
+   * When true, enable the provider's native web search / grounding tool
+   * (OpenAI Responses `web_search`, Gemini `googleSearch`). No third-party search APIs.
+   */
+  enableWebSearch?: boolean;
 };
 
 export type GenerateTextResult = {

@@ -43,6 +43,13 @@ import {
   RateLimitError,
   UsageLimitError,
 } from "@/lib/usage/generation";
+import {
+  classifyUniversalIntent,
+  isStoryUniversalIntent,
+  isUniversalRouterEnabled,
+  runGeneralAiTurn,
+} from "@/lib/universal-router";
+import type { UniversalRouteDecision } from "@/lib/universal-router/intents";
 
 export const storyAgentTurnInputSchema = z.object({
   conversationId: z.string().min(1),
@@ -325,6 +332,158 @@ export async function runStoryAgentTurn(
     latestInstruction: message,
     previous: readCanonicalStoryContext(stateSource),
   });
+
+  let universalDecision: UniversalRouteDecision | null = null;
+  if (isUniversalRouterEnabled()) {
+    const recentAssistantQuestion = [...recent]
+      .reverse()
+      .find((m) => m.role === "assistant")
+      ?.content?.slice(0, 400);
+    universalDecision = await classifyUniversalIntent({
+      userMessage: message,
+      conversationFlow,
+      recentAssistantQuestion,
+    });
+  }
+
+  if (
+    universalDecision &&
+    !isStoryUniversalIntent(universalDecision.intent)
+  ) {
+    let turnState: "ROUTED" | "PROCESSING" | "COMPLETED" | "FAILED" = "ROUTED";
+    let generalReply = "";
+    let provider: string | undefined;
+    let model: string | undefined;
+    let durationMs: number | undefined;
+    try {
+      turnState = "PROCESSING";
+      const general = await runGeneralAiTurn({
+        userMessage: message,
+        intent: universalDecision.intent,
+        enableWebSearch: universalDecision.enableWebSearch,
+        turnRequestId,
+        recentMessages: recent,
+      });
+      generalReply = general.assistantReply;
+      provider = general.provider;
+      model = general.model;
+      durationMs = general.durationMs;
+      turnState = "COMPLETED";
+    } catch (error) {
+      turnState = "FAILED";
+      const errMsg =
+        error instanceof Error
+          ? error.message
+          : "Something went wrong reaching the assistant. Please try again.";
+      await appendOwnedChatMessage({
+        userId,
+        conversationId,
+        role: "ASSISTANT",
+        content: errMsg,
+        status: "ERROR",
+        requestId: assistantRequestId,
+        metadata: {
+          flow: "universal_assistant",
+          turnRequestId,
+          turnState: "FAILED",
+          universalIntent: universalDecision.intent,
+          code: isStoryAgentError(error) ? error.code : "UNKNOWN_AI_ERROR",
+          retryable: isStoryAgentError(error) ? error.retryable : true,
+        } as Prisma.InputJsonValue,
+      });
+      throw error;
+    }
+
+    const statePayload = buildPersistedState({
+      previous: conversation.state,
+      memory,
+      storyId: conversation.storyId,
+      conversationFlow,
+      canonicalStoryContext,
+    });
+
+    await updateOwnedConversationState({
+      userId,
+      conversationId,
+      state: statePayload as Prisma.InputJsonValue,
+      storyId: conversation.storyId ?? undefined,
+    });
+
+    const buildId =
+      process.env.STORYVERSE_BUILD_ID ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      "local-dev";
+
+    const appendedAssistant = await appendOwnedChatMessage({
+      userId,
+      conversationId,
+      role: "ASSISTANT",
+      content: generalReply,
+      requestId: assistantRequestId,
+      metadata: {
+        flow: "universal_assistant",
+        agentVersion: "2",
+        buildId,
+        resultType: "conversation",
+        operation: "conversational_chat",
+        actionType: "none",
+        actionOk: true,
+        provider,
+        model,
+        outputMode: "text",
+        durationMs,
+        turnRequestId,
+        turnState,
+        universalIntent: universalDecision.intent,
+        universalConfidence: universalDecision.confidence,
+        universalSource: universalDecision.source,
+        enableWebSearch: universalDecision.enableWebSearch,
+        intent: universalDecision.intent,
+      } as Prisma.InputJsonValue,
+    });
+
+    console.info(
+      JSON.stringify({
+        event: "universal_router.turn",
+        buildId,
+        flow: "universal_assistant",
+        universalIntent: universalDecision.intent,
+        universalSource: universalDecision.source,
+        enableWebSearch: universalDecision.enableWebSearch,
+        provider,
+        model,
+        conversationId,
+        turnRequestId,
+        messageFingerprint,
+        messageLength: message.length,
+        persistedUserMessageId: appendedUser.message.id,
+        persistedAssistantMessageId: appendedAssistant.message.id,
+        durationMs: Date.now() - turnStartedAt,
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    return {
+      conversationId,
+      assistantReply: generalReply,
+      resultType: "conversation",
+      operation: "conversational_chat",
+      intent: universalDecision.intent,
+      suggestions: [],
+      memoryStatus: memoryStatusForOperation(memory, "conversational_chat", false),
+      showReview: false,
+      storyId: conversation.storyId,
+      memory,
+      draft: null,
+      actionType: "none",
+      actionOk: true,
+      requiresConfirmation: false,
+      duplicated: false,
+      outputMode: "text",
+      provider,
+      model,
+    };
+  }
 
   let turn!: Awaited<ReturnType<typeof runConversationTurn>>;
   let turnState: "ROUTED" | "PROCESSING" | "COMPLETED" | "FAILED" = "ROUTED";

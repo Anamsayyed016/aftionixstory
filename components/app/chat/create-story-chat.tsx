@@ -141,6 +141,10 @@ type CreateStoryChatProps = {
   initialComposerValue?: string;
 };
 
+/**
+ * Universal chat shell used by Story Studio (and reusable elsewhere).
+ * Server-side routing decides story vs general vs search — the UI stays one assistant.
+ */
 export function CreateStoryChat({
   className,
   onClose,
@@ -1122,3 +1126,7 @@ export function CreateStoryChat({
     </div>
   );
 }
+
+/** Alias for the same universal chat shell (Story Studio + future home assistant). */
+export const AssistantChat = CreateStoryChat;
+export type AssistantChatProps = CreateStoryChatProps;

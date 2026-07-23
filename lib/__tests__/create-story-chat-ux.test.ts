@@ -46,9 +46,9 @@ describe("Create Story chat UX helpers", () => {
   });
 
   it("uses conversational empty-state copy", () => {
-    expect(CHAT_SHELL_COPY.create.title).toBe("Story Assistant");
-    expect(CHAT_SHELL_COPY.create.emptyTitle).toBe("Let’s create your story");
-    expect(CHAT_SHELL_COPY.create.emptyDescription).toContain("however it comes");
+    expect(CHAT_SHELL_COPY.create.title).toBe("Chat Assistant");
+    expect(CHAT_SHELL_COPY.create.emptyTitle).toBe("Ask me anything");
+    expect(CHAT_SHELL_COPY.create.emptyDescription).toContain("one chat");
   });
 
   it("ships suggestion cards that send matching prompts", () => {

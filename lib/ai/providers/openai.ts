@@ -62,6 +62,19 @@ export type OpenAIClientLike = {
       }>;
     };
   };
+  /** Optional Responses API surface (web_search). */
+  responses?: {
+    create: (params: {
+      model: string;
+      tools?: Array<{ type: string }>;
+      input?: Array<{ role: string; content: string }>;
+      temperature?: number;
+      max_output_tokens?: number;
+    }) => Promise<{
+      output_text?: string | null;
+      output?: unknown;
+    }>;
+  };
 };
 
 export class OpenAIProvider implements AIProvider {
@@ -164,6 +177,32 @@ export class OpenAIProvider implements AIProvider {
     const maxCompletionTokens = params.input.maxOutputTokens ?? 4096;
 
     try {
+      // Native web_search requires the Responses API (not Chat Completions).
+      if (params.input.enableWebSearch) {
+        if (!client.responses?.create) {
+          throw new AIError(
+            "AI_INVALID_RESPONSE",
+            "OpenAI client does not expose Responses API for web_search.",
+            false
+          );
+        }
+        const response = await client.responses.create({
+          model: params.model,
+          tools: [{ type: "web_search" }],
+          input: [
+            { role: "system", content: params.input.systemInstruction },
+            { role: "user", content: params.input.prompt },
+          ],
+          max_output_tokens: maxCompletionTokens,
+          ...(supportsCustomTemperature(params.model)
+            ? { temperature: params.input.temperature ?? 0.7 }
+            : {}),
+        });
+        const text =
+          typeof response.output_text === "string" ? response.output_text : "";
+        return { text, finishReason: "stop" };
+      }
+
       const request: {
         model: string;
         messages: Array<{ role: string; content: string }>;

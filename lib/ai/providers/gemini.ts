@@ -101,6 +101,9 @@ export class GeminiProvider implements AIProvider {
           systemInstruction: params.input.systemInstruction,
           temperature: params.input.temperature ?? 0.9,
           maxOutputTokens: params.input.maxOutputTokens ?? 4096,
+          ...(params.input.enableWebSearch
+            ? { tools: [{ googleSearch: {} }] }
+            : {}),
         },
       });
 

@@ -60,14 +60,14 @@ export const CHAT_SHELL_COPY: Record<
   { title: string; emptyTitle: string; emptyDescription: string; placeholder: string }
 > = {
   create: {
-    title: "Story Assistant",
-    emptyTitle: "Let’s create your story",
+    title: "Chat Assistant",
+    emptyTitle: "Ask me anything",
     emptyDescription:
-      "Tell me your story idea however it comes to you — one line, a character, a scene, or even a rough feeling. I’ll help you build it.",
-    placeholder: "Tell me your idea…",
+      "Story ideas, writing help, general questions, coding, or what’s happening today — one chat, no mode switching.",
+    placeholder: "Ask or describe your idea…",
   },
   continue: {
-    title: "Continue with Story Assistant",
+    title: "Continue with Chat Assistant",
     emptyTitle: "What should happen next?",
     emptyDescription:
       "Give an instruction for the next episode. Story continuity and existing characters will be connected in a later phase.",

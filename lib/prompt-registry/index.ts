@@ -53,4 +53,5 @@ export {
   formatWritingRulesForPrompt,
   conflictPriorityPreamble,
   platformIdentity,
+  mirrorUserLanguageStyle,
 } from "@/lib/prompt-registry/layers";

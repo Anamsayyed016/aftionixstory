@@ -8,6 +8,10 @@ import {
   type StoryAgentTurnActionData,
 } from "@/lib/story-agent/run-turn";
 
+/**
+ * Universal chat stream entry (auth-gated).
+ * runStoryAgentTurn classifies each turn and routes to Story Agent or General AI.
+ */
 export const dynamic = "force-dynamic";
 
 /** Chunked pseudo-streaming: full reply is generated first, then drip-fed. */

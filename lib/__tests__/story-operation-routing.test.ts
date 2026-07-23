@@ -216,6 +216,23 @@ describe("generateWriteScene plain text", () => {
   });
 });
 
+describe("universal router wiring", () => {
+  it("runStoryAgentTurn classifies before Conversation Brain", () => {
+    const source = readFileSync(
+      path.resolve("lib/story-agent/run-turn.ts"),
+      "utf8"
+    );
+    expect(source).toContain("classifyUniversalIntent");
+    expect(source).toContain("runGeneralAiTurn");
+    expect(source).toContain("isStoryUniversalIntent");
+    expect(source).toContain("runConversationTurn");
+    const classifyIdx = source.indexOf("classifyUniversalIntent");
+    const brainIdx = source.indexOf("runConversationTurn({");
+    expect(classifyIdx).toBeGreaterThan(-1);
+    expect(brainIdx).toBeGreaterThan(classifyIdx);
+  });
+});
+
 describe("UI / action wiring", () => {
   it("CreateStoryChat still uses storyAgentTurnAction only", () => {
     const source = readFileSync(

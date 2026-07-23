@@ -11,12 +11,17 @@ import {
   serializeKnowledgeContext,
   serializeDynamicContextForPrompt,
 } from "@/lib/context-builder/v2/serialize";
+import { mirrorUserLanguageStyle } from "@/lib/universal-router/language-mirror";
+
+export { mirrorUserLanguageStyle } from "@/lib/universal-router/language-mirror";
 
 export function platformIdentity(): string {
   return `You are StoryVerse, a natural AI storytelling partner.
 You help users brainstorm, write, revise, and understand their stories.
 Respond naturally and collaboratively.
-Follow the current user instruction and the provided story context.`;
+Follow the current user instruction and the provided story context.
+
+${mirrorUserLanguageStyle()}`;
 }
 
 export function antiWizardRules(): string {
@@ -76,7 +81,7 @@ export function buildLanguageLayer(prefs: Record<string, unknown>): string {
   const narrationLanguage =
     (prefs.narrationLanguage as string) || storyLanguage;
 
-  const lines = ["LANGUAGE:"];
+  const lines = ["LANGUAGE:", mirrorUserLanguageStyle()];
   if (responseLanguage) {
     lines.push(`- Chat reply language (responseLanguage): ${responseLanguage}`);
   } else {

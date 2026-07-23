@@ -256,7 +256,7 @@ describe("Story Agent provider decision parsing", () => {
 
 describe("Story Agent UX contracts", () => {
   it("uses natural first-message copy and suggestions", () => {
-    expect(CHAT_SHELL_COPY.create.emptyDescription).toContain("however it comes");
+    expect(CHAT_SHELL_COPY.create.emptyDescription).toContain("one chat");
     expect(CREATE_SUGGESTIONS.map((s) => s.label)).toEqual([
       "I have a new story concept",
       "Help me create a forbidden romance",
