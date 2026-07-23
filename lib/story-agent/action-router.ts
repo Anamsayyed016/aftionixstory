@@ -9,6 +9,10 @@ import { generateEpisodeDraft } from "@/lib/ai/services/generate-episode";
 import { generateWriteScene } from "@/lib/ai/services/write-scene";
 import type { CanonicalStoryContext } from "@/lib/story-agent/canonical-story-context";
 import {
+  friendlyMessageForCode,
+  isStoryAgentError,
+} from "@/lib/story-agent/errors";
+import {
   getMissingCreateFields,
   memoryToWizardCandidate,
 } from "@/lib/story-agent/memory-patch";
@@ -231,10 +235,9 @@ export async function routeStoryAgentAction(params: {
           },
         };
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Could not generate the story draft.";
+        const message = isStoryAgentError(error)
+          ? friendlyMessageForCode(error.code, actionType)
+          : "I couldn’t generate that scene correctly. Your story setup is saved—please retry.";
         return {
           memory,
           result: { type: actionType, ok: false, message },
@@ -284,10 +287,9 @@ export async function routeStoryAgentAction(params: {
         },
       };
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Could not generate the episode draft.";
+      const message = isStoryAgentError(error)
+        ? friendlyMessageForCode(error.code, actionType)
+        : "I couldn’t generate that episode correctly. Your previous draft is safe—please retry.";
       return {
         memory,
         result: { type: actionType, ok: false, message },

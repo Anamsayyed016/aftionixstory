@@ -221,6 +221,30 @@ export function isLanguagePreferenceMessage(userMessage: string): boolean {
   return detectLanguageInstruction(userMessage).matched;
 }
 
+/**
+ * Short reply that only sets language (or a near-equivalent), typically answering
+ * a clarifying question — must not trigger creative generation by itself.
+ */
+export function isShortLanguagePreferenceReply(userMessage: string): boolean {
+  const text = userMessage.trim();
+  if (!text || text.length > 100) return false;
+  if (
+    /\b(write|start|continue|generate|scene|episode|story\s+now|likho\s+scene)\b/i.test(
+      text
+    )
+  ) {
+    return false;
+  }
+  if (
+    /^(hinglish|hindi|english|urdu|roman(?:ized)?\s*hindi)(?:\s+please)?[.!?]*$/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+  return detectLanguageInstruction(text).matched && text.length <= 80;
+}
+
 /** Human-readable instruction block for creative prompts. */
 export function formatLanguagePromptBlock(prefs: LanguagePreferences): string {
   const script =

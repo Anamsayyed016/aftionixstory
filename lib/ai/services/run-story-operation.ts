@@ -897,11 +897,9 @@ STRICT: Answer this exact request with 3–5 concrete, distinct story concepts o
         : null;
       const message = isStoryAgentError(error)
         ? friendlyMessageForCode(error.code, operation)
-        : error instanceof Error
-          ? error.message
-          : operation === "revise_draft"
-            ? "I couldn’t apply that change, so I kept the earlier draft unchanged."
-            : "I couldn’t generate that scene correctly. Your previous draft is safe—please retry.";
+        : operation === "revise_draft"
+          ? "I couldn’t apply that change, so I kept the earlier draft unchanged."
+          : "I couldn’t generate that scene correctly. Your previous draft is safe—please retry.";
       console.info(
         JSON.stringify({
           event: "story_operation.turn",

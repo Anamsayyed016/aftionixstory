@@ -111,17 +111,22 @@ const RULES: Rule[] = [
     priority: 40,
     match: (text) => {
       if (
-        /\bhinglish\s+(me|mein)\b|\bhindi\s+(me|mein)\b|\benglish\s+(me|mein)\b|\blikho\s+hinglish\b|\blanguage\s+change\b/i.test(
+        /^(hinglish|hindi|english|urdu|roman(?:ized)?\s*hindi)(?:\s+please)?[.!?]*$/i.test(
+          text.trim()
+        ) ||
+        /\bhinglish\s+(me|mein)\b|\bhindi\s+(me|mein)\b|\benglish\s+(me|mein)\b|\blikho\s+hinglish\b|\blanguage\s+change\b|\bwrite\s+in\s+(hinglish|hindi|english)\b/i.test(
           text
         )
       ) {
         const lang = /\bhinglish\b/i.test(text)
           ? "hinglish"
-          : /\bhindi\b/i.test(text)
+          : /\bhindi\b|roman(?:ized)?\s*hindi/i.test(text)
             ? "hindi"
-            : /\benglish\b/i.test(text)
-              ? "english"
-              : null;
+            : /\burdu\b/i.test(text)
+              ? "urdu"
+              : /\benglish\b/i.test(text)
+                ? "english"
+                : null;
         return base("language_change", 0.97, ["language_change"], {
           entities: { requestedLanguage: lang },
         });

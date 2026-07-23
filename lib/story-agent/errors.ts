@@ -115,7 +115,7 @@ export function friendlyMessageForCode(
     case "CONVERSATION_STATE_FAILED":
       return "Reply generate hua, lekin save nahi ho paya. Please retry.";
     case "CONTEXT_MISMATCH":
-      return "Generated scene didn’t match your requested characters. Previous draft is unchanged—please retry.";
+      return "That draft didn’t stay true to your characters and story setup. Nothing was overwritten—try again, or say “write a scene” when you’re ready.";
     case "CONTEXT_ISOLATION_ERROR":
       return "That draft belonged to another chat. Please retry in this conversation.";
     case "INSTRUCTION_FIDELITY_FAILED":
@@ -134,4 +134,15 @@ export function friendlyMessageForCode(
       }
       return "I couldn’t finish that reply. Please try once more. 🙂";
   }
+}
+
+/** Never surface raw StoryAgentError / internal validator strings in chat. */
+export function userFacingStoryAgentMessage(
+  error: unknown,
+  operation?: string
+): string {
+  if (isStoryAgentError(error)) {
+    return friendlyMessageForCode(error.code, operation ?? error.operation);
+  }
+  return friendlyMessageForCode("UNKNOWN_AI_ERROR", operation);
 }

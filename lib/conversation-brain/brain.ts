@@ -34,7 +34,12 @@ import {
   isDynamicContextV2Enabled,
   summarizeContextForLogs,
 } from "@/lib/context-builder/v2";
-import { maybeDecorateChatReply, readStyleProfile } from "@/lib/story-agent/style-profile";
+import {
+  maybeDecorateChatReply,
+  readStyleProfile,
+  detectStyleFeedback,
+} from "@/lib/story-agent/style-profile";
+import { isShortLanguagePreferenceReply } from "@/lib/story-agent/language-preferences";
 import { runToolFrameworkTurn } from "@/lib/tools/brain-adapter";
 import { isStoryToolFrameworkEnabled } from "@/lib/tools/feature-flag";
 import { applyInstructionFidelityPreTurn } from "@/lib/story-fidelity/brain-adapter";
@@ -457,10 +462,36 @@ export async function runConversationTurn(
   // the existing continuation path instead of returning its "Got it" receipt.
   // This deliberately stays after the deterministic executor so removals and
   // corrections are persisted before the creative context is built.
+  //
+  // Do NOT auto-start Episode 1 for short language/style preference replies
+  // (e.g. "hinglish" answering a clarifying question) — those must only update
+  // preferences and acknowledge.
+  const preferenceOnlyReply =
+    isShortLanguagePreferenceReply(request.userMessage) ||
+    (detectStyleFeedback(
+      request.userMessage,
+      readStyleProfile({
+        formality: turn.memory.userPreferences.formality,
+        emojiStyle: turn.memory.userPreferences.emojiStyle,
+        avoidFormalHindi: turn.memory.userPreferences.avoidFormalHindi,
+        preferShortDialogues: turn.memory.userPreferences.preferShortDialogues,
+        pacingHint: turn.memory.userPreferences.pacingHint,
+        avoid: turn.memory.userPreferences.avoid,
+        uppercaseForLoudDialogue:
+          turn.memory.userPreferences.uppercaseForLoudDialogue,
+        episodeLength: turn.memory.userPreferences.episodeLength,
+      })
+    ).matched &&
+      request.userMessage.trim().length <= 100 &&
+      !/\b(write|start|continue|scene|episode)\b/i.test(request.userMessage));
+
   const needsCanonicalContinuation =
     Boolean(request.canonicalStoryContext?.rawSynopsis) &&
-    isStoryContinuationModifier(request.userMessage);
+    isStoryContinuationModifier(request.userMessage) &&
+    !preferenceOnlyReply;
+
   if (
+    !preferenceOnlyReply &&
     (request.storyId ||
       hasUsableWritingContext(turn.memory) ||
       Boolean(request.canonicalStoryContext?.characters.length)) &&
