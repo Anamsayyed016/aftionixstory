@@ -280,7 +280,7 @@ export function StoryWorkspaceClient({
                 className={`w-full rounded-md px-3 py-2 text-left transition-colors ${
                   selectedEpisodeId === ep.id
                     ? "bg-panel-raised text-ink"
-                    : "bg-charcoal/40 text-ink-dim hover:bg-white/5 hover:text-ink"
+                    : "bg-charcoal/40 text-ink-dim hover:bg-charcoal hover:text-ink"
                 }`}
               >
                 <p className="font-mono text-[10px] text-ink-faint">

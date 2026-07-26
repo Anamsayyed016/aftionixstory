@@ -89,7 +89,7 @@ export function StoryReviewDrawer({
     <div className="fixed inset-0 z-50" role="presentation">
       <button
         type="button"
-        className="absolute inset-0 bg-void/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/45 backdrop-blur-sm"
         aria-label="Close story review"
         onClick={onClose}
       />
@@ -99,7 +99,7 @@ export function StoryReviewDrawer({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "absolute inset-x-0 bottom-0 flex max-h-[92dvh] flex-col rounded-t-2xl border border-border bg-panel shadow-[0_24px_80px_-24px_rgba(0,0,0,0.9)]",
+          "absolute inset-x-0 bottom-0 flex max-h-[92dvh] flex-col rounded-t-2xl border border-border bg-panel shadow-[0_24px_80px_-24px_rgba(16,24,40,0.20)]",
           "md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(100%,28rem)] md:rounded-none md:rounded-l-2xl md:border-y-0 md:border-r-0"
         )}
       >
@@ -119,7 +119,7 @@ export function StoryReviewDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close review"
-            className="rounded-lg border border-border p-2 text-ink-dim hover:bg-white/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac"
+            className="rounded-lg border border-border p-2 text-ink-dim hover:bg-charcoal hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac"
           >
             <X className="h-4 w-4" aria-hidden />
           </button>

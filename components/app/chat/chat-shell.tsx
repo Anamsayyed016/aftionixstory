@@ -60,14 +60,14 @@ export function ChatShell({
     <section
       aria-label={copy.title}
       className={cn(
-        "flex h-[min(70vh,640px)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-border bg-panel/75 shadow-[0_24px_60px_-40px_rgba(0,0,0,0.85)] backdrop-blur-md",
+        "flex h-[min(70vh,640px)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-border bg-panel/75 shadow-[0_24px_60px_-40px_rgba(16,24,40,0.18)] backdrop-blur-md",
         className
       )}
     >
       <header className="flex items-start justify-between gap-3 border-b border-border/80 px-4 py-3 sm:px-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet to-lilac text-white shadow-[0_10px_24px_-12px_rgba(124,92,255,0.75)]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet to-lilac text-white shadow-[0_10px_24px_-12px_rgba(14,116,144,0.22)]">
               <Sparkles className="h-4 w-4" aria-hidden />
             </span>
             <div className="min-w-0">
@@ -97,7 +97,7 @@ export function ChatShell({
               type="button"
               onClick={onClose}
               aria-label="Close chat assistant"
-              className="rounded-lg border border-border p-2 text-ink-dim transition-colors hover:bg-white/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+              className="rounded-lg border border-border p-2 text-ink-dim transition-colors hover:bg-charcoal hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
             >
               <X className="h-4 w-4" aria-hidden />
             </button>

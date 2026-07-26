@@ -22,7 +22,7 @@ export function AuthShell({
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(50% 40% at 20% 0%, rgba(124,92,255,0.14), transparent 55%), radial-gradient(40% 35% at 90% 10%, rgba(232,180,200,0.08), transparent 50%)",
+            "radial-gradient(50% 40% at 20% 0%, rgba(14,116,144,0.10), transparent 55%), radial-gradient(40% 35% at 90% 10%, rgba(15,118,110,0.08), transparent 50%)",
         }}
       />
 
@@ -49,9 +49,9 @@ export function AuthShell({
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           className="w-full max-w-md"
         >
-          <div className="rounded-2xl border border-border/80 bg-panel/70 p-6 shadow-[0_28px_80px_-40px_rgba(0,0,0,0.85),0_0_0_1px_rgba(124,92,255,0.06)] backdrop-blur-xl sm:p-8">
+          <div className="rounded-2xl border border-border/80 bg-panel/70 p-6 shadow-[0_28px_80px_-40px_rgba(16,24,40,0.18),0_0_0_1px_rgba(14,116,144,0.06)] backdrop-blur-xl sm:p-8">
             <div className="mb-7 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet to-lilac text-white shadow-[0_12px_30px_-12px_rgba(124,92,255,0.7)]">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet to-lilac text-white shadow-[0_12px_30px_-12px_rgba(14,116,144,0.20)]">
                 <BookOpen className="h-5 w-5" aria-hidden />
                 <span className="sr-only">{SITE.name}</span>
               </div>

@@ -32,7 +32,7 @@ export function Toast({
           exit={{ opacity: 0, y: -6, scale: 0.98 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           className={cn(
-            "flex items-start gap-3 rounded-xl border px-3.5 py-3 text-sm shadow-[0_12px_40px_-20px_rgba(0,0,0,0.7)] backdrop-blur-md",
+            "flex items-start gap-3 rounded-xl border px-3.5 py-3 text-sm shadow-[0_12px_40px_-20px_rgba(16,24,40,0.14)] backdrop-blur-md",
             isError
               ? "border-danger/35 bg-danger/10 text-danger"
               : "border-success/35 bg-success/10 text-success"
@@ -45,7 +45,7 @@ export function Toast({
               type="button"
               onClick={onDismiss}
               aria-label="Dismiss notification"
-              className="shrink-0 rounded-md p-1 text-ink-faint transition-colors hover:bg-white/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+              className="shrink-0 rounded-md p-1 text-ink-faint transition-colors hover:bg-charcoal hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
             >
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>

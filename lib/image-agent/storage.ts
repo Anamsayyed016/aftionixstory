@@ -18,13 +18,16 @@ function resolveUploadsDir(): string {
 
 export async function saveGeneratedImage(params: {
   buffer: Buffer;
-  kind: "avatar" | "cover";
+  kind: "avatar" | "cover" | "chat" | "upload";
   entityId: string;
+  /** Override the written extension (default png); uploads keep their original type. */
+  extension?: string;
 }): Promise<string> {
   const dir = resolveUploadsDir();
   await fs.mkdir(dir, { recursive: true });
 
-  const filename = `${params.kind}-${params.entityId}-${Date.now()}.png`;
+  const ext = params.extension ?? "png";
+  const filename = `${params.kind}-${params.entityId}-${Date.now()}.${ext}`;
   await fs.writeFile(path.join(dir, filename), params.buffer);
 
   return `/uploads/images/${filename}`;

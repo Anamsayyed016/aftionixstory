@@ -86,6 +86,48 @@ export function classifyUniversalIntentDeterministic(
   }
   const lower = text.toLowerCase();
   const awaiting = isAwaitingSlot(input.conversationFlow);
+  const awaitingImagePrompt =
+    input.conversationFlow?.awaiting.topic === "image_prompt";
+
+  // ---- Answering a pending "what should the image show?" clarification ----
+  if (awaitingImagePrompt) {
+    const question = looksLikeStandaloneQuestion(text);
+    const offTopic =
+      question &&
+      /^(what|who's|who is|what's|whats|define|explain|tell me (about|what))\b/i.test(
+        text
+      ) &&
+      !/\b(image|picture|photo|artwork|illustration|drawing)\b/i.test(lower);
+    if (!offTopic) {
+      return decision(
+        "image_generation_request",
+        0.92,
+        "deterministic",
+        "awaiting_image_prompt_answer",
+        ["awaiting_image_prompt"]
+      );
+    }
+  }
+
+  // ---- Image generation ----
+  if (
+    /\b(generate|create|make|design|produce|render)\s+(me\s+)?(an?\s+)?(image|picture|photo|photograph|artwork|illustration|drawing|avatar|logo)\b/i.test(
+      text
+    ) ||
+    // "draw" alone implies an image even without saying "picture" — but skip idioms.
+    /\bdraw\s+(me\s+)?(an?\s+)?(?!conclusions?\b|attention\b|comparisons?\b|the line\b)/i.test(
+      text
+    ) ||
+    /\b(image|picture|photo)\s+(of|for|showing|depicting)\b/i.test(lower)
+  ) {
+    return decision(
+      "image_generation_request",
+      0.94,
+      "deterministic",
+      "image_generation_signals",
+      ["image_generation_request"]
+    );
+  }
 
   // ---- Current information (web search) ----
   if (
@@ -269,6 +311,7 @@ Rules:
 - coding_help: programming, languages, debugging, software.
 - current_information: needs live/current facts (weather, news, scores, prices today).
 - platform_question: how this app/product works.
+- image_generation_request: user wants an image/picture/photo/artwork generated or drawn.
 - unclear: too ambiguous to route safely.
 If the assistant was awaiting a story slot answer BUT the user asks something clearly unrelated (e.g. "what is python"), choose general_question or coding_help — do NOT force-fit into the slot.`;
 

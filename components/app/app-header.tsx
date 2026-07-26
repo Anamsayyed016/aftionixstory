@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/constants";
 import { logoutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const NAV = [
   { href: "/dashboard", label: "Chat", icon: MessageSquare },
@@ -57,7 +56,6 @@ export function AppHeader({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <ThemeToggle className="hidden sm:inline-flex" />
           {usage && (
             <p
               className="hidden font-mono text-[11px] text-ink-faint sm:block"
@@ -101,7 +99,7 @@ export function AppHeader({
                       "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm",
                       active
                         ? "bg-panel-raised text-ink"
-                        : "text-ink-dim hover:bg-white/5"
+                        : "text-ink-dim hover:bg-charcoal"
                     )}
                   >
                     <Icon className="h-4 w-4" />

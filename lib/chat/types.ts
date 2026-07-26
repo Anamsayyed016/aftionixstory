@@ -8,6 +8,8 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   status?: "sending" | "sent" | "error";
+  /** Generated (assistant) or attached (user) image, rendered inline. */
+  imageUrl?: string;
 }
 
 export interface ChatSuggestion {

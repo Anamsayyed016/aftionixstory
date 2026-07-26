@@ -157,7 +157,7 @@ export function ChatSidebar({
         <div className="fixed inset-0 z-50 lg:hidden" role="presentation">
           <button
             type="button"
-            className="absolute inset-0 bg-void/70 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm"
             aria-label="Close conversation history"
             onClick={onMobileClose}
           />
@@ -166,7 +166,7 @@ export function ChatSidebar({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="absolute inset-y-0 left-0 flex w-[min(100%,20rem)] flex-col border-r border-border bg-panel shadow-[0_24px_60px_-20px_rgba(0,0,0,0.85)]"
+            className="absolute inset-y-0 left-0 flex w-[min(100%,20rem)] flex-col border-r border-border bg-panel shadow-[0_24px_60px_-20px_rgba(16,24,40,0.18)]"
           >
             <div className="flex items-center justify-between border-b border-border/80 px-3 py-3">
               <h2 id={titleId} className="font-display text-base font-semibold text-ink">
@@ -176,7 +176,7 @@ export function ChatSidebar({
                 type="button"
                 onClick={onMobileClose}
                 aria-label="Close history"
-                className="rounded-lg border border-border p-2 text-ink-dim hover:bg-white/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac"
+                className="rounded-lg border border-border p-2 text-ink-dim hover:bg-charcoal hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac"
               >
                 <X className="h-4 w-4" aria-hidden />
               </button>

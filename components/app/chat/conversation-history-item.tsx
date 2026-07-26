@@ -38,7 +38,7 @@ export function ConversationHistoryItem({
         "group flex items-start gap-2 rounded-xl border px-2.5 py-2 transition-colors",
         active
           ? "border-violet-soft/40 bg-panel-raised"
-          : "border-transparent hover:border-border hover:bg-white/5"
+          : "border-transparent hover:border-border hover:bg-charcoal"
       )}
     >
       <div
@@ -87,7 +87,7 @@ export function ConversationHistoryItem({
             onArchive(item.id);
           }}
           aria-label={`Archive ${item.title || "conversation"}`}
-          className="rounded-lg p-1.5 text-ink-faint opacity-100 transition-opacity hover:bg-white/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac disabled:opacity-40 sm:opacity-70 sm:group-hover:opacity-100"
+          className="rounded-lg p-1.5 text-ink-faint opacity-100 transition-opacity hover:bg-charcoal hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac disabled:opacity-40 sm:opacity-70 sm:group-hover:opacity-100"
         >
           <Archive className="h-3.5 w-3.5" aria-hidden />
         </button>

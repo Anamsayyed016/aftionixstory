@@ -79,8 +79,8 @@ export function GoogleSignInButton({
       whileTap={busy ? undefined : { scale: 0.985 }}
       transition={{ type: "spring", stiffness: 420, damping: 28 }}
       className={cn(
-        "group relative flex h-12 w-full items-center justify-center gap-3 overflow-hidden rounded-xl border border-border-strong bg-white text-sm font-semibold text-[#1f1f1f] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)] transition-[border-color,box-shadow,background-color] duration-200",
-        "hover:border-violet-soft/50 hover:shadow-[0_16px_40px_-18px_rgba(124,92,255,0.45)]",
+        "group relative flex h-12 w-full items-center justify-center gap-3 overflow-hidden rounded-xl border border-border-strong bg-white text-sm font-semibold text-[#1f1f1f] shadow-[0_10px_30px_-18px_rgba(16,24,40,0.12)] transition-[border-color,box-shadow,background-color] duration-200",
+        "hover:border-violet-soft/50 hover:shadow-[0_16px_40px_-18px_rgba(14,116,144,0.18)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac focus-visible:ring-offset-2 focus-visible:ring-offset-panel",
         "disabled:pointer-events-none disabled:opacity-60",
         className

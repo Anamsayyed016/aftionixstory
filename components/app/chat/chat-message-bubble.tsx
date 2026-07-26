@@ -1,11 +1,33 @@
 "use client";
 
+import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Bot, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/chat/types";
+
+function MessageImage({ src, isUser }: { src: string; isUser: boolean }) {
+  const [loaded, setLoaded] = React.useState(false);
+  return (
+    <div className="relative mt-2 aspect-square w-full max-w-[280px] overflow-hidden rounded-xl border border-border/60 bg-charcoal/60">
+      {!loaded ? (
+        <div className="absolute inset-0 animate-pulse bg-panel-raised/60" aria-hidden />
+      ) : null}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={isUser ? "Attached image" : "Generated image"}
+        onLoad={() => setLoaded(true)}
+        className={cn(
+          "h-full w-full object-cover transition-opacity duration-300",
+          loaded ? "opacity-100" : "opacity-0"
+        )}
+      />
+    </div>
+  );
+}
 
 type ChatMessageBubbleProps = {
   message: ChatMessage;
@@ -40,7 +62,7 @@ export function ChatMessageBubble({ message, onRetry }: ChatMessageBubbleProps) 
 
       <div
         className={cn(
-          "max-w-[min(36rem,85%)] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-[0_10px_28px_-22px_rgba(0,0,0,0.8)]",
+          "max-w-[min(36rem,85%)] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-[0_10px_28px_-22px_rgba(16,24,40,0.16)]",
           isUser
             ? "rounded-br-md bg-gradient-to-br from-violet/90 to-lilac/80 text-white"
             : isError
@@ -49,6 +71,9 @@ export function ChatMessageBubble({ message, onRetry }: ChatMessageBubbleProps) 
         )}
       >
         <p className="whitespace-pre-wrap">{message.content}</p>
+        {message.imageUrl ? (
+          <MessageImage src={message.imageUrl} isUser={isUser} />
+        ) : null}
         {message.status === "sending" ? (
           <p className="mt-1 text-[11px] text-ink-faint">Sending…</p>
         ) : null}

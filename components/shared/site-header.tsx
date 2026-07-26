@@ -3,12 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, BookOpen } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/container";
 import { NAV_LINKS, SITE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 function useScrolled(threshold = 8) {
   const [scrolled, setScrolled] = React.useState(false);
@@ -33,10 +32,13 @@ export function SiteHeader() {
       )}
     >
       <Container className="flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 group">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-violet to-lilac text-white">
-            <BookOpen className="h-4 w-4" />
-          </span>
+        <Link href="/" className="flex items-center gap-2.5 group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/aftionix-logo.jpg"
+            alt="AFTIONIX"
+            className="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-border"
+          />
           <span className="font-display text-lg font-semibold tracking-tight text-ink">
             {SITE.name}
           </span>
@@ -55,7 +57,6 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <ThemeToggle />
           <Link href="/sign-in">
             <Button variant="ghost" size="sm">
               Sign In

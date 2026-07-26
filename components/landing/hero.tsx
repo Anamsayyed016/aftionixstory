@@ -16,7 +16,7 @@ export function Hero() {
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(60% 50% at 15% 10%, rgba(124,92,255,0.14), transparent 60%), radial-gradient(45% 40% at 90% 20%, rgba(232,180,200,0.10), transparent 60%)",
+            "radial-gradient(60% 50% at 15% 10%, rgba(14,116,144,0.10), transparent 60%), radial-gradient(45% 40% at 90% 20%, rgba(15,118,110,0.10), transparent 60%)",
         }}
       />
       <div
@@ -87,7 +87,7 @@ export function Hero() {
             className="relative"
           >
             {/* Story workspace preview — the signature manuscript card */}
-            <div className="sv-manuscript relative overflow-hidden rounded-xl border border-border-strong p-1 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.6)]">
+            <div className="sv-manuscript relative overflow-hidden rounded-xl border border-border-strong p-1 shadow-[0_40px_80px_-30px_rgba(16,24,40,0.13)]">
               <div className="flex items-center justify-between border-b border-border px-5 py-3">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-rose-dim/60" />

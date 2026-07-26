@@ -46,6 +46,14 @@ function mapError(error: unknown): ActionResult<never> {
   return fail("DATABASE_ERROR", "Something went wrong. Please try again.");
 }
 
+function imageUrlFromMetadata(metadata: Prisma.JsonValue): string | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+  const value = (metadata as Record<string, unknown>).imageUrl;
+  return typeof value === "string" && value ? value : null;
+}
+
 function serializeMessage(message: {
   id: string;
   role: string;
@@ -63,7 +71,7 @@ function serializeMessage(message: {
       message.status === "ERROR" ? ("error" as const) : ("sent" as const),
     createdAt: message.createdAt.toISOString(),
     requestId: message.requestId,
-    metadata: message.metadata,
+    imageUrl: imageUrlFromMetadata(message.metadata),
   };
 }
 
@@ -177,6 +185,7 @@ export async function loadConversationAction(
       status: "sent" | "error";
       createdAt: string;
       requestId: string | null;
+      imageUrl: string | null;
     }>;
   }>
 > {
@@ -287,6 +296,7 @@ export async function appendChatMessageAction(
       status: "sent" | "error";
       createdAt: string;
       requestId: string | null;
+      imageUrl: string | null;
     };
     duplicated: boolean;
     conversationStatus: "ACTIVE" | "ARCHIVED";

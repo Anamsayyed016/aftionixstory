@@ -14,7 +14,7 @@ export function FinalCta() {
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(50% 80% at 50% 100%, rgba(124,92,255,0.15), transparent 70%)",
+            "radial-gradient(50% 80% at 50% 100%, rgba(14,116,144,0.10), transparent 70%)",
         }}
       />
       <Container className="text-center">

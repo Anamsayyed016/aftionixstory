@@ -28,6 +28,7 @@ export type AwaitingTopic =
   | "setting"
   | "character"
   | "who_falls_first"
+  | "image_prompt"
   | "none";
 
 export type ConversationOffer = {
@@ -162,6 +163,7 @@ export function readConversationFlow(state: unknown): ConversationFlow {
         awaitingRaw.topic === "setting" ||
         awaitingRaw.topic === "character" ||
         awaitingRaw.topic === "who_falls_first" ||
+        awaitingRaw.topic === "image_prompt" ||
         awaitingRaw.topic === "none"
           ? awaitingRaw.topic
           : "none",

@@ -33,7 +33,7 @@ export function Pricing() {
               <GlassCard
                 className={cn(
                   "relative flex h-full flex-col p-7",
-                  tier.highlighted && "border-violet/50 shadow-[0_30px_60px_-30px_rgba(124,92,255,0.5)]"
+                  tier.highlighted && "border-violet/50 shadow-[0_30px_60px_-30px_rgba(14,116,144,0.18)]"
                 )}
               >
                 {tier.highlighted && (

@@ -40,6 +40,7 @@ enum GenerationAction {
   ADD_COMEDY
   GENERATE_AVATAR
   GENERATE_COVER
+  GENERATE_CHAT_IMAGE
 }
 
 enum GenerationStatus {
@@ -330,7 +331,7 @@ model EpisodeVersion {
 model GenerationLog {
   id                    String           @id @default(cuid())
   userId                String
-  storyId               String
+  storyId               String?
   episodeId             String?
   characterId           String?
   provider              String
@@ -347,7 +348,7 @@ model GenerationLog {
   createdAt             DateTime         @default(now())
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  story     Story      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story     Story?     @relation(fields: [storyId], references: [id], onDelete: SetNull)
   episode   Episode?   @relation(fields: [episodeId], references: [id], onDelete: SetNull)
   character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
 

@@ -262,6 +262,7 @@ export function CreateStoryChat({
           content: string;
           status: "sent" | "error";
           createdAt: string;
+          imageUrl?: string | null;
         }>;
         state: unknown;
       },
@@ -286,6 +287,7 @@ export function CreateStoryChat({
           content: m.content,
           createdAt: m.createdAt,
           status: m.status,
+          imageUrl: m.imageUrl ?? undefined,
         }))
       );
       const parsedMemory = parseStoryMemory(data.state);
@@ -582,8 +584,11 @@ export function CreateStoryChat({
   );
 
   const sendPrompt = useCallback(
-    async (raw: string, opts?: { isRetry?: boolean }) => {
-      const content = raw.trim();
+    async (raw: string, opts?: { isRetry?: boolean; imageUrl?: string }) => {
+      const trimmed = raw.trim();
+      const attachedImageUrl = opts?.imageUrl;
+      // An attached image can stand on its own without typed text.
+      const content = trimmed || (attachedImageUrl ? "Shared an image" : "");
       if (
         sendingLockRef.current ||
         !canSendMessage(content, false) ||
@@ -640,12 +645,15 @@ export function CreateStoryChat({
           if (last?.role === "user" && last.content === content) {
             return next;
           }
-          return [...next, buildChatMessage("user", content, "sent")];
+          return [
+            ...next,
+            buildChatMessage("user", content, "sent", attachedImageUrl),
+          ];
         });
       } else {
         setMessages((prev) => [
           ...prev,
-          buildChatMessage("user", content, "sent"),
+          buildChatMessage("user", content, "sent", attachedImageUrl),
         ]);
       }
 
@@ -664,6 +672,7 @@ export function CreateStoryChat({
             message: content,
             turnRequestId,
             reuseLastUserMessage: isRetry,
+            imageUrl: attachedImageUrl,
           }),
         });
       } catch {
@@ -678,6 +687,7 @@ export function CreateStoryChat({
             message: content,
             turnRequestId,
             reuseLastUserMessage: isRetry,
+            imageUrl: attachedImageUrl,
           });
           if (isStale()) return;
 
@@ -696,7 +706,8 @@ export function CreateStoryChat({
             buildChatMessage(
               "assistant",
               fallback.data.assistantReply,
-              isError ? "error" : "sent"
+              isError ? "error" : "sent",
+              fallback.data.imageUrl
             ),
           ]);
           applyTurnResult(fallback.data, { conversationAtSend, myTurn });
@@ -767,7 +778,12 @@ export function CreateStoryChat({
           setMessages((prev) =>
             prev.map((m) =>
               m.id === id
-                ? { ...m, content: data.assistantReply, status: isError ? "error" : "sent" }
+                ? {
+                    ...m,
+                    content: data.assistantReply,
+                    status: isError ? "error" : "sent",
+                    imageUrl: data.imageUrl,
+                  }
                 : m
             )
           );
@@ -778,7 +794,8 @@ export function CreateStoryChat({
             buildChatMessage(
               "assistant",
               data.assistantReply,
-              isError ? "error" : "sent"
+              isError ? "error" : "sent",
+              data.imageUrl
             ),
           ]);
         }
@@ -813,8 +830,8 @@ export function CreateStoryChat({
     [archivedConversation, conversationId, refreshHistory, applyTurnResult]
   );
 
-  function handleSend() {
-    void sendPrompt(draft);
+  function handleSend(imageUrl?: string) {
+    void sendPrompt(draft, { imageUrl });
   }
 
   function handleSelectSuggestion(suggestion: ChatSuggestion) {
@@ -879,7 +896,7 @@ export function CreateStoryChat({
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 overflow-hidden rounded-2xl border border-border bg-panel/80 shadow-[0_24px_60px_-40px_rgba(0,0,0,0.85)]",
+        "flex h-full min-h-0 overflow-hidden rounded-2xl border border-border bg-panel/80 shadow-[0_24px_60px_-40px_rgba(16,24,40,0.18)]",
         className
       )}
     >
@@ -904,7 +921,7 @@ export function CreateStoryChat({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-border p-2 text-ink-dim hover:bg-white/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac lg:hidden"
+                className="rounded-lg border border-border p-2 text-ink-dim hover:bg-charcoal hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac lg:hidden"
                 aria-label="Open conversation history"
                 onClick={() => setHistoryOpen(true)}
               >
@@ -1147,6 +1164,7 @@ export function CreateStoryChat({
               placeholder={copy.placeholder}
               disabled={composerLocked}
               busy={busy}
+              allowAttachments
             />
           </div>
         </div>

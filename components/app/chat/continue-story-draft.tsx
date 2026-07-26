@@ -42,7 +42,7 @@ export function ContinueStoryDraft({
     <section
       aria-label="Unsaved episode draft"
       className={cn(
-        "space-y-4 rounded-2xl border border-border bg-panel/75 p-4 shadow-[0_20px_50px_-36px_rgba(0,0,0,0.85)] backdrop-blur-md sm:p-5",
+        "space-y-4 rounded-2xl border border-border bg-panel/75 p-4 shadow-[0_20px_50px_-36px_rgba(16,24,40,0.18)] backdrop-blur-md sm:p-5",
         className
       )}
     >

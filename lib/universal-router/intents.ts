@@ -10,6 +10,7 @@ export const UNIVERSAL_INTENTS = [
   "coding_help",
   "current_information",
   "platform_question",
+  "image_generation_request",
   "unclear",
 ] as const;
 

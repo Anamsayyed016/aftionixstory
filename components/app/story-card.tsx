@@ -94,20 +94,20 @@ export function StoryCard({ story }: { story: StoryCardStory }) {
             <div className="absolute right-0 z-10 mt-1 w-40 rounded-md border border-border bg-panel-raised py-1 text-sm shadow-lg">
               <Link
                 href={`/stories/${story.id}/edit`}
-                className="block px-3 py-2 text-ink-dim hover:bg-white/5 hover:text-ink"
+                className="block px-3 py-2 text-ink-dim hover:bg-charcoal hover:text-ink"
               >
                 Edit
               </Link>
               <button
                 type="button"
-                className="block w-full px-3 py-2 text-left text-ink-dim hover:bg-white/5 hover:text-ink"
+                className="block w-full px-3 py-2 text-left text-ink-dim hover:bg-charcoal hover:text-ink"
                 onClick={() => runAction("duplicate")}
               >
                 Duplicate
               </button>
               <button
                 type="button"
-                className="block w-full px-3 py-2 text-left text-ink-dim hover:bg-white/5 hover:text-ink"
+                className="block w-full px-3 py-2 text-left text-ink-dim hover:bg-charcoal hover:text-ink"
                 onClick={() => setConfirm("archive")}
               >
                 Archive

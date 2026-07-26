@@ -10,7 +10,7 @@ import {
   memoryStatusForOperation,
   runConversationTurn,
 } from "@/lib/conversation-brain/server";
-import { readConversationFlow } from "@/lib/conversation-brain";
+import { mergeConversationFlow, readConversationFlow } from "@/lib/conversation-brain";
 import { fail, ok, type ActionResult } from "@/lib/actions/result";
 import {
   ConversationAccessError,
@@ -50,6 +50,14 @@ import {
   runGeneralAiTurn,
 } from "@/lib/universal-router";
 import type { UniversalRouteDecision } from "@/lib/universal-router/intents";
+import {
+  extractImagePromptSubject,
+  friendlyImageErrorMessage,
+  generateFreeformChatImage,
+  isImageGenerationEnabled,
+  isVagueImagePrompt,
+  normalizeImageAgentError,
+} from "@/lib/image-agent";
 
 export const storyAgentTurnInputSchema = z.object({
   conversationId: z.string().min(1),
@@ -62,6 +70,8 @@ export const storyAgentTurnInputSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/),
   /** Retry: reuse last USER message instead of appending a duplicate. */
   reuseLastUserMessage: z.boolean().optional().default(false),
+  /** URL of an image the user attached via the composer's "+" button. */
+  imageUrl: z.string().trim().min(1).max(500).optional(),
 });
 
 export type StoryAgentTurnActionData = {
@@ -92,6 +102,7 @@ export type StoryAgentTurnActionData = {
   model?: string;
   errorCode?: string;
   retryable?: boolean;
+  imageUrl?: string;
 };
 
 export function mapStoryAgentTurnError(error: unknown): ActionResult<never> {
@@ -201,7 +212,7 @@ export type StoryAgentTurnInput = z.infer<typeof storyAgentTurnInputSchema> & {
 export async function runStoryAgentTurn(
   input: StoryAgentTurnInput
 ): Promise<StoryAgentTurnActionData> {
-  const { userId, conversationId, message, turnRequestId, reuseLastUserMessage } =
+  const { userId, conversationId, message, turnRequestId, reuseLastUserMessage, imageUrl: attachedImageUrl } =
     input;
   const messageFingerprint = extractStoryConcept(message).fingerprint;
   const userRequestId = `t_${turnRequestId}_u`;
@@ -290,6 +301,7 @@ export async function runStoryAgentTurn(
         metadata: {
           turnRequestId,
           turnState: "RECEIVED",
+          imageUrl: attachedImageUrl,
         } as Prisma.InputJsonValue,
       });
     }
@@ -303,6 +315,7 @@ export async function runStoryAgentTurn(
       metadata: {
         turnRequestId,
         turnState: "RECEIVED",
+        imageUrl: attachedImageUrl,
       } as Prisma.InputJsonValue,
     });
   }
@@ -344,6 +357,140 @@ export async function runStoryAgentTurn(
       conversationFlow,
       recentAssistantQuestion,
     });
+  }
+
+  if (universalDecision && universalDecision.intent === "image_generation_request") {
+    let turnState: "ROUTED" | "PROCESSING" | "COMPLETED" | "FAILED" = "ROUTED";
+    let assistantReply = "";
+    let imageUrl: string | undefined;
+    let nextAwaiting = conversationFlow.awaiting;
+    const startedAt = Date.now();
+
+    try {
+      turnState = "PROCESSING";
+
+      if (!isImageGenerationEnabled()) {
+        assistantReply = "Image generation isn't available right now.";
+        nextAwaiting = { type: "none", topic: "none" };
+      } else {
+        const awaitingImagePrompt =
+          conversationFlow.awaiting.topic === "image_prompt";
+        const subject = awaitingImagePrompt
+          ? message.trim()
+          : extractImagePromptSubject(message);
+
+        if (!awaitingImagePrompt && isVagueImagePrompt(message)) {
+          assistantReply = "What would you like the image to show?";
+          nextAwaiting = { type: "clarification", topic: "image_prompt" };
+        } else {
+          const result = await generateFreeformChatImage({
+            userId,
+            conversationId,
+            storyId: conversation.storyId,
+            prompt: subject,
+          });
+          imageUrl = result.imageUrl;
+          assistantReply = "Here's what I generated:";
+          nextAwaiting = { type: "none", topic: "none" };
+        }
+      }
+      turnState = "COMPLETED";
+    } catch (error) {
+      turnState = "FAILED";
+      const normalized = normalizeImageAgentError(error);
+      assistantReply = friendlyImageErrorMessage(normalized.code);
+      nextAwaiting = { type: "none", topic: "none" };
+    }
+
+    const nextConversationFlow = mergeConversationFlow(conversationFlow, {
+      awaiting: nextAwaiting,
+    });
+
+    const statePayload = buildPersistedState({
+      previous: conversation.state,
+      memory,
+      storyId: conversation.storyId,
+      conversationFlow: nextConversationFlow,
+      canonicalStoryContext,
+    });
+
+    await updateOwnedConversationState({
+      userId,
+      conversationId,
+      state: statePayload as Prisma.InputJsonValue,
+      storyId: conversation.storyId ?? undefined,
+    });
+
+    const buildId =
+      process.env.STORYVERSE_BUILD_ID ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      "local-dev";
+
+    const appendedAssistant = await appendOwnedChatMessage({
+      userId,
+      conversationId,
+      role: "ASSISTANT",
+      content: assistantReply,
+      status: turnState === "FAILED" ? "ERROR" : undefined,
+      requestId: assistantRequestId,
+      metadata: {
+        flow: "universal_assistant",
+        agentVersion: "2",
+        buildId,
+        resultType: "conversation",
+        operation: "generate_chat_image",
+        actionType: "none",
+        actionOk: turnState !== "FAILED",
+        provider: imageUrl ? "openai" : undefined,
+        outputMode: "text",
+        durationMs: Date.now() - startedAt,
+        turnRequestId,
+        turnState,
+        universalIntent: universalDecision.intent,
+        universalConfidence: universalDecision.confidence,
+        universalSource: universalDecision.source,
+        imageUrl,
+      } as Prisma.InputJsonValue,
+    });
+
+    console.info(
+      JSON.stringify({
+        event: "universal_router.turn",
+        buildId,
+        flow: "universal_assistant",
+        universalIntent: universalDecision.intent,
+        universalSource: universalDecision.source,
+        hasImage: Boolean(imageUrl),
+        conversationId,
+        turnRequestId,
+        messageFingerprint,
+        messageLength: message.length,
+        persistedUserMessageId: appendedUser.message.id,
+        persistedAssistantMessageId: appendedAssistant.message.id,
+        durationMs: Date.now() - turnStartedAt,
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    return {
+      conversationId,
+      assistantReply,
+      resultType: "conversation",
+      operation: "conversational_chat",
+      intent: universalDecision.intent,
+      suggestions: [],
+      memoryStatus: memoryStatusForOperation(memory, "conversational_chat", false),
+      showReview: false,
+      storyId: conversation.storyId,
+      memory,
+      draft: null,
+      actionType: "none",
+      actionOk: turnState !== "FAILED",
+      requiresConfirmation: false,
+      duplicated: false,
+      outputMode: "text",
+      imageUrl,
+    };
   }
 
   if (

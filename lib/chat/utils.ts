@@ -60,7 +60,8 @@ export function createLocalMessageId(): string {
 export function buildChatMessage(
   role: ChatRole,
   content: string,
-  status: ChatMessage["status"] = "sent"
+  status: ChatMessage["status"] = "sent",
+  imageUrl?: string
 ): ChatMessage {
   return {
     id: createLocalMessageId(),
@@ -68,5 +69,6 @@ export function buildChatMessage(
     content,
     createdAt: new Date().toISOString(),
     status,
+    imageUrl,
   };
 }

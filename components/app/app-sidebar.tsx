@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BookOpen,
-  Library,
-  MessageSquare,
-  Settings,
-  LogOut,
-} from "lucide-react";
+import { Library, MessageSquare, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/constants";
 import { logoutAction } from "@/app/actions/auth";
@@ -33,11 +27,14 @@ export function AppSidebar({
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-charcoal/80 md:flex">
-      <div className="flex h-16 items-center gap-2 border-b border-border px-5">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-violet to-lilac text-white">
-            <BookOpen className="h-4 w-4" />
-          </span>
+      <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/aftionix-logo.jpg"
+            alt="AFTIONIX"
+            className="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-border"
+          />
           <span className="font-display text-base font-semibold text-ink">
             {SITE.name}
           </span>
@@ -62,7 +59,7 @@ export function AppSidebar({
                 "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors",
                 active
                   ? "bg-panel-raised text-ink"
-                  : "text-ink-dim hover:bg-white/5 hover:text-ink"
+                  : "text-ink-dim hover:bg-charcoal hover:text-ink"
               )}
             >
               <Icon className="h-4 w-4" />

@@ -45,8 +45,8 @@ export function ChatModeToggle<T extends string>({
             className={cn(
               "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac focus-visible:ring-offset-2 focus-visible:ring-offset-void",
               selected
-                ? "bg-panel-raised text-ink shadow-[0_8px_20px_-14px_rgba(124,92,255,0.65)]"
-                : "text-ink-dim hover:bg-white/5 hover:text-ink"
+                ? "bg-panel-raised text-ink shadow-[0_8px_20px_-14px_rgba(14,116,144,0.20)]"
+                : "text-ink-dim hover:bg-charcoal hover:text-ink"
             )}
           >
             {option.label}

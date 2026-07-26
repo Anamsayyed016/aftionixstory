@@ -15,28 +15,37 @@
 :root {
   color-scheme: light;
 
-  /* Semantic foundations — light is the default writing experience. */
-  --sv-bg: #f7f5f0;
-  --sv-bg-subtle: #f0ede6;
-  --sv-surface: #fffdf9;
-  --sv-surface-raised: #ffffff;
-  --sv-surface-muted: #f6f3ed;
-  --sv-text: #24221e;
-  --sv-text-muted: #6b675f;
-  --sv-text-faint: #8a857b;
-  --sv-border: #dfd9cf;
-  --sv-border-strong: #c9c1b5;
-  --sv-accent: #4b5c93;
-  --sv-accent-soft: #6475ae;
-  --sv-accent-subtle: #e9edf8;
-  --sv-secondary: #a45e76;
-  --sv-success: #247557;
-  --sv-warning: #a46618;
-  --sv-danger: #b34550;
+  /*
+   * Single theme, sampled from the AFTIONIX logo (public/aftionix-logo.jpg)
+   * via scripts/sample-logo-color.mjs: brightest glow ~#61fbfe, mid-tone
+   * ~#1cacd3. --sv-accent is a darkened, contrast-safe version of that same
+   * hue (used for text/buttons); --sv-accent-soft is the real sampled
+   * mid-tone (used for hover/softer fills and glows).
+   */
+  --sv-bg: #f7f9fc;
+  --sv-bg-subtle: #eef2f7;
+  --sv-surface: #ffffff;
+  --sv-surface-raised: #e4e9f2;
+  --sv-surface-muted: #eef2f7;
+  --sv-text: #101828;
+  --sv-text-muted: #475467;
+  --sv-text-faint: #5b6577;
+  --sv-border: #e1e7ef;
+  --sv-border-strong: #c7d2e0;
+  --sv-accent: #0e7490;
+  --sv-accent-soft: #0c7f9b;
+  --sv-accent-subtle: #e3f6fb;
+  /* Real sampled logo glow (#61fbfe/#1cacd3 blend) — decorative use only
+     (gradients, glows, shadows), never as text: it fails AA contrast on white. */
+  --sv-accent-glow: #22d3ee;
+  --sv-secondary: #0f766e;
+  --sv-success: #15803d;
+  --sv-warning: #b45309;
+  --sv-danger: #dc2626;
 
-  --sv-shadow-sm: 0 1px 2px rgb(36 34 30 / 0.05);
-  --sv-shadow-md: 0 12px 32px rgb(63 55 44 / 0.09);
-  --sv-shadow-lg: 0 24px 64px rgb(63 55 44 / 0.13);
+  --sv-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.06);
+  --sv-shadow-md: 0 12px 32px rgb(16 24 40 / 0.10);
+  --sv-shadow-lg: 0 24px 64px rgb(16 24 40 / 0.14);
   --sv-radius-sm: 0.5rem;
   --sv-radius-md: 0.75rem;
   --sv-radius-lg: 1rem;
@@ -61,30 +70,6 @@
   --sv-ink-faint: var(--sv-text-faint);
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --sv-bg: #191b20;
-  --sv-bg-subtle: #20232a;
-  --sv-surface: #252830;
-  --sv-surface-raised: #2c3039;
-  --sv-surface-muted: #22252c;
-  --sv-text: #f1efe9;
-  --sv-text-muted: #c3c0b8;
-  --sv-text-faint: #95938e;
-  --sv-border: #363a43;
-  --sv-border-strong: #4a4f5a;
-  --sv-accent: #a9b8f3;
-  --sv-accent-soft: #c2ccfb;
-  --sv-accent-subtle: #2b3350;
-  --sv-secondary: #e0a8b8;
-  --sv-success: #82c9a6;
-  --sv-warning: #e1b96f;
-  --sv-danger: #e3949d;
-  --sv-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.18);
-  --sv-shadow-md: 0 14px 36px rgb(0 0 0 / 0.22);
-  --sv-shadow-lg: 0 28px 70px rgb(0 0 0 / 0.3);
-}
-
 @theme inline {
   --color-void: var(--sv-void);
   --color-charcoal: var(--sv-charcoal);
@@ -94,6 +79,7 @@
   --color-border-strong: var(--sv-border-strong);
   --color-violet: var(--sv-violet);
   --color-violet-soft: var(--sv-violet-soft);
+  --color-accent-glow: var(--sv-accent-glow);
   --color-lilac: var(--sv-lilac);
   --color-rose: var(--sv-rose);
   --color-rose-dim: var(--sv-rose-dim);
