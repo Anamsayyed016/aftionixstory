@@ -35,8 +35,7 @@ export function stripPromptQueryFromUrl(): void {
 }
 
 /**
- * Chat shell height accounts for:
- * app header + page title + mode toggle + main padding + mobile nav (pb-24).
+ * Chat shell fills remaining viewport via flex (app layout reserves mobile tab bar).
  * Inner CreateStoryChat uses flex + min-h-0 so the composer stays visible.
  */
 export function NewStoryEntry({
@@ -65,7 +64,7 @@ export function NewStoryEntry({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="shrink-0">
         <ChatModeToggle
           label="Story creation method"
@@ -74,9 +73,9 @@ export function NewStoryEntry({
           onChange={setEntryMode}
         />
       </div>
-      <div className="h-[calc(100dvh-16.5rem)] min-h-[420px] md:h-[calc(100dvh-13.5rem)]">
+      <div className="flex min-h-0 flex-1 flex-col">
         <CreateStoryChat
-          className="h-full min-h-0"
+          className="min-h-0 flex-1"
           initialComposerValue={starterPrompt || undefined}
         />
       </div>

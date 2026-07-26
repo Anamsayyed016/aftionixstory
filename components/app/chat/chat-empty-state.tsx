@@ -32,7 +32,7 @@ export function ChatEmptyState({
           ? { duration: 0 }
           : { duration: 0.35, ease: [0.22, 1, 0.36, 1] }
       }
-      className="flex h-full flex-col items-center justify-center px-4 py-10 text-center"
+      className="flex min-h-0 flex-col items-center justify-center px-4 py-8 text-center sm:py-10"
     >
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-panel-raised text-lilac">
         <Sparkles className="h-5 w-5" aria-hidden />

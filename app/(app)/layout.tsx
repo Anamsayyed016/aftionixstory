@@ -32,11 +32,17 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-void text-ink">
+    <div className="flex h-dvh max-h-dvh overflow-hidden bg-void text-ink">
       <AppSidebar userName={userName} userEmail={userEmail} plan={plan} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppHeader userName={userName} usage={usage} />
-        <main className="flex-1 px-4 pb-24 pt-6 md:px-8 md:pb-8">{children}</main>
+        {/*
+          Mobile: reserve bottom space for fixed tab bar (h-14) + safe area.
+          Use flex fill (not 100dvh calcs) so chat + composer stay on-screen.
+        */}
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] pt-4 md:px-8 md:pb-8 md:pt-6">
+          {children}
+        </main>
         <MobileNavigation />
       </div>
     </div>

@@ -46,3 +46,11 @@ next-env.d.ts
 
 # consent-controlled feedback export (local)
 .data/
+
+# runtime image uploads (keep folder via .gitkeep)
+/public/uploads/images/*
+!/public/uploads/images/.gitkeep
+
+# local screenshot artifacts
+/tmp-screenshots/
+tmp-test.png

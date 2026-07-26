@@ -13,4 +13,5 @@ export {
   extractImagePromptSubject,
   isVagueImagePrompt,
 } from "./freeform-prompt";
-export { saveGeneratedImage } from "./storage";
+export { saveGeneratedImage, ImageStorageError } from "./storage";
+export type { ImageStorageErrorCode } from "./storage";

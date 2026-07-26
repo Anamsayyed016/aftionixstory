@@ -26,12 +26,21 @@ ENV STORYVERSE_BUILD_ID=$STORYVERSE_BUILD_ID
 ENV STORYVERSE_BUILT_AT=$STORYVERSE_BUILT_AT
 
 RUN addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 nextjs
+  && adduser --system --uid 1001 nextjs \
+  && apk add --no-cache su-exec \
+  && mkdir -p /app/public/uploads/images \
+  && chown -R nextjs:nodejs /app/public
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh \
+  && mkdir -p /app/public/uploads/images \
+  && chown -R nextjs:nodejs /app/public
 
-USER nextjs
+# Entrypoint runs as root briefly to chown the uploads volume, then drops to nextjs.
+USER root
 EXPOSE 3000
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

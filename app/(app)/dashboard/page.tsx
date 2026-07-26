@@ -19,8 +19,11 @@ export default async function DashboardPage({
   const prompt = sanitizeStarterPrompt(rawPrompt);
 
   return (
-    <div className="h-[calc(100dvh-11rem)] min-h-[420px] md:h-[calc(100dvh-7rem)]">
-      <CreateStoryChat className="h-full" initialComposerValue={prompt || undefined} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <CreateStoryChat
+        className="min-h-0 flex-1"
+        initialComposerValue={prompt || undefined}
+      />
     </div>
   );
 }

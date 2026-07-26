@@ -896,7 +896,7 @@ export function CreateStoryChat({
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 overflow-hidden rounded-2xl border border-border bg-panel/80 shadow-[0_24px_60px_-40px_rgba(16,24,40,0.18)]",
+        "flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-panel/80 shadow-[0_24px_60px_-40px_rgba(16,24,40,0.18)]",
         className
       )}
     >

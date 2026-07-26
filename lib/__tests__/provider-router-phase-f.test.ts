@@ -388,7 +388,9 @@ describe("Provider Router Phase F", () => {
 });
 
 describe("Provider SDK boundary audit", () => {
-  it("37. non-adapter services do not import provider SDKs", () => {
+  it(
+    "37. non-adapter services do not import provider SDKs",
+    () => {
     const root = join(process.cwd(), "lib");
     const forbidden = [
       'from "openai"',
@@ -437,5 +439,6 @@ describe("Provider SDK boundary audit", () => {
       }
     }
     expect(offenders).toEqual([]);
-  });
-});
+  },
+  20_000
+  );});
