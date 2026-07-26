@@ -42,14 +42,15 @@ describe("Hydration-safe /stories/new params", () => {
     expect(parseNewStoryPageParams(null).mode).toBe("wizard");
   });
 
-  it("page passes server-parsed props into NewStoryEntry", () => {
+  it("page redirects chat mode to the chat home and renders the wizard otherwise", () => {
     const page = readFileSync(
       path.resolve("app/(app)/stories/new/page.tsx"),
       "utf8"
     );
     expect(page).toContain("parseNewStoryPageParams");
-    expect(page).toContain("initialMode={mode}");
-    expect(page).toContain("initialPrompt={prompt}");
+    expect(page).toContain('mode === "chat"');
+    expect(page).toContain("redirect(");
+    expect(page).toContain("StoryWizard");
     expect(page).not.toContain("useSearchParams");
     expect(page).not.toContain("Suspense");
   });

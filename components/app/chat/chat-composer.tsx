@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  forwardRef,
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useRef,
   type KeyboardEvent,
 } from "react";
@@ -26,15 +28,13 @@ type ChatComposerProps = {
   busy?: boolean;
 };
 
-export function ChatComposer({
-  value,
-  onChange,
-  onSend,
-  placeholder,
-  disabled = false,
-  busy = false,
-}: ChatComposerProps) {
+export const ChatComposer = forwardRef<HTMLTextAreaElement, ChatComposerProps>(
+  function ChatComposer(
+    { value, onChange, onSend, placeholder, disabled = false, busy = false },
+    forwardedRef
+  ) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  useImperativeHandle(forwardedRef, () => textareaRef.current as HTMLTextAreaElement, []);
   const labelId = useId();
   const countId = useId();
   const canSend = canSendMessage(value, busy || disabled);
@@ -110,4 +110,6 @@ export function ChatComposer({
       </div>
     </div>
   );
-}
+  }
+);
+ChatComposer.displayName = "ChatComposer";

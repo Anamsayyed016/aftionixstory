@@ -141,7 +141,7 @@ export async function listConversationsAction(
       return fail("VALIDATION_ERROR", "Invalid list request.");
     }
 
-    if (parsed.data.mode === "CONTINUE" && parsed.data.storyId) {
+    if (parsed.data.storyId) {
       await requireStoryOwnership(parsed.data.storyId);
     }
 

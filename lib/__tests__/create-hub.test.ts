@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
   CREATE_CATEGORIES,
   STORY_STARTERS,
-  buildStoryAssistantHref,
   canSubmitCreatePrompt,
   filterStoryStarters,
   sanitizeStarterPrompt,
@@ -13,7 +12,7 @@ import {
 import { parseNewStoryEntryMode } from "@/lib/chat/utils";
 import { parseNewStoryPageParams } from "@/lib/chat/new-story-page-params";
 
-describe("Create hub starters", () => {
+describe("Story starter data", () => {
   it("defaults category list with All first", () => {
     expect(CREATE_CATEGORIES[0]).toBe("All");
   });
@@ -28,18 +27,6 @@ describe("Create hub starters", () => {
 
     const all = filterStoryStarters(STORY_STARTERS, "All");
     expect(all).toHaveLength(STORY_STARTERS.length);
-  });
-
-  it("builds a chat href with encoded prompt and mode=chat", () => {
-    const href = buildStoryAssistantHref(
-      "Help me create a slow-burn romance"
-    );
-    expect(href.startsWith("/stories/new?")).toBe(true);
-    const params = new URLSearchParams(href.split("?")[1]);
-    expect(params.get("mode")).toBe("chat");
-    expect(params.get("prompt")).toBe(
-      "Help me create a slow-burn romance"
-    );
   });
 
   it("blocks empty prompt submit and accepts non-empty", () => {
@@ -67,7 +54,7 @@ describe("Create hub starters", () => {
   });
 });
 
-describe("Create → Story Assistant integration contracts", () => {
+describe("Chat home → routing contracts", () => {
   it("keeps Guided Wizard default when mode is absent", () => {
     expect(parseNewStoryEntryMode(null)).toBe("wizard");
     expect(parseNewStoryEntryMode("chat")).toBe("chat");
@@ -87,42 +74,51 @@ describe("Create → Story Assistant integration contracts", () => {
     );
   });
 
-  it("NewStoryEntry uses server props and strips prompt without soft navigation", () => {
+  it("/create redirects to the chat home, forwarding the prompt", () => {
     const source = readFileSync(
-      path.resolve("components/app/new-story-entry.tsx"),
-      "utf8"
-    );
-    expect(source).toContain("initialMode");
-    expect(source).toContain("initialPrompt");
-    expect(source).toContain("history.replaceState");
-    expect(source).not.toMatch(/\brouter\.replace\b/);
-    expect(source).not.toContain("useSearchParams");
-    expect(source).not.toContain("captureStarterPrompt");
-    expect(source).toContain("stripPromptQueryFromUrl");
-    expect(source).toContain("initialComposerValue");
-    expect(source).toContain("StoryWizard");
-  });
-
-  it("reuses existing app sidebar and does not add media generation", () => {
-    const hub = readFileSync(
-      path.resolve("components/app/create/create-hub.tsx"),
-      "utf8"
-    );
-    const page = readFileSync(
       path.resolve("app/(app)/create/page.tsx"),
       "utf8"
     );
+    expect(source).toContain("redirect(");
+    expect(source).toContain("/dashboard");
+    expect(source).toContain("sanitizeStarterPrompt");
+  });
+
+  it("/stories/new redirects chat mode to the chat home and otherwise renders the wizard", () => {
+    const source = readFileSync(
+      path.resolve("app/(app)/stories/new/page.tsx"),
+      "utf8"
+    );
+    expect(source).toContain('mode === "chat"');
+    expect(source).toContain("redirect(");
+    expect(source).toContain("/dashboard");
+    expect(source).toContain("StoryWizard");
+  });
+
+  it("dashboard is the chat home: no stats fetch, renders the universal chat", () => {
+    const source = readFileSync(
+      path.resolve("app/(app)/dashboard/page.tsx"),
+      "utf8"
+    );
+    expect(source).toContain("CreateStoryChat");
+    expect(source).not.toContain("getDashboardStats");
+  });
+
+  it("sidebar/header/bottom nav no longer link to /create", () => {
     const sidebar = readFileSync(
       path.resolve("components/app/app-sidebar.tsx"),
       "utf8"
     );
-
-    expect(sidebar).toContain('href: "/create"');
-    expect(sidebar).toContain('label: "Create"');
-    expect(page).toContain("CreateHub");
-    expect(hub).not.toMatch(/text to (image|video)/i);
-    expect(hub).not.toMatch(/aspect ratio|camera controls/i);
-    expect(hub).toMatch(/Character visuals and story videos/);
-    expect(hub).not.toMatch(/openai|gemini|getAIProvider/i);
+    const header = readFileSync(
+      path.resolve("components/app/app-header.tsx"),
+      "utf8"
+    );
+    const mobileNav = readFileSync(
+      path.resolve("components/app/mobile-navigation.tsx"),
+      "utf8"
+    );
+    for (const source of [sidebar, header, mobileNav]) {
+      expect(source).not.toContain('href: "/create"');
+    }
   });
 });

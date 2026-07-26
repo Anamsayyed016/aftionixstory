@@ -22,10 +22,18 @@ import { ChatComposer } from "@/components/app/chat/chat-composer";
 import { ChatMessageList } from "@/components/app/chat/chat-message-list";
 import { ChatSidebar } from "@/components/app/chat/chat-sidebar";
 import type { ConversationHistoryItemData } from "@/components/app/chat/conversation-history-item";
+import { QuickActionChips } from "@/components/app/chat/quick-action-chips";
 import { StoryProgress } from "@/components/app/chat/story-progress";
 import { StoryReviewDrawer } from "@/components/app/chat/story-review-drawer";
 import { Button } from "@/components/ui/button";
 import { CREATE_SUGGESTIONS, CHAT_SHELL_COPY } from "@/lib/chat/constants";
+import { CREATE_MODE_SHORTCUTS, STORY_STARTERS } from "@/lib/create/story-starters";
+
+const MORE_IDEAS = STORY_STARTERS.map((starter) => ({
+  id: starter.id,
+  title: starter.title,
+  prompt: starter.prompt,
+}));
 import {
   evaluateStoryCompleteness,
   normalizeChatStoryDraft,
@@ -189,6 +197,7 @@ export function CreateStoryChat({
   const sendingLockRef = useRef(false);
   const createLockRef = useRef(false);
   const archiveLockRef = useRef(false);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const lastFailedPromptRef = useRef<string | null>(null);
   /** Monotonic: bumps on each send; stale restores must not overwrite. */
   const turnSeqRef = useRef(0);
@@ -214,9 +223,15 @@ export function CreateStoryChat({
     conversationId,
   });
 
+  /**
+   * Home chat lists conversations across BOTH modes (mode: "ALL") so the
+   * assistant's history feels unified — one assistant, one memory. CONTINUE
+   * items still open in their story workspace (see openConversation) since
+   * their state shape and save/draft UI are story-specific, not portable here.
+   */
   const refreshHistory = useCallback(async () => {
     const listed = await listConversationsAction({
-      mode: "CREATE",
+      mode: "ALL",
       limit: 20,
     });
     if (listed.success) {
@@ -228,6 +243,8 @@ export function CreateStoryChat({
           storyTitle: c.storyTitle,
           lastMessageAt: c.lastMessageAt,
           lastMessagePreview: c.lastMessagePreview,
+          mode: c.mode,
+          storyId: c.storyId,
         }))
       );
     }
@@ -383,6 +400,15 @@ export function CreateStoryChat({
 
   const openConversation = useCallback(
     async (id: string) => {
+      // Story-scoped (CONTINUE) conversations carry their own draft/save UI
+      // that only exists in the story workspace — send the user there instead
+      // of trying to render an incompatible state shape inline here.
+      const item = history.find((h) => h.id === id);
+      if (item?.mode === "CONTINUE" && item.storyId) {
+        router.push(`/stories/${item.storyId}`);
+        return;
+      }
+
       const restoreVersion = ++restoreSeqRef.current;
       const turnAtStart = turnSeqRef.current;
       setRestoring(true);
@@ -403,7 +429,7 @@ export function CreateStoryChat({
         setRestoring(false);
       }
     },
-    [applyLoadedConversation]
+    [applyLoadedConversation, history, router]
   );
 
   async function startNewConversation() {
@@ -795,6 +821,12 @@ export function CreateStoryChat({
     void sendPrompt(suggestion.prompt);
   }
 
+  /** Quick-action chips prefill + focus the composer — they never auto-send. */
+  function handleQuickActionPrompt(prompt: string) {
+    setDraft(prompt);
+    composerRef.current?.focus();
+  }
+
   function handleRetry() {
     const prompt = lastFailedPromptRef.current;
     if (!prompt || sendingLockRef.current) return;
@@ -1096,8 +1128,19 @@ export function CreateStoryChat({
             ) : null}
           </div>
 
+          {messages.length === 0 && !busy && !restoring ? (
+            <QuickActionChips
+              actions={CREATE_MODE_SHORTCUTS}
+              onSelectPrompt={handleQuickActionPrompt}
+              wizardHref="/stories/new"
+              disabled={composerLocked}
+              moreIdeas={MORE_IDEAS}
+            />
+          ) : null}
+
           <div className="shrink-0 border-t border-border/80 pb-[max(0px,env(safe-area-inset-bottom))]">
             <ChatComposer
+              ref={composerRef}
               value={draft}
               onChange={setDraft}
               onSend={handleSend}
@@ -1127,6 +1170,6 @@ export function CreateStoryChat({
   );
 }
 
-/** Alias for the same universal chat shell (Story Studio + future home assistant). */
+/** Alias for the same universal chat shell — this is the app's home assistant. */
 export const AssistantChat = CreateStoryChat;
 export type AssistantChatProps = CreateStoryChatProps;

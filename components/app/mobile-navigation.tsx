@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Library, Settings, Sparkles } from "lucide-react";
+import { Library, MessageSquare, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { href: "/create", label: "Create", icon: Sparkles },
+  { href: "/dashboard", label: "Chat", icon: MessageSquare },
   { href: "/stories", label: "Stories", icon: Library },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;

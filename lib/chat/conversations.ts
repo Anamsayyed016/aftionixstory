@@ -64,7 +64,7 @@ export async function requireOwnedConversation(
 
 export async function listOwnedConversations(params: {
   userId: string;
-  mode: ConversationMode;
+  mode: ConversationMode | "ALL";
   storyId?: string;
   limit?: number;
   /** Default ACTIVE-only for sidebar history. */
@@ -80,7 +80,7 @@ export async function listOwnedConversations(params: {
   const rows = await prisma.conversation.findMany({
     where: {
       userId: params.userId,
-      mode: params.mode,
+      ...(params.mode === "ALL" ? {} : { mode: params.mode }),
       ...(params.storyId ? { storyId: params.storyId } : {}),
       ...statusWhere,
     },

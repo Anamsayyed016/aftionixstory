@@ -4,10 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BookOpen,
-  LayoutDashboard,
   Library,
+  MessageSquare,
   Settings,
-  Sparkles,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,8 +15,7 @@ import { logoutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/create", label: "Create", icon: Sparkles },
+  { href: "/dashboard", label: "Chat", icon: MessageSquare },
   { href: "/stories", label: "My Stories", icon: Library },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;

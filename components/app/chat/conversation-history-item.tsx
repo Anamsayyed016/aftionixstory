@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, MessageSquare } from "lucide-react";
+import { Archive, BookOpen, MessageSquare } from "lucide-react";
 
 import { formatConversationWhenUtc } from "@/lib/chat/format-conversation-when";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,9 @@ export type ConversationHistoryItemData = {
   storyTitle?: string | null;
   lastMessageAt: string;
   lastMessagePreview: string | null;
+  /** CREATE = opens inline here; CONTINUE = a story-scoped chat, opens in that story's workspace. */
+  mode?: "CREATE" | "CONTINUE";
+  storyId?: string | null;
 };
 
 type ConversationHistoryItemProps = {
@@ -52,7 +55,11 @@ export function ConversationHistoryItem({
         aria-current={active ? "true" : undefined}
       >
         <div className="flex items-center gap-1.5">
-          <MessageSquare className="h-3.5 w-3.5 shrink-0 text-lilac" aria-hidden />
+          {item.mode === "CONTINUE" ? (
+            <BookOpen className="h-3.5 w-3.5 shrink-0 text-rose" aria-hidden />
+          ) : (
+            <MessageSquare className="h-3.5 w-3.5 shrink-0 text-lilac" aria-hidden />
+          )}
           <p className="truncate text-sm font-medium text-ink">
             {item.title || "Untitled conversation"}
           </p>

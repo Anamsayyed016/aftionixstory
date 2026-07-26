@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, BookOpen, LayoutDashboard, Library, Settings, Sparkles } from "lucide-react";
+import { Menu, X, BookOpen, Library, MessageSquare, Settings } from "lucide-react";
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -12,17 +12,15 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/create", label: "Create", icon: Sparkles },
+  { href: "/dashboard", label: "Chat", icon: MessageSquare },
   { href: "/stories", label: "My Stories", icon: Library },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 function titleForPath(pathname: string) {
-  if (pathname.startsWith("/create")) return "Create";
   if (pathname.startsWith("/stories")) return "My Stories";
   if (pathname.startsWith("/settings")) return "Settings";
-  if (pathname.startsWith("/dashboard")) return "Dashboard";
+  if (pathname.startsWith("/dashboard")) return "Chat";
   return "Workspace";
 }
 

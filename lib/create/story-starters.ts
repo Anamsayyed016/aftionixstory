@@ -304,15 +304,6 @@ export function sanitizeStarterPrompt(
   return decoded.replace(/\u0000/g, "").trim().slice(0, CREATE_PROMPT_MAX_CHARS);
 }
 
-export function buildStoryAssistantHref(prompt: string): string {
-  const cleaned = sanitizeStarterPrompt(prompt);
-  const params = new URLSearchParams({ mode: "chat" });
-  if (cleaned) {
-    params.set("prompt", cleaned);
-  }
-  return `/stories/new?${params.toString()}`;
-}
-
 export function canSubmitCreatePrompt(value: string): boolean {
   const trimmed = value.trim();
   return trimmed.length > 0 && trimmed.length <= CREATE_PROMPT_MAX_CHARS;

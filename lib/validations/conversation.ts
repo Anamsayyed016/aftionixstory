@@ -33,7 +33,7 @@ export const conversationIdSchema = z.object({
 });
 
 export const listConversationsSchema = z.object({
-  mode: conversationModeSchema,
+  mode: z.enum(["CREATE", "CONTINUE", "ALL"]),
   storyId: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
 });

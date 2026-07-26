@@ -1,12 +1,16 @@
 import Link from "next/link";
-import { Library, Plus } from "lucide-react";
+import { ArrowRight, Library, Plus } from "lucide-react";
 import type { StoryStatus } from "@prisma/client";
 
 import { requireUser } from "@/lib/auth/session";
 import { listUserStories } from "@/lib/data/stories";
+import { getDashboardStats } from "@/lib/data/dashboard";
 import { EmptyState } from "@/components/app/empty-state";
 import { StoryCard } from "@/components/app/story-card";
+import { StoryStatusBadge } from "@/components/app/story-badges";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/ui/glass-card";
 
 export default async function StoriesPage({
   searchParams,
@@ -24,12 +28,20 @@ export default async function StoriesPage({
       ? (statusParam as StoryStatus | "ALL")
       : "ALL";
 
-  const result = await listUserStories(user.id, {
-    q: params.q,
-    status,
-    genre: params.genre,
-    page: params.page ? Number(params.page) : 1,
-  });
+  const [result, stats] = await Promise.all([
+    listUserStories(user.id, {
+      q: params.q,
+      status,
+      genre: params.genre,
+      page: params.page ? Number(params.page) : 1,
+    }),
+    getDashboardStats(user.id),
+  ]);
+  const currentProject = stats.recentStories[0];
+  const goalProgress = Math.min(
+    100,
+    Math.round((stats.monthlyGenerations / Math.max(1, stats.generationLimit)) * 100)
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -45,13 +57,58 @@ export default async function StoriesPage({
             {result.total} stor{result.total === 1 ? "y" : "ies"} in your workspace.
           </p>
         </div>
-        <Link href="/create">
+        <Link href="/dashboard">
           <Button>
             <Plus className="h-4 w-4" />
             Create Story
           </Button>
         </Link>
       </div>
+
+      <section className="grid gap-4 sm:grid-cols-3">
+        {currentProject ? (
+          <GlassCard hover className="sm:col-span-2 flex flex-col justify-between p-5">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <StoryStatusBadge status={currentProject.status} />
+                <Badge variant="outline">{currentProject.genre}</Badge>
+              </div>
+              <p className="mt-3 font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                Continue writing
+              </p>
+              <h3 className="mt-1 font-display text-xl font-semibold text-ink">
+                {currentProject.title}
+              </h3>
+            </div>
+            <Link
+              href={`/stories/${currentProject.id}`}
+              className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-violet hover:underline"
+            >
+              Open workspace <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </GlassCard>
+        ) : (
+          <div className="sm:col-span-2" />
+        )}
+        <GlassCard className="p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+            This month
+          </p>
+          <p className="mt-2 font-display text-3xl text-ink">
+            {stats.monthlyGenerations}
+            <span className="text-base text-ink-faint">/{stats.generationLimit}</span>
+          </p>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-charcoal">
+            <div
+              className="h-full rounded-full bg-violet transition-[width] duration-500"
+              style={{ width: `${goalProgress}%` }}
+            />
+          </div>
+          <p className="mt-3 font-mono text-[10px] text-ink-faint">
+            {stats.totalStories} stories · {stats.totalCharacters} characters
+          </p>
+        </GlassCard>
+      </section>
 
       <form className="flex flex-col gap-3 rounded-xl border border-border bg-panel/40 p-4 sm:flex-row">
         <input
@@ -86,7 +143,7 @@ export default async function StoriesPage({
           icon={Library}
           title="No stories yet"
           description="Create your first story with characters, relationships, and writing rules. AI episodes come later."
-          actionHref="/create"
+          actionHref="/dashboard"
           actionLabel="Create Story"
         />
       ) : (
