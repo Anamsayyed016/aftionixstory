@@ -19,6 +19,7 @@ import {
 } from "@/app/actions/conversations";
 import { createStoryAction } from "@/app/actions/stories";
 import { ChatComposer } from "@/components/app/chat/chat-composer";
+import { ChatErrorBoundary } from "@/components/app/chat/chat-error-boundary";
 import { ChatMessageList } from "@/components/app/chat/chat-message-list";
 import { ChatSidebar } from "@/components/app/chat/chat-sidebar";
 import type { ConversationHistoryItemData } from "@/components/app/chat/conversation-history-item";
@@ -894,9 +895,12 @@ export function CreateStoryChat({
   }
 
   return (
+    <ChatErrorBoundary label="create-story-chat">
     <div
       className={cn(
-        "flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-panel/80 shadow-[0_24px_60px_-40px_rgba(16,24,40,0.18)]",
+        // Row layout: conversation sidebar | main chat. Must NOT be flex-col —
+        // the sidebar uses h-full and would consume 100% height, collapsing the chat to 0.
+        "flex h-full min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-panel/80 shadow-[0_24px_60px_-40px_rgba(16,24,40,0.18)]",
         className
       )}
     >
@@ -1185,6 +1189,7 @@ export function CreateStoryChat({
         />
       ) : null}
     </div>
+    </ChatErrorBoundary>
   );
 }
 
