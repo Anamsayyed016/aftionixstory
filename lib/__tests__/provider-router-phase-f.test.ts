@@ -400,6 +400,7 @@ describe("Provider SDK boundary audit", () => {
       join(root, "ai", "providers"),
       join(root, "provider-router", "adapters"),
       join(root, "ai", "health.ts"), // health probe may touch SDKs for live checks
+      join(root, "image-agent"), // standalone image generation, intentionally outside Provider Router v2
     ];
 
     function walk(dir: string, files: string[] = []) {

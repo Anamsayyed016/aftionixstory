@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { requireUser } from "@/lib/auth/session";
 import { getOwnedStoryDetail } from "@/lib/data/stories";
+import { isImageGenerationEnabled } from "@/lib/image-agent";
 import { CharactersManager } from "./characters-manager";
 
 export default async function StoryCharactersPage({
@@ -32,6 +33,7 @@ export default async function StoryCharactersPage({
       </div>
       <CharactersManager
         storyId={story.id}
+        imageGenerationEnabled={isImageGenerationEnabled()}
         initialCharacters={story.characters.map((c) => ({
           id: c.id,
           name: c.name,
@@ -45,6 +47,7 @@ export default async function StoryCharactersPage({
           secrets: c.secrets,
           emotionalState: c.emotionalState,
           status: c.status,
+          avatarUrl: c.avatarUrl,
           _count: c._count,
         }))}
         initialRelationships={story.relationships}

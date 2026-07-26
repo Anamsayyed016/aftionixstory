@@ -44,6 +44,8 @@ services:
       AUTH_TRUST_HOST: "true"
       STORYVERSE_BUILD_ID: ${STORYVERSE_BUILD_ID:-unknown}
       STORYVERSE_BUILT_AT: ${STORYVERSE_BUILT_AT:-}
+    volumes:
+      - storyverse_uploads:/app/public/uploads
     healthcheck:
       test:
         [
@@ -80,6 +82,8 @@ services:
       AUTH_TRUST_HOST: "true"
       STORYVERSE_BUILD_ID: ${STORYVERSE_BUILD_ID:-unknown}
       STORYVERSE_BUILT_AT: ${STORYVERSE_BUILT_AT:-}
+    volumes:
+      - storyverse_uploads:/app/public/uploads
     healthcheck:
       test:
         [
@@ -95,3 +99,4 @@ services:
 
 volumes:
   storyverse_pgdata:
+  storyverse_uploads:

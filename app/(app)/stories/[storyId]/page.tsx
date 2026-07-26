@@ -4,7 +4,9 @@ import { Users } from "lucide-react";
 
 import { requireUser } from "@/lib/auth/session";
 import { getOwnedStoryDetail } from "@/lib/data/stories";
+import { isImageGenerationEnabled } from "@/lib/image-agent";
 import { StoryWorkspaceClient } from "@/components/app/story-workspace";
+import { StoryCover } from "@/components/app/story-cover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,18 +30,23 @@ export default async function StoryWorkspacePage({
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <StoryStatusBadge status={story.status} />
-            <StoryVisibilityBadge visibility={story.visibility} />
-            <Badge variant="outline">{story.genre}</Badge>
+        <div className="flex gap-4">
+          {isImageGenerationEnabled() && (
+            <StoryCover storyId={story.id} initialCoverImageUrl={story.coverImageUrl} />
+          )}
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StoryStatusBadge status={story.status} />
+              <StoryVisibilityBadge visibility={story.visibility} />
+              <Badge variant="outline">{story.genre}</Badge>
+            </div>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+              {story.title}
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm text-ink-dim">
+              {story.description || "No description yet."}
+            </p>
           </div>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-            {story.title}
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-ink-dim">
-            {story.description || "No description yet."}
-          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/stories/${story.id}/edit`}>

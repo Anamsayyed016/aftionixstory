@@ -31,6 +31,7 @@ type CharacterRow = {
   secrets: string | null;
   emotionalState: string | null;
   status: string;
+  avatarUrl: string | null;
   _count: { outgoingRelationships: number; incomingRelationships: number };
 };
 
@@ -48,15 +49,50 @@ const fieldClass =
 
 export function CharactersManager({
   storyId,
+  imageGenerationEnabled,
   initialCharacters,
   initialRelationships,
 }: {
   storyId: string;
+  imageGenerationEnabled: boolean;
   initialCharacters: CharacterRow[];
   initialRelationships: RelRow[];
 }) {
   const router = useRouter();
   const [q, setQ] = React.useState("");
+  const [avatarUrls, setAvatarUrls] = React.useState<Record<string, string | null>>(
+    () => Object.fromEntries(initialCharacters.map((c) => [c.id, c.avatarUrl]))
+  );
+  const [generatingAvatarId, setGeneratingAvatarId] = React.useState<string | null>(null);
+  const [avatarError, setAvatarError] = React.useState<Record<string, string>>({});
+
+  async function generateAvatar(characterId: string) {
+    setGeneratingAvatarId(characterId);
+    setAvatarError((e) => ({ ...e, [characterId]: "" }));
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ characterId }),
+      });
+      const data = (await res.json()) as { imageUrl?: string; error?: string };
+      if (!res.ok || !data.imageUrl) {
+        setAvatarError((e) => ({
+          ...e,
+          [characterId]: data.error || "Couldn't generate an avatar. Please try again.",
+        }));
+        return;
+      }
+      setAvatarUrls((m) => ({ ...m, [characterId]: data.imageUrl as string }));
+    } catch {
+      setAvatarError((e) => ({
+        ...e,
+        [characterId]: "Couldn't generate an avatar. Please try again.",
+      }));
+    } finally {
+      setGeneratingAvatarId(null);
+    }
+  }
   const [status, setStatus] = React.useState<"ALL" | "ACTIVE" | "ARCHIVED">("ACTIVE");
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -264,11 +300,29 @@ export function CharactersManager({
         {filtered.map((c) => (
           <GlassCard key={c.id} className="p-5">
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="font-display text-xl text-ink">{c.name}</h3>
-                <p className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-                  {c.role}
-                </p>
+              <div className="flex items-center gap-3">
+                {imageGenerationEnabled && (
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-border bg-charcoal">
+                    {avatarUrls[c.id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatarUrls[c.id] as string}
+                        alt={`${c.name} avatar`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center font-mono text-[10px] text-ink-faint">
+                        No avatar
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-display text-xl text-ink">{c.name}</h3>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                    {c.role}
+                  </p>
+                </div>
               </div>
               <Badge variant={c.status === "ACTIVE" ? "success" : "outline"}>
                 {c.status}
@@ -279,10 +333,24 @@ export function CharactersManager({
               {c._count.outgoingRelationships + c._count.incomingRelationships}{" "}
               relationships
             </p>
+            {avatarError[c.id] && (
+              <p className="mt-2 text-xs text-danger">{avatarError[c.id]}</p>
+            )}
             <div className="mt-4 flex flex-wrap gap-2">
               <Button type="button" size="sm" variant="secondary" onClick={() => openEdit(c)}>
                 Edit
               </Button>
+              {imageGenerationEnabled && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  loading={generatingAvatarId === c.id}
+                  onClick={() => generateAvatar(c.id)}
+                >
+                  {avatarUrls[c.id] ? "Regenerate avatar" : "Generate avatar"}
+                </Button>
+              )}
               {c.status === "ACTIVE" && (
                 <Button
                   type="button"

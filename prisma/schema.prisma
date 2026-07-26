@@ -38,6 +38,8 @@ enum GenerationAction {
   MORE_ROMANTIC
   MORE_EMOTIONAL
   ADD_COMEDY
+  GENERATE_AVATAR
+  GENERATE_COVER
 }
 
 enum GenerationStatus {
@@ -154,6 +156,7 @@ model Story {
   worldRules         String?         @db.Text
   contentBoundaries  String?         @db.Text
   currentSummary     String?         @db.Text
+  coverImageUrl      String?
   status             StoryStatus     @default(DRAFT)
   totalEpisodes      Int             @default(0)
   createdAt          DateTime        @default(now())
@@ -224,6 +227,7 @@ model Character {
   speakingStyle  String?         @db.Text
   secrets        String?         @db.Text
   emotionalState String?         @db.Text
+  avatarUrl      String?
   status         CharacterStatus @default(ACTIVE)
   sortOrder      Int             @default(0)
   createdAt      DateTime        @default(now())
@@ -232,6 +236,7 @@ model Character {
   story                 Story                   @relation(fields: [storyId], references: [id], onDelete: Cascade)
   outgoingRelationships CharacterRelationship[] @relation("RelationshipSource")
   incomingRelationships CharacterRelationship[] @relation("RelationshipTarget")
+  generationLogs        GenerationLog[]
 
   @@index([storyId])
   @@index([status])
@@ -327,6 +332,7 @@ model GenerationLog {
   userId                String
   storyId               String
   episodeId             String?
+  characterId           String?
   provider              String
   model                 String
   action                GenerationAction
@@ -340,14 +346,16 @@ model GenerationLog {
   requestId             String
   createdAt             DateTime         @default(now())
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  story   Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  episode Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  story     Story      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  episode   Episode?   @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
 
   @@unique([userId, requestId])
   @@index([userId])
   @@index([storyId])
   @@index([episodeId])
+  @@index([characterId])
   @@index([createdAt])
   @@index([success])
   @@index([requestId])
