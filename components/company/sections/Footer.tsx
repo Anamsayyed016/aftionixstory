@@ -2,10 +2,17 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/company/ui/Container";
 import { SITE, FOOTER_LINKS } from "@/constants/company/site";
-import { GithubIcon, LinkedinIcon, InstagramIcon } from "@/components/company/ui/SocialIcons";
+import { GithubIcon, LinkedinIcon, InstagramIcon, WhatsAppIcon } from "@/components/company/ui/SocialIcons";
 
 export function Footer() {
   const year = new Date().getFullYear();
+
+  const socialLinks = [
+    { icon: LinkedinIcon, href: SITE.socials.linkedin, label: "LinkedIn" },
+    { icon: GithubIcon, href: SITE.socials.github, label: "GitHub" },
+    { icon: InstagramIcon, href: SITE.socials.instagram, label: "Instagram" },
+    { icon: WhatsAppIcon, href: SITE.socials.whatsapp, label: "WhatsApp" },
+  ] as const;
 
   return (
     <footer className="relative border-t border-border bg-canvas-soft">
@@ -27,18 +34,14 @@ export function Footer() {
               custom software, SaaS, and AI products.
             </p>
             <div className="mt-6 flex items-center gap-3">
-              {[
-                { icon: LinkedinIcon, href: SITE.socials.linkedin, label: "LinkedIn" },
-                { icon: GithubIcon, href: SITE.socials.github, label: "GitHub" },
-                { icon: InstagramIcon, href: SITE.socials.instagram, label: "Instagram" },
-              ].map(({ icon: Icon, href, label }) => (
+              {socialLinks.map(({ icon: Icon, href, label }) => (
                 <a
                   key={label}
                   href={href}
                   aria-label={label}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex size-9 items-center justify-center rounded-full border border-border-strong text-ink-soft transition-colors hover:border-primary/40 hover:text-primary"
+                  className="flex size-9 items-center justify-center rounded-[var(--radius-sm)] border border-border-strong bg-white/80 text-ink-soft shadow-[var(--shadow-soft)] transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary hover:shadow-[var(--shadow-lifted)]"
                 >
                   <Icon className="size-4" />
                 </a>

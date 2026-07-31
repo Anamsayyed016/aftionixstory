@@ -7,11 +7,14 @@ export const SITE = {
   description:
     "AFTIONIX is a premium software development agency building custom software, SaaS platforms, AI solutions, and high-converting AI advertisement content for startups, healthcare companies, and enterprises.",
   email: "hello@aftionix.tech",
-  whatsapp: "https://wa.me/910000000000",
+  whatsapp:
+    "https://wa.me/918107738186?text=Hi%2C%20I%27d%20like%20to%20discuss%20a%20project",
   socials: {
-    linkedin: "https://linkedin.com/company/aftionix",
-    github: "https://github.com/aftionix",
-    instagram: "https://instagram.com/aftionix",
+    linkedin: "https://www.linkedin.com/in/sayyedanam/",
+    github: "https://github.com/Anamsayyed016",
+    instagram: "https://www.instagram.com/anam_sayyed_16/",
+    whatsapp:
+      "https://wa.me/918107738186?text=Hi%2C%20I%27d%20like%20to%20discuss%20a%20project",
   },
 } as const;
 

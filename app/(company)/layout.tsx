@@ -4,6 +4,7 @@ import "@fontsource/space-grotesk/600.css";
 import "@fontsource/space-grotesk/700.css";
 import { Header } from "@/components/company/sections/Header";
 import { Footer } from "@/components/company/sections/Footer";
+import { WhatsAppFloat } from "@/components/company/ui/WhatsAppFloat";
 import { SITE } from "@/constants/company/site";
 
 export const metadata: Metadata = {
@@ -41,7 +42,12 @@ const organizationSchema = {
   },
   url: SITE.url,
   description: SITE.description,
-  sameAs: [SITE.socials.linkedin, SITE.socials.github, SITE.socials.instagram],
+  sameAs: [
+    SITE.socials.linkedin,
+    SITE.socials.github,
+    SITE.socials.instagram,
+    SITE.socials.whatsapp,
+  ],
 };
 
 export default function CompanyLayout({
@@ -62,6 +68,7 @@ export default function CompanyLayout({
         {children}
       </main>
       <Footer />
+      <WhatsAppFloat />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}

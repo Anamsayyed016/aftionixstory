@@ -24,7 +24,12 @@ export default function ContactPage() {
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Button href={`mailto:${SITE.email}`}>Email {SITE.email}</Button>
-          <Button href={SITE.whatsapp} variant="secondary">
+          <Button
+            href={SITE.whatsapp}
+            variant="secondary"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             WhatsApp
           </Button>
           <Button href="/studio" variant="ghost">
