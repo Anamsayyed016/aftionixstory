@@ -26,6 +26,11 @@ export {
   mirrorUserLanguageStyle,
 } from "@/lib/universal-router/language-mirror";
 
+export {
+  buildMessageWithAttachedImage,
+  isBareImageShareMessage,
+} from "@/lib/universal-router/attached-image";
+
 export function isUniversalRouterEnabled(): boolean {
   const raw = (process.env.AI_UNIVERSAL_ROUTER_ENABLED || "true")
     .trim()

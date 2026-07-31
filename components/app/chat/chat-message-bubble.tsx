@@ -9,20 +9,28 @@ import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/chat/types";
 
 function MessageImage({ src, isUser }: { src: string; isUser: boolean }) {
-  const [loaded, setLoaded] = React.useState(false);
+  const [status, setStatus] = React.useState<"loading" | "ready" | "error">(
+    "loading"
+  );
   return (
     <div className="relative mt-2 aspect-square w-full max-w-[280px] overflow-hidden rounded-xl border border-border/60 bg-charcoal/60">
-      {!loaded ? (
+      {status === "loading" ? (
         <div className="absolute inset-0 animate-pulse bg-panel-raised/60" aria-hidden />
+      ) : null}
+      {status === "error" ? (
+        <div className="absolute inset-0 flex items-center justify-center px-3 text-center text-[11px] text-ink-faint">
+          Image couldn’t load
+        </div>
       ) : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt={isUser ? "Attached image" : "Generated image"}
-        onLoad={() => setLoaded(true)}
+        onLoad={() => setStatus("ready")}
+        onError={() => setStatus("error")}
         className={cn(
-          "h-full w-full object-cover transition-opacity duration-300",
-          loaded ? "opacity-100" : "opacity-0"
+          "h-full w-full object-contain transition-opacity duration-300",
+          status === "ready" ? "opacity-100" : "opacity-0"
         )}
       />
     </div>

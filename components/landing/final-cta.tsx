@@ -25,14 +25,15 @@ export function FinalCta() {
           transition={{ duration: 0.5 }}
         >
           <h2 className="mx-auto max-w-2xl font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-            Your next episode is one instruction away.
+            Ready when you are.
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-ink-dim">
-            Start free. No credit card, no character limit, no forgetting.
+            Start free with Story Studio and the universal assistant. Directory
+            and Jobs when they&apos;re ready — not before.
           </p>
           <Link href="/sign-up">
             <Button size="lg" className="group mt-8">
-              Start Your Story
+              Get Started
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Button>
           </Link>

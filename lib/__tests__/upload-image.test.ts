@@ -77,7 +77,7 @@ describe("saveGeneratedImage", () => {
       entityId: "user_1",
       extension: "png",
     });
-    expect(url).toMatch(/^\/uploads\/images\/upload-user_1-\d+\.png$/);
+    expect(url).toMatch(/^\/api\/media\/upload-user_1-\d+\.png$/);
   });
 
   it("throws STORAGE_* when directory is not writable", async () => {

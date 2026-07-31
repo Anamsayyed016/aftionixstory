@@ -8,6 +8,15 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  // Legacy URLs stored in message metadata before /api/media serving.
+  async rewrites() {
+    return [
+      {
+        source: "/uploads/images/:filename",
+        destination: "/api/media/:filename",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

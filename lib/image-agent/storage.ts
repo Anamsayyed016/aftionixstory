@@ -128,5 +128,7 @@ export async function saveGeneratedImage(params: {
     );
   }
 
-  return `/uploads/images/${filename}`;
+  // Served by /api/media/[filename] so Docker volume / standalone runtime
+  // writes are always reachable (static public/ serving is unreliable here).
+  return `/api/media/${filename}`;
 }

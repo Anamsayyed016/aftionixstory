@@ -35,6 +35,8 @@ export type ClassifyUniversalInput = {
   recentAssistantQuestion?: string | null;
   /** When false, skip LLM and use deterministic/fallback only (tests). */
   allowLlm?: boolean;
+  /** User attached an image this turn (upload). */
+  hasAttachedImage?: boolean;
 };
 
 function norm(text: string): string {
@@ -86,6 +88,20 @@ export function classifyUniversalIntentDeterministic(
   }
   const lower = text.toLowerCase();
   const awaiting = isAwaitingSlot(input.conversationFlow);
+
+  // Image-only upload must not be force-fit into a story slot answer.
+  if (
+    input.hasAttachedImage &&
+    (/^shared an image\.?$/i.test(text) || /^i shared an image/i.test(text))
+  ) {
+    return decision(
+      "general_question",
+      0.93,
+      "deterministic",
+      "attached_image_share",
+      ["attached_image"]
+    );
+  }
   const awaitingImagePrompt =
     input.conversationFlow?.awaiting.topic === "image_prompt";
 

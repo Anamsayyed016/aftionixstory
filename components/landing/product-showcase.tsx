@@ -59,7 +59,7 @@ export function ProductShowcase() {
       <Container>
         <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
           <div className="max-w-xl">
-            <SectionEyebrow>Inside the Workspace</SectionEyebrow>
+            <SectionEyebrow>Inside Story Studio</SectionEyebrow>
             <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
               One story, three layers underneath it
             </h2>

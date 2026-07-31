@@ -3,14 +3,20 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AFTIONIX Studio — AI writing, made memorable.",
+  title: "AFTIONIX Studio — One assistant. Stories, answers, and what's next.",
   description:
-    "A premium AI writing studio for long-form stories, scripts, characters, and worlds that stay in context.",
-  keywords: ["AI writing", "screenplay", "storytelling", "character development", "writing studio"],
+    "An AI platform for writing stories with memory, getting answers, and — soon — listing businesses and finding jobs.",
+  keywords: [
+    "AI assistant",
+    "AI writing",
+    "story studio",
+    "character memory",
+    "AFTIONIX",
+  ],
   openGraph: {
-    title: "AFTIONIX Studio — AI writing, made memorable.",
+    title: "AFTIONIX Studio — One assistant. Stories, answers, and what's next.",
     description:
-      "A premium AI writing studio for long-form stories, scripts, characters, and worlds that stay in context.",
+      "Write fiction that remembers, ask questions, get coding help — all in one place. Directory and Jobs coming soon.",
     type: "website",
   },
 };
@@ -19,10 +25,10 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "AFTIONIX Studio",
-  applicationCategory: "CreativeWork",
+  applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   description:
-    "An AI writing studio for stories, scripts, characters, and worlds with persistent creative context.",
+    "An AI platform for writing stories with memory, getting answers, and upcoming business directory and jobs.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -50,6 +50,7 @@ import {
   runGeneralAiTurn,
 } from "@/lib/universal-router";
 import type { UniversalRouteDecision } from "@/lib/universal-router/intents";
+import { buildMessageWithAttachedImage } from "@/lib/universal-router/attached-image";
 import {
   extractImagePromptSubject,
   friendlyImageErrorMessage,
@@ -346,6 +347,15 @@ export async function runStoryAgentTurn(
     previous: readCanonicalStoryContext(stateSource),
   });
 
+  // Persist the user's typed content, but enrich what we send to models when
+  // an image was attached (otherwise "Shared an image" is treated as story text).
+  const messageForAi = attachedImageUrl
+    ? buildMessageWithAttachedImage({
+        message,
+        imageUrl: attachedImageUrl,
+      })
+    : message;
+
   let universalDecision: UniversalRouteDecision | null = null;
   if (isUniversalRouterEnabled()) {
     const recentAssistantQuestion = [...recent]
@@ -356,6 +366,7 @@ export async function runStoryAgentTurn(
       userMessage: message,
       conversationFlow,
       recentAssistantQuestion,
+      hasAttachedImage: Boolean(attachedImageUrl),
     });
   }
 
@@ -505,7 +516,7 @@ export async function runStoryAgentTurn(
     try {
       turnState = "PROCESSING";
       const general = await runGeneralAiTurn({
-        userMessage: message,
+        userMessage: messageForAi,
         intent: universalDecision.intent,
         enableWebSearch: universalDecision.enableWebSearch,
         turnRequestId,
@@ -641,7 +652,7 @@ export async function runStoryAgentTurn(
       conversationId,
       storyId: conversation.storyId,
       memory,
-      userMessage: message,
+      userMessage: messageForAi,
       recentMessages: recent,
       turnRequestId,
       conversationFlow,

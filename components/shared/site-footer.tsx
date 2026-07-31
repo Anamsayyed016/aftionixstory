@@ -1,18 +1,17 @@
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { SITE } from "@/lib/constants";
 
 const FOOTER_LINKS = {
   Product: [
+    { label: "Story Studio", href: "#story-studio" },
     { label: "Features", href: "#features" },
-    { label: "How It Works", href: "#how-it-works" },
+    { label: "How it works", href: "#how-it-works" },
     { label: "Pricing", href: "#pricing" },
   ],
-  Company: [
-    { label: "About", href: "#" },
-    { label: "Blog", href: "#" },
-    { label: "Careers", href: "#" },
+  "Coming soon": [
+    { label: "Business Directory", href: "#coming-soon" },
+    { label: "Jobs", href: "#coming-soon" },
   ],
   Legal: [
     { label: "Privacy", href: "#" },
@@ -27,10 +26,13 @@ export function SiteFooter() {
       <Container className="py-16">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
           <div className="col-span-2">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-violet to-lilac text-white">
-                <BookOpen className="h-4 w-4" />
-              </span>
+            <Link href="/" className="flex items-center gap-2.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/aftionix-logo.jpg"
+                alt="AFTIONIX"
+                className="h-8 w-8 shrink-0 rounded-md object-cover ring-1 ring-border"
+              />
               <span className="font-display text-lg font-semibold text-ink">
                 {SITE.name}
               </span>
@@ -63,7 +65,7 @@ export function SiteFooter() {
 
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 text-xs text-ink-faint sm:flex-row">
           <p>© {new Date().getFullYear()} {SITE.name}. All rights reserved.</p>
-          <p className="font-mono">Made for stories that don&apos;t forget.</p>
+          <p className="font-mono">{SITE.tagline}</p>
         </div>
       </Container>
     </footer>
