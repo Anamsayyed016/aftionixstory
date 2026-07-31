@@ -1,0 +1,51 @@
+import Link from "next/link";
+
+import { requireUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
+import { BusinessProfileForm } from "@/components/app/marketplace/business-profile-form";
+
+export const dynamic = "force-dynamic";
+
+export default async function BusinessFormPage() {
+  const user = await requireUser();
+  const existing = await prisma.business.findFirst({
+    where: { ownerUserId: user.id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return (
+    <div className="mx-auto w-full max-w-2xl space-y-4 overflow-y-auto pb-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs text-violet-soft">Business Directory</p>
+          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
+            {existing ? "Edit business listing" : "List your business"}
+          </h1>
+          <p className="mt-1 max-w-xl text-sm text-ink-dim">
+            Structured form — same fields the chat assistant saves.
+          </p>
+        </div>
+        <Link
+          href="/dashboard?prompt=List%20my%20business%20on%20the%20directory"
+          className="text-sm text-lilac hover:underline"
+        >
+          Prefer to chat instead?
+        </Link>
+      </div>
+      <BusinessProfileForm
+        defaults={
+          existing
+            ? {
+                name: existing.name,
+                category: existing.category || undefined,
+                location: existing.location || undefined,
+                contactEmail: existing.contactEmail || undefined,
+                contactPhone: existing.contactPhone || undefined,
+                summary: existing.summary || undefined,
+              }
+            : { contactEmail: user.email || undefined }
+        }
+      />
+    </div>
+  );
+}

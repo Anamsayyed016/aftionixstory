@@ -69,6 +69,17 @@ export default async function ConnectPage() {
 
       <section className="space-y-3 rounded-xl border border-border bg-panel/40 p-5">
         <h2 className="font-display text-lg font-semibold">Your profiles</h2>
+        <div className="mb-2 flex flex-wrap gap-3 text-sm">
+          <Link href="/connect/business" className="text-violet-soft hover:underline">
+            Business form
+          </Link>
+          <Link href="/connect/freelancer" className="text-violet-soft hover:underline">
+            Freelancer form
+          </Link>
+          <Link href="/connect/gig" className="text-violet-soft hover:underline">
+            Post a gig (form)
+          </Link>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-border p-4">
             <p className="text-xs uppercase tracking-wider text-ink-faint">
@@ -86,7 +97,11 @@ export default async function ConnectPage() {
               </>
             ) : (
               <p className="mt-2 text-sm text-ink-dim">
-                None yet — in chat: “List my business…”
+                None yet —{" "}
+                <Link href="/connect/business" className="text-violet-soft hover:underline">
+                  use the form
+                </Link>{" "}
+                or chat: “List my business…”
               </p>
             )}
           </div>
@@ -108,7 +123,11 @@ export default async function ConnectPage() {
               </>
             ) : (
               <p className="mt-2 text-sm text-ink-dim">
-                None yet — in chat: “Find gig work…”
+                None yet —{" "}
+                <Link href="/connect/freelancer" className="text-violet-soft hover:underline">
+                  use the form
+                </Link>{" "}
+                or chat: “Find gig work…”
               </p>
             )}
           </div>

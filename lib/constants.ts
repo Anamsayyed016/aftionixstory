@@ -16,21 +16,21 @@ export const PRODUCT_LINKS = [
     id: "story-studio",
     label: "Story Studio",
     description: "Write & continue stories with lasting memory",
-    href: "#story-studio",
+    href: "/dashboard",
     status: "live" as const,
   },
   {
     id: "business-directory",
     label: "Business Directory",
     description: "List and discover local businesses",
-    href: "#business-directory",
+    href: "/connect/business",
     status: "live" as const,
   },
   {
     id: "freelancer-connect",
     label: "Freelancer Connect",
     description: "Match businesses with freelancers for gigs",
-    href: "#freelancer-connect",
+    href: "/connect",
     status: "live" as const,
   },
 ] as const;
@@ -117,12 +117,14 @@ export const FEATURE_GROUPS = [
         title: "List in chat",
         description:
           "Describe your business once — name, summary, location, and contact — and publish a /b/ page.",
+        href: "/dashboard?prompt=" + encodeURIComponent("List my business on the directory"),
       },
       {
         id: "shopfront",
         title: "Public shopfront",
         description:
           "Owner-chosen email and phone appear on your listing so customers can reach you.",
+        href: "/connect/business",
       },
     ],
   },
@@ -139,18 +141,27 @@ export const FEATURE_GROUPS = [
         title: "Post a gig",
         description:
           "Need a logo or a day of deliveries? Describe the task in chat and match to freelancers.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent("I need someone for a logo design gig"),
       },
       {
         id: "freelancer",
         title: "Freelancer profiles",
         description:
           "Skills, availability, and portfolio on a public /f/ page — contact stays private until matched.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent(
+            "I'm looking for gig work. Help me set up my freelancer profile with skills and availability."
+          ),
       },
       {
         id: "connect",
         title: "Mutual connect",
         description:
           "Express interest, accept on both sides, then see contact info. No escrow or payments yet.",
+        href: "/connect",
       },
     ],
   },

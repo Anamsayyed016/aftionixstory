@@ -1,7 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/db";
-import { allocateBusinessSlug } from "@/lib/marketplace/slugs";
+import { saveBusinessProfile } from "@/lib/marketplace/mutations";
+import { businessProfileSchema } from "@/lib/marketplace/schemas";
 import {
   draftHasAnyField,
   extractBusinessDraft,
@@ -29,46 +30,22 @@ export async function upsertBusinessFromDraft(input: {
     throw new Error("Business name is required to save");
   }
 
-  const existing = await prisma.business.findFirst({
-    where: { ownerUserId: input.userId },
-    orderBy: { createdAt: "asc" },
+  const parsed = businessProfileSchema.safeParse({
+    name: input.draft.name,
+    category: input.draft.category,
+    location: input.draft.location,
+    contactEmail: input.draft.contactEmail || "",
+    contactPhone: input.draft.contactPhone,
+    summary: input.draft.summary,
   });
-
-  const name = input.draft.name.trim();
-  const contactEmail =
-    input.draft.contactEmail?.trim() ||
-    existing?.contactEmail ||
-    input.fallbackEmail ||
-    null;
-
-  const data = {
-    name,
-    summary: input.draft.summary?.trim() || existing?.summary || null,
-    category: input.draft.category?.trim() || existing?.category || null,
-    location: input.draft.location?.trim() || existing?.location || null,
-    contactEmail,
-    contactPhone:
-      input.draft.contactPhone?.trim() || existing?.contactPhone || null,
-  };
-
-  if (existing) {
-    const slug =
-      existing.name === name
-        ? existing.slug
-        : await allocateBusinessSlug(name, existing.id);
-    return prisma.business.update({
-      where: { id: existing.id },
-      data: { ...data, slug },
-    });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message || "Invalid business data");
   }
 
-  const slug = await allocateBusinessSlug(name);
-  return prisma.business.create({
-    data: {
-      ownerUserId: input.userId,
-      slug,
-      ...data,
-    },
+  return saveBusinessProfile({
+    userId: input.userId,
+    data: parsed.data,
+    fallbackEmail: input.fallbackEmail,
   });
 }
 

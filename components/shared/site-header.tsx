@@ -61,14 +61,14 @@ function ProductsMenu({
           );
         }
         return (
-          <a
+          <Link
             key={product.id}
             href={product.href}
             onClick={onNavigate}
             className={classNameItem}
           >
             {body}
-          </a>
+          </Link>
         );
       })}
     </div>

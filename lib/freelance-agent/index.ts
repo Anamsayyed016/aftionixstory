@@ -3,7 +3,11 @@ import "server-only";
 import type { GigMatchInitiator, GigMatchStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
-import { allocateFreelancerSlug } from "@/lib/marketplace/slugs";
+import {
+  createGigRequest,
+  saveFreelancerProfile,
+} from "@/lib/marketplace/mutations";
+import { freelancerProfileSchema, gigPostingSchema } from "@/lib/marketplace/schemas";
 import {
   canRevealMatchContact,
   revealContactsForMatch,
@@ -130,45 +134,41 @@ export async function upsertFreelancerFromDraft(input: {
     where: { userId: input.userId },
   });
 
-  const slugHint =
-    input.draft.displayNameHint ||
-    input.nameHint ||
-    input.draft.skills?.[0] ||
-    "freelancer";
+  const skills =
+    input.draft.skills && input.draft.skills.length > 0
+      ? input.draft.skills
+      : existing?.skills || [];
+  const summary =
+    input.draft.summary?.trim() ||
+    existing?.summary ||
+    (skills.length > 0 ? `Skills: ${skills.join(", ")}` : "");
 
-  const data = {
-    summary: input.draft.summary?.trim() || existing?.summary || null,
-    skills:
-      input.draft.skills && input.draft.skills.length > 0
-        ? input.draft.skills
-        : existing?.skills || [],
-    location: input.draft.location?.trim() || existing?.location || null,
+  const parsed = freelancerProfileSchema.safeParse({
+    summary: summary || "Freelancer",
+    skills: skills.length > 0 ? skills : ["general"],
+    location: input.draft.location || existing?.location || undefined,
     availability:
-      input.draft.availability?.trim() || existing?.availability || null,
+      input.draft.availability || existing?.availability || undefined,
     portfolioLinks:
       input.draft.portfolioLinks && input.draft.portfolioLinks.length > 0
         ? input.draft.portfolioLinks
         : existing?.portfolioLinks || [],
     contactEmail:
-      input.draft.contactEmail?.trim() || existing?.contactEmail || null,
+      input.draft.contactEmail || existing?.contactEmail || undefined,
     contactPhone:
-      input.draft.contactPhone?.trim() || existing?.contactPhone || null,
-  };
-
-  if (existing) {
-    return prisma.freelancerProfile.update({
-      where: { id: existing.id },
-      data,
-    });
+      input.draft.contactPhone || existing?.contactPhone || undefined,
+  });
+  if (!parsed.success) {
+    throw new Error(
+      parsed.error.issues[0]?.message || "Invalid freelancer profile"
+    );
   }
 
-  const slug = await allocateFreelancerSlug(slugHint);
-  return prisma.freelancerProfile.create({
-    data: {
-      userId: input.userId,
-      slug,
-      ...data,
-    },
+  return saveFreelancerProfile({
+    userId: input.userId,
+    data: parsed.data,
+    nameHint:
+      input.draft.displayNameHint || input.nameHint || skills[0] || null,
   });
 }
 
@@ -492,18 +492,26 @@ export async function runGigPostingTurn(input: {
   }
 
   const draft = extractGigDraft(input.message);
-  const gig = await prisma.gigRequest.create({
-    data: {
-      businessId: business.id,
-      postedByUserId: input.userId,
-      title: draft.title || "New gig",
-      description: draft.description || input.message,
-      skillNeeded: draft.skillNeeded || null,
-      category: draft.category || null,
-      location: draft.location || business.location || null,
-      budget: draft.budget || null,
-      status: "OPEN",
-    },
+  const parsed = gigPostingSchema.safeParse({
+    title: draft.title || "New gig",
+    description: draft.description || input.message,
+    skillNeeded: draft.skillNeeded,
+    category: draft.category,
+    location: draft.location || business.location || undefined,
+    budget: draft.budget,
+  });
+  if (!parsed.success) {
+    return {
+      assistantReply:
+        parsed.error.issues[0]?.message ||
+        "I couldn't save that gig — try again with a clearer title and description.",
+      suggestions: [],
+    };
+  }
+
+  const gig = await createGigRequest({
+    userId: input.userId,
+    data: parsed.data,
   });
 
   const freelancers = await prisma.freelancerProfile.findMany({

@@ -122,6 +122,17 @@ export function QuickActionChips({
           <ArrowRight className="h-3 w-3" aria-hidden />
         </Link>
       </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-faint">
+        <Link href="/connect/business" className="hover:text-ink-dim">
+          Business form
+        </Link>
+        <Link href="/connect/freelancer" className="hover:text-ink-dim">
+          Freelancer form
+        </Link>
+        <Link href="/connect/gig" className="hover:text-ink-dim">
+          Gig form
+        </Link>
+      </div>
     </motion.div>
   );
 }

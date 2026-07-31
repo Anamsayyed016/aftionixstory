@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Sparkles,
@@ -88,6 +89,47 @@ export function Features() {
                 >
                   {group.features.map((feature, i) => {
                     const Icon = ICONS[feature.id] ?? Sparkles;
+                    const href =
+                      "href" in feature
+                        ? (feature.href as string | undefined)
+                        : undefined;
+                    const card = (
+                      <GlassCard
+                        hover={!comingSoon}
+                        className={cn(
+                          "h-full p-6",
+                          comingSoon && "opacity-80",
+                          href && "transition-colors group-hover:border-violet-soft/50"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-10 w-10 items-center justify-center rounded-md",
+                            comingSoon
+                              ? "bg-charcoal text-ink-faint"
+                              : "bg-violet/12 text-violet-soft"
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <h4 className="mt-5 font-display text-lg font-semibold text-ink">
+                          {feature.title}
+                        </h4>
+                        <p className="mt-2 text-sm leading-relaxed text-ink-dim">
+                          {feature.description}
+                        </p>
+                        {comingSoon ? (
+                          <p className="mt-4 font-mono text-[10px] uppercase tracking-wider text-warning">
+                            Coming soon · not available yet
+                          </p>
+                        ) : href ? (
+                          <p className="mt-4 font-mono text-[10px] uppercase tracking-wider text-violet-soft">
+                            Open →
+                          </p>
+                        ) : null}
+                      </GlassCard>
+                    );
+
                     return (
                       <motion.div
                         key={feature.id}
@@ -95,36 +137,15 @@ export function Features() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true, margin: "-60px" }}
                         transition={{ duration: 0.5, delay: i * 0.06 }}
+                        className={href ? "group" : undefined}
                       >
-                        <GlassCard
-                          hover={!comingSoon}
-                          className={cn(
-                            "h-full p-6",
-                            comingSoon && "opacity-80"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "flex h-10 w-10 items-center justify-center rounded-md",
-                              comingSoon
-                                ? "bg-charcoal text-ink-faint"
-                                : "bg-violet/12 text-violet-soft"
-                            )}
-                          >
-                            <Icon className="h-5 w-5" />
-                          </span>
-                          <h4 className="mt-5 font-display text-lg font-semibold text-ink">
-                            {feature.title}
-                          </h4>
-                          <p className="mt-2 text-sm leading-relaxed text-ink-dim">
-                            {feature.description}
-                          </p>
-                          {comingSoon ? (
-                            <p className="mt-4 font-mono text-[10px] uppercase tracking-wider text-warning">
-                              Coming soon · not available yet
-                            </p>
-                          ) : null}
-                        </GlassCard>
+                        {href && !comingSoon ? (
+                          <Link href={href} className="block h-full">
+                            {card}
+                          </Link>
+                        ) : (
+                          card
+                        )}
                       </motion.div>
                     );
                   })}
