@@ -60,7 +60,11 @@ import {
   isVagueImagePrompt,
   normalizeImageAgentError,
 } from "@/lib/image-agent";
-import { runBusinessProfileTurn } from "@/lib/business-agent";
+import {
+  runBusinessProfileTurn,
+  withBusinessDraftInState,
+} from "@/lib/business-agent";
+import type { BusinessDraft } from "@/lib/business-agent/extract";
 import {
   runFreelancerProfileTurn,
   runGigPostingTurn,
@@ -518,6 +522,7 @@ export async function runStoryAgentTurn(
     let turnState: "ROUTED" | "PROCESSING" | "COMPLETED" | "FAILED" = "ROUTED";
     let assistantReply = "";
     let suggestions: Array<{ label: string; prompt: string }> = [];
+    let businessDraftToPersist: BusinessDraft | null = null;
     const startedAt = Date.now();
 
     try {
@@ -532,9 +537,11 @@ export async function runStoryAgentTurn(
           userId,
           message,
           userEmail: userRow?.email,
+          conversationState: conversation.state,
         });
         assistantReply = result.assistantReply;
         suggestions = result.suggestions;
+        businessDraftToPersist = result.nextDraft;
       } else if (universalDecision.intent === "gig_posting_request") {
         const result = await runGigPostingTurn({ userId, message });
         assistantReply = result.assistantReply;
@@ -557,13 +564,19 @@ export async function runStoryAgentTurn(
           : "Something went wrong with marketplace chat. Please try again.";
     }
 
-    const statePayload = buildPersistedState({
+    let statePayload = buildPersistedState({
       previous: conversation.state,
       memory,
       storyId: conversation.storyId,
       conversationFlow,
       canonicalStoryContext,
     });
+    if (businessDraftToPersist) {
+      statePayload = withBusinessDraftInState(
+        statePayload,
+        businessDraftToPersist
+      ) as typeof statePayload;
+    }
 
     await updateOwnedConversationState({
       userId,
