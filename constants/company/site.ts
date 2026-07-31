@@ -6,7 +6,7 @@ export const SITE = {
   url: "https://aftionix.tech",
   description:
     "AFTIONIX is a premium software development agency building custom software, SaaS platforms, AI solutions, and high-converting AI advertisement content for startups, healthcare companies, and enterprises.",
-  email: "hello@aftionix.tech",
+  email: "anamsayyed58@gmail.com",
   whatsapp:
     "https://wa.me/918107738186?text=Hi%2C%20I%27d%20like%20to%20discuss%20a%20project",
   socials: {
