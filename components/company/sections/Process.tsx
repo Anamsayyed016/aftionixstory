@@ -40,7 +40,7 @@ export function Process() {
               className={cn(
                 "rounded-[var(--radius-md)] border p-4 text-left transition-all duration-300",
                 active === i
-                  ? "border-transparent bg-[linear-gradient(135deg,#2563eb,#7c3aed)] shadow-[var(--shadow-glow-accent)]"
+                  ? "border-transparent bg-[linear-gradient(135deg,var(--co-primary),var(--co-accent))] shadow-[var(--shadow-glow-accent)]"
                   : "border-white/10 bg-white/[0.03] hover:border-white/25"
               )}
             >

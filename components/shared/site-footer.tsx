@@ -30,7 +30,7 @@ export function SiteFooter() {
       <Container className="py-16">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
           <div className="col-span-2">
-            <Link href="/studio" className="flex items-center gap-2.5">
+            <Link href="/" className="flex items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/aftionix-logo.jpg"

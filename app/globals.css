@@ -70,34 +70,34 @@
   --sv-ink-faint: var(--sv-text-faint);
 }
 
-/* Company (agency) marketing tokens — used by components/company/* */
+/* Company (agency) marketing tokens — aligned 1:1 with Studio --sv-* */
 :root {
-  --co-canvas: #ffffff;
-  --co-canvas-soft: #f6f7fb;
-  --co-canvas-deep: #0b0e17;
-  --co-primary: #2563eb;
-  --co-primary-dim: #1d4ed8;
-  --co-accent: #7c3aed;
-  --co-accent-dim: #6d28d9;
-  --co-ink: #111827;
-  --co-ink-soft: #6b7280;
-  --co-ink-faint: #9ca3af;
-  --co-ink-invert: #f9fafb;
-  --co-border: rgba(17, 24, 39, 0.08);
-  --co-border-strong: rgba(17, 24, 39, 0.14);
-  --co-glass: rgba(255, 255, 255, 0.6);
-  --co-shadow-soft: 0 1px 2px rgba(17, 24, 39, 0.04), 0 8px 24px -8px rgba(17, 24, 39, 0.08);
-  --co-shadow-lifted: 0 4px 12px rgba(17, 24, 39, 0.06), 0 24px 48px -12px rgba(37, 99, 235, 0.14);
-  --co-gradient-brand: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-  --co-gradient-mesh: radial-gradient(60% 50% at 20% 10%, rgba(37, 99, 235, 0.14) 0%, transparent 60%),
-    radial-gradient(50% 40% at 85% 20%, rgba(124, 58, 237, 0.12) 0%, transparent 60%);
+  --co-canvas: var(--sv-bg);
+  --co-canvas-soft: var(--sv-bg-subtle);
+  --co-canvas-deep: var(--sv-text);
+  --co-primary: var(--sv-accent);
+  --co-primary-dim: var(--sv-accent-soft);
+  --co-accent: var(--sv-accent-glow);
+  --co-accent-dim: var(--sv-accent-soft);
+  --co-ink: var(--sv-text);
+  --co-ink-soft: var(--sv-text-muted);
+  --co-ink-faint: var(--sv-text-faint);
+  --co-ink-invert: #ffffff;
+  --co-border: var(--sv-border);
+  --co-border-strong: var(--sv-border-strong);
+  --co-glass: rgba(255, 255, 255, 0.72);
+  --co-shadow-soft: var(--sv-shadow-sm);
+  --co-shadow-lifted: var(--sv-shadow-md);
+  --co-gradient-brand: linear-gradient(135deg, var(--sv-accent) 0%, var(--sv-accent-glow) 100%);
+  --co-gradient-mesh: radial-gradient(60% 50% at 20% 10%, color-mix(in srgb, var(--sv-accent) 14%, transparent) 0%, transparent 60%),
+    radial-gradient(50% 40% at 85% 20%, color-mix(in srgb, var(--sv-accent-glow) 16%, transparent) 0%, transparent 60%);
   --font-space-grotesk: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 
   /* Aliases used by company components (shadow-[var(--shadow-*)], etc.) */
   --shadow-soft: var(--co-shadow-soft);
   --shadow-lifted: var(--co-shadow-lifted);
-  --shadow-glow-primary: 0 0 0 1px rgba(37, 99, 235, 0.12), 0 16px 40px -12px rgba(37, 99, 235, 0.35);
-  --shadow-glow-accent: 0 0 0 1px rgba(124, 58, 237, 0.12), 0 16px 40px -12px rgba(124, 58, 237, 0.35);
+  --shadow-glow-primary: 0 0 0 1px color-mix(in srgb, var(--sv-accent) 18%, transparent), 0 16px 40px -12px color-mix(in srgb, var(--sv-accent) 35%, transparent);
+  --shadow-glow-accent: 0 0 0 1px color-mix(in srgb, var(--sv-accent-glow) 22%, transparent), 0 16px 40px -12px color-mix(in srgb, var(--sv-accent-glow) 30%, transparent);
 }
 
 @theme inline {
@@ -171,7 +171,7 @@
 }
 
 [data-theme="company"] ::selection {
-  background: rgba(37, 99, 235, 0.18);
+  background: color-mix(in srgb, var(--sv-accent) 22%, transparent);
   color: var(--co-ink);
 }
 

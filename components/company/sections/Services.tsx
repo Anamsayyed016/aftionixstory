@@ -38,7 +38,7 @@ export function Services() {
                 variants={fadeUp}
                 className="group flex flex-col rounded-[var(--radius-lg)] border border-border bg-white p-6 shadow-[var(--shadow-soft)] transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[var(--shadow-lifted)]"
               >
-                <div className="flex size-11 items-center justify-center rounded-[var(--radius-sm)] bg-[linear-gradient(135deg,rgba(37,99,235,0.1),rgba(124,58,237,0.1))] text-primary transition-colors group-hover:bg-[linear-gradient(135deg,#2563eb,#7c3aed)] group-hover:text-white">
+                <div className="flex size-11 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--sv-accent-subtle)] text-primary transition-colors group-hover:bg-[linear-gradient(135deg,var(--co-primary),var(--co-accent))] group-hover:text-white">
                   <Icon className="size-5" />
                 </div>
                 <h3 className="mt-5 font-display text-base font-semibold text-ink">

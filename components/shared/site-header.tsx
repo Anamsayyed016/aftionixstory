@@ -107,7 +107,7 @@ export function SiteHeader() {
       )}
     >
       <Container className="flex h-16 items-center justify-between">
-        <Link href="/studio" className="flex items-center gap-2.5 group">
+        <Link href="/" className="flex items-center gap-2.5 group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/aftionix-logo.jpg"

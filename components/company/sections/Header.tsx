@@ -30,9 +30,12 @@ export function Header() {
             className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-ink"
             onClick={() => setOpen(false)}
           >
-            <span className="flex size-8 items-center justify-center rounded-[var(--radius-sm)] bg-[linear-gradient(135deg,#2563eb,#7c3aed)] text-sm font-bold text-white">
-              A
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/aftionix-logo.jpg"
+              alt="AFTIONIX"
+              className="size-8 shrink-0 rounded-[var(--radius-sm)] object-cover ring-1 ring-border"
+            />
             AFTIONIX
           </Link>
 

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { BookOpen } from "lucide-react";
 
 import { SITE } from "@/lib/constants";
 
@@ -32,9 +31,12 @@ export function AuthShell({
             href="/"
             className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac focus-visible:ring-offset-2 focus-visible:ring-offset-void"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-violet to-lilac text-white">
-              <BookOpen className="h-4 w-4" aria-hidden />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/aftionix-logo.jpg"
+              alt="AFTIONIX"
+              className="h-8 w-8 shrink-0 rounded-md object-cover ring-1 ring-border"
+            />
             <span className="font-display text-lg font-semibold tracking-tight text-ink">
               {SITE.name}
             </span>
@@ -51,10 +53,13 @@ export function AuthShell({
         >
           <div className="rounded-2xl border border-border/80 bg-panel/70 p-6 shadow-[0_28px_80px_-40px_rgba(16,24,40,0.18),0_0_0_1px_rgba(14,116,144,0.06)] backdrop-blur-xl sm:p-8">
             <div className="mb-7 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet to-lilac text-white shadow-[0_12px_30px_-12px_rgba(14,116,144,0.20)]">
-                <BookOpen className="h-5 w-5" aria-hidden />
-                <span className="sr-only">{SITE.name}</span>
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/aftionix-logo.jpg"
+                alt=""
+                className="mx-auto mb-4 h-12 w-12 rounded-2xl object-cover ring-1 ring-border shadow-[0_12px_30px_-12px_rgba(14,116,144,0.20)]"
+              />
+              <span className="sr-only">{SITE.name}</span>
               <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
                 {title}
               </h1>

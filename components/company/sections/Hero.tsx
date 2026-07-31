@@ -83,7 +83,7 @@ export function Hero() {
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
           >
-            <GlassCard className="relative z-10 overflow-hidden bg-[#0b0e17]/95 p-5 shadow-[var(--shadow-lifted)] lg:translate-x-6">
+            <GlassCard className="relative z-10 overflow-hidden bg-[var(--co-canvas-deep)]/95 p-5 shadow-[var(--shadow-lifted)] lg:translate-x-6">
               <div className="flex items-center gap-1.5 pb-3">
                 <span className="size-2.5 rounded-full bg-white/20" />
                 <span className="size-2.5 rounded-full bg-white/20" />
@@ -103,7 +103,7 @@ export function Hero() {
           </motion.div>
 
           {/* Connector */}
-          <div className="hidden h-px w-10 bg-[linear-gradient(90deg,transparent,#7c3aed)] lg:block" />
+          <div className="hidden h-px w-10 bg-[linear-gradient(90deg,transparent,var(--co-accent))] lg:block" />
 
           {/* Product card */}
           <motion.div
@@ -123,13 +123,13 @@ export function Hero() {
                 {[40, 65, 50, 80, 60, 95, 72].map((h, i) => (
                   <div
                     key={i}
-                    className="flex-1 rounded-t-sm bg-[linear-gradient(180deg,#2563eb,#7c3aed)]"
+                    className="flex-1 rounded-t-sm bg-[linear-gradient(180deg,var(--co-primary),var(--co-accent))]"
                     style={{ height: `${h}%`, opacity: 0.55 + i * 0.06 }}
                   />
                 ))}
               </div>
               <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-                <div className="size-7 rounded-full bg-[linear-gradient(135deg,#2563eb,#7c3aed)]" />
+                <div className="size-7 rounded-full bg-[linear-gradient(135deg,var(--co-primary),var(--co-accent))]" />
                 <div className="h-2 flex-1 rounded-full bg-canvas-soft" />
               </div>
             </GlassCard>
