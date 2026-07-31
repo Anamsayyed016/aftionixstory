@@ -31,7 +31,10 @@ const ICONS: Record<string, LucideIcon> = {
   current: Globe2,
   images: ImagePlus,
   directory: Building2,
-  jobs: Briefcase,
+  shopfront: Building2,
+  gigs: Briefcase,
+  freelancer: Briefcase,
+  connect: Briefcase,
 };
 
 export function Features() {
@@ -41,17 +44,17 @@ export function Features() {
         <div className="max-w-2xl">
           <SectionEyebrow>What you can do</SectionEyebrow>
           <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-            Live today — and honest about what&apos;s next
+            Stories, answers, businesses, and gigs
           </h2>
           <p className="mt-4 text-ink-dim">
-            Story Studio and the universal assistant are available now. Business
-            Directory and Jobs are coming soon — no trial links, no fake demos.
+            Story Studio, the universal assistant, Business Directory, and
+            Freelancer Connect — connect-only for gigs (no payments in v1).
           </p>
         </div>
 
         <div className="mt-16 space-y-20">
           {FEATURE_GROUPS.map((group) => {
-            const comingSoon = group.status === "coming_soon";
+            const comingSoon = (group.status as string) === "coming_soon";
             return (
               <div key={group.id} id={group.id}>
                 <div className="flex flex-wrap items-end justify-between gap-4">

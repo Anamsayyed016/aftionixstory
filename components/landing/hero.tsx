@@ -24,7 +24,7 @@ type PreviewSlide = {
 const SLIDES: PreviewSlide[] = [
   { id: "story", label: "Story Studio" },
   { id: "qa", label: "Ask anything" },
-  { id: "soon", label: "Coming soon" },
+  { id: "connect", label: "Connect" },
 ];
 
 function PreviewChrome({ title }: { title: string }) {
@@ -121,38 +121,37 @@ function QaPreview() {
   );
 }
 
-function SoonPreview() {
+function ConnectPreview() {
   return (
-    <div className="overflow-hidden rounded-xl border border-dashed border-border-strong bg-charcoal/40 shadow-[0_40px_80px_-30px_rgba(16,24,40,0.08)]">
-      <PreviewChrome title="Platform · roadmap" />
+    <div className="sv-glass overflow-hidden rounded-xl border border-border-strong shadow-[0_40px_80px_-30px_rgba(16,24,40,0.13)]">
+      <PreviewChrome title="Directory · Connect" />
       <div className="space-y-3 p-6">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
-          Not available yet
-        </p>
-        <div className="rounded-lg border border-border bg-panel/50 px-4 py-3 opacity-70">
+        <div className="rounded-lg border border-border bg-panel-raised px-4 py-3">
           <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-ink-faint" />
-            <span className="text-sm font-medium text-ink-dim">
+            <Building2 className="h-4 w-4 text-violet-soft" />
+            <span className="text-sm font-medium text-ink">
               Business Directory
             </span>
-            <Badge variant="warning" className="ml-auto text-[10px]">
-              Coming soon
+            <Badge variant="success" className="ml-auto text-[10px]" dot>
+              Live
             </Badge>
           </div>
           <p className="mt-1.5 text-xs text-ink-faint">
-            List and discover local businesses
+            Public /b/ shopfront with owner-chosen contact
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-panel/50 px-4 py-3 opacity-70">
+        <div className="rounded-lg border border-border bg-panel-raised px-4 py-3">
           <div className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-ink-faint" />
-            <span className="text-sm font-medium text-ink-dim">Jobs</span>
-            <Badge variant="warning" className="ml-auto text-[10px]">
-              Coming soon
+            <Briefcase className="h-4 w-4 text-violet-soft" />
+            <span className="text-sm font-medium text-ink">
+              Freelancer Connect
+            </span>
+            <Badge variant="success" className="ml-auto text-[10px]" dot>
+              Live
             </Badge>
           </div>
           <p className="mt-1.5 text-xs text-ink-faint">
-            Roles matched with the same assistant
+            Gigs + mutual match — contact after both accept
           </p>
         </div>
       </div>
@@ -200,7 +199,7 @@ function CyclingPreview() {
           >
             {slide.id === "story" ? <StoryPreview /> : null}
             {slide.id === "qa" ? <QaPreview /> : null}
-            {slide.id === "soon" ? <SoonPreview /> : null}
+            {slide.id === "connect" ? <ConnectPreview /> : null}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -253,7 +252,7 @@ export function Hero() {
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
             <Badge variant="violet" dot>
-              One assistant · Story Studio live
+              One assistant · Studio + Connect
             </Badge>
 
             <h1 className="mt-6 font-display text-4xl font-semibold leading-[1.08] tracking-tight text-ink sm:text-5xl lg:text-6xl">
@@ -263,8 +262,8 @@ export function Hero() {
             </h1>
 
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-ink-dim">
-              Write fiction that remembers, ask questions, get coding help —
-              all in one place. Business Directory and Jobs are on the way.
+              Write fiction that remembers, ask questions, list a business, or
+              match a gig — connect-only for freelancers (no payments in v1).
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -282,7 +281,7 @@ export function Hero() {
             </div>
 
             <p className="mt-8 text-sm text-ink-faint">
-              Free to start · No credit card · Directory &amp; Jobs coming soon
+              Free to start · No credit card · Connect without escrow
             </p>
           </motion.div>
 

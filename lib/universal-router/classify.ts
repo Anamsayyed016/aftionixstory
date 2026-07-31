@@ -126,10 +126,13 @@ export function classifyUniversalIntentDeterministic(
   }
 
   // ---- Image generation ----
+  // "design a logo" as image gen only when clearly image/artwork oriented.
+  // Gig hiring ("need a logo designed" / "hire someone for logo") is marketplace.
   if (
-    /\b(generate|create|make|design|produce|render)\s+(me\s+)?(an?\s+)?(image|picture|photo|photograph|artwork|illustration|drawing|avatar|logo)\b/i.test(
+    /\b(generate|create|make|produce|render)\s+(me\s+)?(an?\s+)?(image|picture|photo|photograph|artwork|illustration|drawing|avatar)\b/i.test(
       text
     ) ||
+    /\b(generate|create|make)\s+(me\s+)?(an?\s+)?logo\b/i.test(text) ||
     // "draw" alone implies an image even without saying "picture" — but skip idioms.
     /\bdraw\s+(me\s+)?(an?\s+)?(?!conclusions?\b|attention\b|comparisons?\b|the line\b)/i.test(
       text
@@ -142,6 +145,89 @@ export function classifyUniversalIntentDeterministic(
       "deterministic",
       "image_generation_signals",
       ["image_generation_request"]
+    );
+  }
+
+  // ---- Marketplace: match commands (either gig or freelancer flow) ----
+  if (
+    /\b(express interest|accept match|decline match|withdraw match|accept connection|decline connection)\b/i.test(
+      lower
+    )
+  ) {
+    const asFreelancer = /\b(gig|find gig|freelancer profile)\b/i.test(lower);
+    return decision(
+      asFreelancer ? "freelancer_profile_request" : "gig_posting_request",
+      0.93,
+      "deterministic",
+      "marketplace_match_command",
+      ["marketplace_match"]
+    );
+  }
+
+  // ---- Business directory profile ----
+  if (
+    /\b(list (my )?business|add (my )?(business|shop|store)( to (the )?directory)?|business (directory )?profile|create (a )?business (listing|profile))\b/i.test(
+      lower
+    ) ||
+    /\bmy business (is|called|named)\b/i.test(lower) ||
+    (/\b(shop|store|company)\s+(is|called|named)\b/i.test(lower) &&
+      !/\b(need|looking for|hire|gig)\b/i.test(lower))
+  ) {
+    return decision(
+      "business_profile_request",
+      0.94,
+      "deterministic",
+      "business_profile_signals",
+      ["business_profile_request"]
+    );
+  }
+
+  // ---- Gig posting (business needs help for a task) ----
+  if (
+    /\b(post (a )?gig|need (a |an |someone )?(for )?[a-z].{0,40}|looking (for )?(a |an )?freelancer|hire (a |an |someone)|need someone for)\b/i.test(
+      lower
+    ) ||
+    /\bi need (a |an )?(logo|delivery|driver|designer|developer|writer)\b/i.test(
+      lower
+    ) ||
+    /\bneed (a |an )?logo designed\b/i.test(lower) ||
+    /\b(day of deliveries|delivery (help|person|run))\b/i.test(lower)
+  ) {
+    // Don't steal pure freelancer self-description
+    if (
+      !/\b(i'?m a|i am a|my skills|looking for gig work|freelancer profile)\b/i.test(
+        lower
+      )
+    ) {
+      return decision(
+        "gig_posting_request",
+        0.93,
+        "deterministic",
+        "gig_posting_signals",
+        ["gig_posting_request"]
+      );
+    }
+  }
+
+  // ---- Freelancer profile ----
+  if (
+    /\b(find gig work|freelancer profile|set up (my )?freelancer|looking for gig(s)? work|i'?m (a |an )?(designer|developer|writer|freelancer).{0,40}(looking|available|skills))\b/i.test(
+      lower
+    ) ||
+    /\b(my skills? (are|include)|skills?:\s*)\b/i.test(lower) ||
+    (/\bi'?m (a |an )?(designer|developer|writer|photographer|freelancer)\b/i.test(
+      lower
+    ) &&
+      /\b(available|gig|skills|portfolio|looking for (work|gigs))\b/i.test(
+        lower
+      ))
+  ) {
+    return decision(
+      "freelancer_profile_request",
+      0.93,
+      "deterministic",
+      "freelancer_profile_signals",
+      ["freelancer_profile_request"]
     );
   }
 
@@ -327,8 +413,13 @@ Rules:
 - coding_help: programming, languages, debugging, software.
 - current_information: needs live/current facts (weather, news, scores, prices today).
 - platform_question: how this app/product works.
-- image_generation_request: user wants an image/picture/photo/artwork generated or drawn.
+- image_generation_request: user wants an image/picture/photo/artwork generated or drawn (not hiring someone to design).
+- business_profile_request: list/update a business on the directory (shop profile), not hiring.
+- gig_posting_request: a business describes a task/gig they need done ("need a logo designed", "need delivery help").
+- freelancer_profile_request: someone describes their skills/availability to find gig work.
 - unclear: too ambiguous to route safely.
+Prefer gig_posting_request over image_generation_request when the user wants to hire someone for a task.
+Prefer business_profile_request when listing their own business, not when requesting freelance help.
 If the assistant was awaiting a story slot answer BUT the user asks something clearly unrelated (e.g. "what is python"), choose general_question or coding_help — do NOT force-fit into the slot.`;
 
   const prompt = [

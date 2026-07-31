@@ -5,6 +5,7 @@
 export {
   UNIVERSAL_INTENTS,
   isGeneralAiIntent,
+  isMarketplaceIntent,
   isStoryUniversalIntent,
   type UniversalIntent,
   type UniversalRouteDecision,

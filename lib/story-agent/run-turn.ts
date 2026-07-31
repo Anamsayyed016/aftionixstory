@@ -45,6 +45,7 @@ import {
 } from "@/lib/usage/generation";
 import {
   classifyUniversalIntent,
+  isMarketplaceIntent,
   isStoryUniversalIntent,
   isUniversalRouterEnabled,
   runGeneralAiTurn,
@@ -59,6 +60,12 @@ import {
   isVagueImagePrompt,
   normalizeImageAgentError,
 } from "@/lib/image-agent";
+import { runBusinessProfileTurn } from "@/lib/business-agent";
+import {
+  runFreelancerProfileTurn,
+  runGigPostingTurn,
+} from "@/lib/freelance-agent";
+import { prisma } from "@/lib/db";
 
 export const storyAgentTurnInputSchema = z.object({
   conversationId: z.string().min(1),
@@ -501,6 +508,135 @@ export async function runStoryAgentTurn(
       duplicated: false,
       outputMode: "text",
       imageUrl,
+    };
+  }
+
+  if (
+    universalDecision &&
+    isMarketplaceIntent(universalDecision.intent)
+  ) {
+    let turnState: "ROUTED" | "PROCESSING" | "COMPLETED" | "FAILED" = "ROUTED";
+    let assistantReply = "";
+    let suggestions: Array<{ label: string; prompt: string }> = [];
+    const startedAt = Date.now();
+
+    try {
+      turnState = "PROCESSING";
+      const userRow = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, name: true },
+      });
+
+      if (universalDecision.intent === "business_profile_request") {
+        const result = await runBusinessProfileTurn({
+          userId,
+          message,
+          userEmail: userRow?.email,
+        });
+        assistantReply = result.assistantReply;
+        suggestions = result.suggestions;
+      } else if (universalDecision.intent === "gig_posting_request") {
+        const result = await runGigPostingTurn({ userId, message });
+        assistantReply = result.assistantReply;
+        suggestions = result.suggestions;
+      } else {
+        const result = await runFreelancerProfileTurn({
+          userId,
+          message,
+          userName: userRow?.name,
+        });
+        assistantReply = result.assistantReply;
+        suggestions = result.suggestions;
+      }
+      turnState = "COMPLETED";
+    } catch (error) {
+      turnState = "FAILED";
+      assistantReply =
+        error instanceof Error
+          ? error.message
+          : "Something went wrong with marketplace chat. Please try again.";
+    }
+
+    const statePayload = buildPersistedState({
+      previous: conversation.state,
+      memory,
+      storyId: conversation.storyId,
+      conversationFlow,
+      canonicalStoryContext,
+    });
+
+    await updateOwnedConversationState({
+      userId,
+      conversationId,
+      state: statePayload as Prisma.InputJsonValue,
+      storyId: conversation.storyId ?? undefined,
+    });
+
+    const buildId =
+      process.env.STORYVERSE_BUILD_ID ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      "local-dev";
+
+    const appendedAssistant = await appendOwnedChatMessage({
+      userId,
+      conversationId,
+      role: "ASSISTANT",
+      content: assistantReply,
+      status: turnState === "FAILED" ? "ERROR" : undefined,
+      requestId: assistantRequestId,
+      metadata: {
+        flow: "universal_assistant",
+        agentVersion: "2",
+        buildId,
+        resultType: "conversation",
+        operation: universalDecision.intent,
+        actionType: "none",
+        actionOk: turnState !== "FAILED",
+        outputMode: "text",
+        durationMs: Date.now() - startedAt,
+        turnRequestId,
+        turnState,
+        universalIntent: universalDecision.intent,
+        universalConfidence: universalDecision.confidence,
+        universalSource: universalDecision.source,
+        suggestions,
+      } as Prisma.InputJsonValue,
+    });
+
+    console.info(
+      JSON.stringify({
+        event: "universal_router.turn",
+        buildId,
+        flow: "marketplace",
+        universalIntent: universalDecision.intent,
+        universalSource: universalDecision.source,
+        conversationId,
+        turnRequestId,
+        messageFingerprint,
+        persistedUserMessageId: appendedUser.message.id,
+        persistedAssistantMessageId: appendedAssistant.message.id,
+        durationMs: Date.now() - turnStartedAt,
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    return {
+      conversationId,
+      assistantReply,
+      resultType: "conversation",
+      operation: "conversational_chat",
+      intent: universalDecision.intent,
+      suggestions,
+      memoryStatus: memoryStatusForOperation(memory, "conversational_chat", false),
+      showReview: false,
+      storyId: conversation.storyId,
+      memory,
+      draft: null,
+      actionType: "none",
+      actionOk: turnState !== "FAILED",
+      requiresConfirmation: false,
+      duplicated: false,
+      outputMode: "text",
     };
   }
 

@@ -70,6 +70,24 @@ enum ChatMessageStatus {
   ERROR
 }
 
+enum GigStatus {
+  OPEN
+  MATCHED
+  CLOSED
+}
+
+enum GigMatchStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum GigMatchInitiator {
+  BUSINESS
+  FREELANCER
+}
+
 model User {
   id                     String    @id @default(cuid())
   name                   String?
@@ -84,11 +102,15 @@ model User {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  accounts       Account[]
-  sessions       Session[]
-  stories        Story[]
-  generationLogs GenerationLog[]
-  conversations  Conversation[]
+  accounts            Account[]
+  sessions            Session[]
+  stories             Story[]
+  generationLogs      GenerationLog[]
+  conversations       Conversation[]
+  businesses          Business[]
+  freelancerProfile   FreelancerProfile?
+  gigRequestsPosted   GigRequest[]       @relation("GigPostedBy")
+  gigMatchesInitiated GigMatch[]         @relation("GigMatchInitiatedBy")
 
   @@index([email])
   @@index([createdAt])
@@ -360,4 +382,93 @@ model GenerationLog {
   @@index([createdAt])
   @@index([success])
   @@index([requestId])
+}
+
+/// Phase A — Business Directory (shopfront). Owner-chosen contact is public.
+model Business {
+  id           String   @id @default(cuid())
+  ownerUserId  String
+  name         String
+  slug         String   @unique
+  summary      String?  @db.Text
+  category     String?
+  location     String?
+  contactEmail String?
+  contactPhone String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  owner User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  gigs  GigRequest[]
+
+  @@index([ownerUserId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+/// Phase B — Freelancer Connect. Contact is private until GigMatch ACCEPTED.
+model FreelancerProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  slug          String   @unique
+  summary       String?  @db.Text
+  skills        String[] @default([])
+  location      String?
+  portfolioLinks String[] @default([])
+  availability  String?
+  contactEmail  String?
+  contactPhone  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matches GigMatch[]
+
+  @@index([location])
+  @@index([createdAt])
+}
+
+model GigRequest {
+  id             String    @id @default(cuid())
+  businessId     String
+  postedByUserId String
+  title          String
+  description    String    @db.Text
+  skillNeeded    String?
+  category       String?
+  location       String?
+  budget         String?
+  status         GigStatus @default(OPEN)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  postedBy User     @relation("GigPostedBy", fields: [postedByUserId], references: [id], onDelete: Cascade)
+  matches  GigMatch[]
+
+  @@index([businessId])
+  @@index([postedByUserId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model GigMatch {
+  id                  String            @id @default(cuid())
+  gigId               String
+  freelancerProfileId String
+  initiatedBy         GigMatchInitiator
+  initiatedByUserId   String
+  status              GigMatchStatus    @default(PENDING)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  gig               GigRequest        @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  freelancerProfile FreelancerProfile @relation(fields: [freelancerProfileId], references: [id], onDelete: Cascade)
+  initiatedByUser   User              @relation("GigMatchInitiatedBy", fields: [initiatedByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([gigId, freelancerProfileId])
+  @@index([gigId])
+  @@index([freelancerProfileId])
+  @@index([status])
+  @@index([createdAt])
 }

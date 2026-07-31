@@ -11,6 +11,9 @@ export const UNIVERSAL_INTENTS = [
   "current_information",
   "platform_question",
   "image_generation_request",
+  "business_profile_request",
+  "gig_posting_request",
+  "freelancer_profile_request",
   "unclear",
 ] as const;
 
@@ -18,6 +21,14 @@ export type UniversalIntent = (typeof UNIVERSAL_INTENTS)[number];
 
 export function isStoryUniversalIntent(intent: UniversalIntent): boolean {
   return intent === "story_request" || intent === "story_continuation";
+}
+
+export function isMarketplaceIntent(intent: UniversalIntent): boolean {
+  return (
+    intent === "business_profile_request" ||
+    intent === "gig_posting_request" ||
+    intent === "freelancer_profile_request"
+  );
 }
 
 export function isGeneralAiIntent(intent: UniversalIntent): boolean {

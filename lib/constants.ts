@@ -2,7 +2,7 @@ export const SITE = {
   name: "AFTIONIX Studio",
   tagline: "One assistant. Many things you can do.",
   description:
-    "An AI platform for writing stories with memory, getting answers, and — soon — listing businesses and finding jobs.",
+    "An AI platform for writing stories with memory, getting answers, listing businesses, and connecting freelancers to gigs.",
 };
 
 /** Flat top-level nav (Products is rendered separately as a dropdown). */
@@ -23,15 +23,15 @@ export const PRODUCT_LINKS = [
     id: "business-directory",
     label: "Business Directory",
     description: "List and discover local businesses",
-    href: "#coming-soon",
-    status: "coming_soon" as const,
+    href: "#business-directory",
+    status: "live" as const,
   },
   {
-    id: "jobs",
-    label: "Jobs",
-    description: "Find roles matched to your profile",
-    href: "#coming-soon",
-    status: "coming_soon" as const,
+    id: "freelancer-connect",
+    label: "Freelancer Connect",
+    description: "Match businesses with freelancers for gigs",
+    href: "#freelancer-connect",
+    status: "live" as const,
   },
 ] as const;
 
@@ -105,24 +105,52 @@ export const FEATURE_GROUPS = [
     ],
   },
   {
-    id: "coming-soon",
-    title: "Coming soon",
-    eyebrow: "On the roadmap",
+    id: "business-directory",
+    title: "Business Directory",
+    eyebrow: "Available now",
     description:
-      "More of the platform is on the way. These are planned — not available to try yet.",
-    status: "coming_soon" as const,
+      "List your business in chat and get a public shopfront page with the contact details you choose.",
+    status: "live" as const,
     features: [
       {
         id: "directory",
-        title: "Business Directory",
+        title: "List in chat",
         description:
-          "List your business and help people discover local services — launching after Story Studio.",
+          "Describe your business once — name, summary, location, and contact — and publish a /b/ page.",
       },
       {
-        id: "jobs",
-        title: "Jobs",
+        id: "shopfront",
+        title: "Public shopfront",
         description:
-          "Browse and match to roles with the same assistant — coming after Directory.",
+          "Owner-chosen email and phone appear on your listing so customers can reach you.",
+      },
+    ],
+  },
+  {
+    id: "freelancer-connect",
+    title: "Freelancer Connect",
+    eyebrow: "Available now",
+    description:
+      "Businesses post gigs; freelancers list skills. Mutual interest unlocks contact — connect-only, no payments in v1.",
+    status: "live" as const,
+    features: [
+      {
+        id: "gigs",
+        title: "Post a gig",
+        description:
+          "Need a logo or a day of deliveries? Describe the task in chat and match to freelancers.",
+      },
+      {
+        id: "freelancer",
+        title: "Freelancer profiles",
+        description:
+          "Skills, availability, and portfolio on a public /f/ page — contact stays private until matched.",
+      },
+      {
+        id: "connect",
+        title: "Mutual connect",
+        description:
+          "Express interest, accept on both sides, then see contact info. No escrow or payments yet.",
       },
     ],
   },
@@ -143,19 +171,19 @@ export const HOW_IT_WORKS = [
     step: 2,
     title: "Ask or create",
     description:
-      "Write a story beat, ask a question, or attach an image. Routing decides what happens next.",
+      "Write a story, list a business, post a gig, or set up freelancer skills. Routing decides what happens next.",
   },
   {
     step: 3,
-    title: "Keep going in Story Studio",
+    title: "Keep going",
     description:
-      "When you’re writing fiction, memory, characters, and episodes stay with the story.",
+      "Story memory stays with your fiction; Connect keeps match history until both sides accept.",
   },
   {
     step: 4,
     title: "Return anytime",
     description:
-      "Pick up the same conversation or story later — context is where you left it.",
+      "Pick up the same conversation, story, or match later — context is where you left it.",
   },
 ] as const;
 
@@ -164,12 +192,12 @@ export const PRICING_TIERS = [
     name: "Free",
     price: "$0",
     period: "forever",
-    description: "Try the assistant and Story Studio with light limits.",
+    description: "Try the assistant, Story Studio, and Connect with light limits.",
     features: [
       "Universal chat access",
       "1 active story",
       "20 episodes / month",
-      "Core memory system",
+      "Business + freelancer profiles",
     ],
     cta: "Get Started",
     highlighted: false,
@@ -231,7 +259,7 @@ export const FAQS = [
   {
     question: "Is AFTIONIX only for writing stories?",
     answer:
-      "Story Studio is the deepest product today — with persistent memory for long-running fiction. The same assistant also handles general questions, coding help, and current-info lookups. Business Directory and Jobs are coming soon.",
+      "No. Story Studio is deepest for long-running fiction, but the same assistant also answers questions, lists businesses on the Directory, and matches gigs via Freelancer Connect (connect-only — no payments in v1).",
   },
   {
     question: "Does the AI really remember past episodes?",
@@ -249,8 +277,8 @@ export const FAQS = [
       "Multilingual writing is supported, including Hinglish and other code-switched styles, with configurable formality and dialogue conventions.",
   },
   {
-    question: "When will Business Directory and Jobs launch?",
+    question: "How does Freelancer Connect share contact info?",
     answer:
-      "They're on the roadmap and shown as Coming soon on this site. Nothing to try yet — we'll open them when they're ready, not before.",
+      "Public freelancer pages never show email or phone. After both sides express mutual interest on a gig (accept the match), contact is revealed to each other. Payments and escrow are not included yet.",
   },
 ] as const;

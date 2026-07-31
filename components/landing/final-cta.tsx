@@ -28,8 +28,8 @@ export function FinalCta() {
             Ready when you are.
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-ink-dim">
-            Start free with Story Studio and the universal assistant. Directory
-            and Jobs when they&apos;re ready — not before.
+            Start free with Story Studio, Directory, and Freelancer Connect.
+            Payments and escrow stay out of scope for now.
           </p>
           <Link href="/sign-up">
             <Button size="lg" className="group mt-8">

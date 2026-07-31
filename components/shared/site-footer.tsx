@@ -5,13 +5,11 @@ import { SITE } from "@/lib/constants";
 const FOOTER_LINKS = {
   Product: [
     { label: "Story Studio", href: "#story-studio" },
+    { label: "Business Directory", href: "#business-directory" },
+    { label: "Freelancer Connect", href: "#freelancer-connect" },
     { label: "Features", href: "#features" },
     { label: "How it works", href: "#how-it-works" },
     { label: "Pricing", href: "#pricing" },
-  ],
-  "Coming soon": [
-    { label: "Business Directory", href: "#coming-soon" },
-    { label: "Jobs", href: "#coming-soon" },
   ],
   Legal: [
     { label: "Privacy", href: "#" },

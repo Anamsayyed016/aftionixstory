@@ -2,6 +2,8 @@ import type { LucideIcon } from "lucide-react";
 import {
   BookHeart,
   Brain,
+  Briefcase,
+  Building2,
   Ghost,
   Heart,
   HeartHandshake,
@@ -253,6 +255,29 @@ export const CREATE_MODE_SHORTCUTS: CreateModeShortcut[] = [
     description: "Choose a story from your library.",
     icon: RefreshCw,
     href: "/stories",
+  },
+  {
+    id: "list-business",
+    title: "List my business",
+    description: "Publish a Business Directory shopfront.",
+    icon: Building2,
+    prompt:
+      "List my business on the directory. I'll share the name, what we do, location, and contact email.",
+  },
+  {
+    id: "post-gig",
+    title: "Post a gig",
+    description: "Describe a task you need done.",
+    icon: Briefcase,
+    prompt: "I need someone for a logo design gig",
+  },
+  {
+    id: "find-gig-work",
+    title: "Find gig work",
+    description: "Set up your freelancer profile.",
+    icon: Users,
+    prompt:
+      "I'm looking for gig work. Help me set up my freelancer profile with skills and availability.",
   },
   {
     id: "build-characters",

@@ -31,7 +31,7 @@ function ProductsMenu({
   return (
     <div className={cn("flex flex-col gap-1 p-2", className)}>
       {PRODUCT_LINKS.map((product) => {
-        const comingSoon = product.status === "coming_soon";
+        const comingSoon = (product.status as string) === "coming_soon";
         const classNameItem = cn(
           "rounded-lg px-3 py-2.5 text-left transition-colors",
           comingSoon

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Library, MessageSquare, Settings, LogOut } from "lucide-react";
+import { Library, MessageSquare, Settings, LogOut, Handshake } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/constants";
 import { logoutAction } from "@/app/actions/auth";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 const NAV = [
   { href: "/dashboard", label: "Chat", icon: MessageSquare },
   { href: "/stories", label: "My Stories", icon: Library },
+  { href: "/connect", label: "Connect", icon: Handshake },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -70,11 +71,11 @@ export function AppSidebar({
 
         <div className="mt-4 rounded-md border border-border/80 bg-panel/50 p-3">
           <div className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-            Coming later
+            Freelancer Connect
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-dim">
-            Persistent memories and plot threads arrive in a later phase. Open a
-            story workspace to generate and save episodes now.
+            Post gigs or list skills in chat. Mutual accept reveals contact —
+            no payments in v1.
           </p>
         </div>
       </nav>
