@@ -7,9 +7,15 @@ const FOOTER_LINKS = {
     { label: "Story Studio", href: "/dashboard" },
     { label: "Business Directory", href: "/connect/business" },
     { label: "Freelancer Connect", href: "/connect" },
-    { label: "Features", href: "#features" },
-    { label: "How it works", href: "#how-it-works" },
-    { label: "Pricing", href: "#pricing" },
+    { label: "Features", href: "/studio#features" },
+    { label: "How it works", href: "/studio#how-it-works" },
+    { label: "Pricing", href: "/studio#pricing" },
+  ],
+  Company: [
+    { label: "AFTIONIX Home", href: "/" },
+    { label: "About", href: "/#about" },
+    { label: "Services", href: "/#services" },
+    { label: "Process", href: "/#process" },
   ],
   Legal: [
     { label: "Privacy", href: "#" },
@@ -24,7 +30,7 @@ export function SiteFooter() {
       <Container className="py-16">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
           <div className="col-span-2">
-            <Link href="/" className="flex items-center gap-2.5">
+            <Link href="/studio" className="flex items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/aftionix-logo.jpg"

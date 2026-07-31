@@ -3,21 +3,25 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AFTIONIX Studio — One assistant. Stories, answers, and what's next.",
+  title: {
+    default: "AFTIONIX — Software, AI & Studio",
+    template: "%s — AFTIONIX",
+  },
   description:
-    "An AI platform for writing stories with memory, getting answers, listing businesses, and connecting freelancers to gigs.",
+    "AFTIONIX builds software and AI products — from custom development to AFTIONIX Studio for stories, answers, business listings, and freelancer gigs.",
   keywords: [
+    "AFTIONIX",
+    "software development agency",
     "AI assistant",
     "AI writing",
     "story studio",
     "business directory",
     "freelancer connect",
-    "AFTIONIX",
   ],
   openGraph: {
-    title: "AFTIONIX Studio — One assistant. Stories, answers, and what's next.",
+    title: "AFTIONIX — Software, AI & Studio",
     description:
-      "Write fiction that remembers, ask questions, list a business, or match a gig — connect-only (no payments in v1).",
+      "Premium software agency and AFTIONIX Studio — stories, answers, business listings, and freelancer connect.",
     type: "website",
   },
 };

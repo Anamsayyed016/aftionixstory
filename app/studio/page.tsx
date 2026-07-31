@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { SiteHeader } from "@/components/shared/site-header";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { Hero } from "@/components/landing/hero";
@@ -9,7 +10,13 @@ import { Pricing } from "@/components/landing/pricing";
 import { FAQ } from "@/components/landing/faq";
 import { FinalCta } from "@/components/landing/final-cta";
 
-export default function Home() {
+export const metadata: Metadata = {
+  title: "AFTIONIX Studio — One assistant. Stories, answers, and what's next.",
+  description:
+    "An AI platform for writing stories with memory, getting answers, listing businesses, and connecting freelancers to gigs.",
+};
+
+export default function StudioLandingPage() {
   return (
     <>
       <SiteHeader />

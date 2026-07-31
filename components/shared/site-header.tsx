@@ -107,7 +107,7 @@ export function SiteHeader() {
       )}
     >
       <Container className="flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 group">
+        <Link href="/studio" className="flex items-center gap-2.5 group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/aftionix-logo.jpg"
@@ -152,13 +152,13 @@ export function SiteHeader() {
             </AnimatePresence>
           </div>
           {NAV_LINKS.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="text-sm text-ink-dim transition-colors hover:text-ink"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -201,14 +201,14 @@ export function SiteHeader() {
                 <ProductsMenu onNavigate={() => setOpen(false)} />
               </div>
               {NAV_LINKS.map((link) => (
-                <a
+                <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setOpen(false)}
                   className="text-sm text-ink-dim hover:text-ink"
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
               <div className="mt-2 flex flex-col gap-3">
                 <Link href="/sign-in" onClick={() => setOpen(false)}>

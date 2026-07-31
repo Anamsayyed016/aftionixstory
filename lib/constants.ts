@@ -7,8 +7,9 @@ export const SITE = {
 
 /** Flat top-level nav (Products is rendered separately as a dropdown). */
 export const NAV_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "Pricing", href: "#pricing" },
+  { label: "Company", href: "/" },
+  { label: "Features", href: "/studio#features" },
+  { label: "Pricing", href: "/studio#pricing" },
 ] as const;
 
 export const PRODUCT_LINKS = [
