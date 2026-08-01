@@ -9,7 +9,6 @@ import { Testimonials } from "@/components/landing/testimonials";
 import { Pricing } from "@/components/landing/pricing";
 import { FAQ } from "@/components/landing/faq";
 import { FinalCta } from "@/components/landing/final-cta";
-import { prisma } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: "AFTIONIX Studio — One assistant. Stories, answers, and what's next.",
@@ -17,22 +16,18 @@ export const metadata: Metadata = {
     "An AI platform for writing stories with memory, getting answers, listing businesses, and connecting freelancers to gigs.",
 };
 
-export default async function StudioLandingPage() {
-  const exampleBusiness = await prisma.business.findFirst({
-    orderBy: { createdAt: "asc" },
-    select: { slug: true },
-  });
-
+/**
+ * Static marketing page — must not query the database at build time.
+ * Docker `npm run build` has no Postgres (db:5432); a Prisma call here
+ * fails the whole image build ("Export encountered an error on /studio").
+ */
+export default function StudioLandingPage() {
   return (
     <>
       <SiteHeader />
       <main className="flex-1">
         <Hero />
-        <Features
-          exampleBusinessHref={
-            exampleBusiness ? `/b/${exampleBusiness.slug}` : "/b/bright-print-co"
-          }
-        />
+        <Features />
         <HowItWorks />
         <ProductShowcase />
         <Testimonials />
