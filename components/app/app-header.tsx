@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, BookOpen, Library, MessageSquare, Settings } from "lucide-react";
+import {
+  Menu,
+  X,
+  BookOpen,
+  Library,
+  MessageSquare,
+  Settings,
+  Shield,
+} from "lucide-react";
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -26,9 +34,11 @@ function titleForPath(pathname: string) {
 export function AppHeader({
   userName,
   usage,
+  isAdmin = false,
 }: {
   userName: string;
   usage?: { used: number; limit: number };
+  isAdmin?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
@@ -107,6 +117,21 @@ export function AppHeader({
                   </Link>
                 );
               })}
+              {isAdmin ? (
+                <Link
+                  href="/admin"
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm",
+                    pathname.startsWith("/admin")
+                      ? "bg-panel-raised text-ink"
+                      : "text-ink-dim hover:bg-charcoal"
+                  )}
+                >
+                  <Shield className="h-4 w-4" />
+                  Admin Dashboard
+                </Link>
+              ) : null}
               <form action={logoutAction} className="mt-2">
                 <Button type="submit" variant="secondary" className="w-full">
                   Log out

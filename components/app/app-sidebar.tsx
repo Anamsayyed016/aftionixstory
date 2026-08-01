@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Library, MessageSquare, Settings, LogOut, Handshake } from "lucide-react";
+import {
+  Library,
+  MessageSquare,
+  Settings,
+  LogOut,
+  Handshake,
+  Shield,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/constants";
 import { logoutAction } from "@/app/actions/auth";
@@ -19,10 +26,12 @@ export function AppSidebar({
   userName,
   userEmail,
   plan,
+  isAdmin = false,
 }: {
   userName: string;
   userEmail: string;
   plan: string;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -90,6 +99,20 @@ export function AppSidebar({
             Plan · {plan}
           </p>
         </div>
+        {isAdmin ? (
+          <Link
+            href="/admin"
+            className={cn(
+              "mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+              pathname.startsWith("/admin")
+                ? "bg-panel-raised text-ink"
+                : "text-ink-dim hover:bg-charcoal hover:text-ink"
+            )}
+          >
+            <Shield className="h-4 w-4" />
+            Admin Dashboard
+          </Link>
+        ) : null}
         <form action={logoutAction}>
           <Button type="submit" variant="ghost" size="sm" className="w-full justify-start">
             <LogOut className="h-4 w-4" />
