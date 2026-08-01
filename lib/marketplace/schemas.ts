@@ -82,6 +82,7 @@ export function isSafeAppPath(path: string): boolean {
     path.startsWith("/stories") ||
     path.startsWith("/settings") ||
     path.startsWith("/create") ||
+    path.startsWith("/admin") ||
     path.startsWith("/b/") ||
     path.startsWith("/f/")
   );

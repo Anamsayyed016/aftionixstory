@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { GigPostingForm } from "@/components/app/marketplace/gig-posting-form";
+import { BackLink } from "@/components/ui/back-link";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function GigFormPage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4 overflow-y-auto pb-8">
+      <BackLink href="/connect">Back to Connect</BackLink>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs text-violet-soft">Freelancer Connect</p>

@@ -19,7 +19,8 @@ export const proxy = proxyAuth((req) => {
     pathname.startsWith("/stories") ||
     pathname.startsWith("/settings") ||
     pathname.startsWith("/connect") ||
-    pathname.startsWith("/create");
+    pathname.startsWith("/create") ||
+    pathname.startsWith("/admin");
 
   if (isProtected && !isLoggedIn) {
     const signInUrl = new URL("/sign-in", req.nextUrl.origin);
@@ -51,6 +52,8 @@ export const config = {
     "/settings/:path*",
     "/connect/:path*",
     "/create/:path*",
+    "/admin",
+    "/admin/:path*",
     "/sign-in",
     "/sign-up",
     "/forgot-password",

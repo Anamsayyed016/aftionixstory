@@ -17,6 +17,7 @@ export async function getCurrentUser() {
     email: session.user.email ?? null,
     image: session.user.image ?? null,
     plan: session.user.plan ?? "FREE",
+    role: session.user.role ?? "USER",
   };
 }
 

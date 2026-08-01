@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BackLink } from "@/components/ui/back-link";
 import { prisma } from "@/lib/db";
 import { revealContactsForMatch } from "@/lib/freelance-agent/contact-reveal";
 import {
@@ -57,14 +58,17 @@ export default async function ConnectPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-10 overflow-y-auto pb-8">
-      <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">
-          Freelancer Connect
-        </h1>
-        <p className="mt-2 text-sm text-ink-dim">
-          Connect-only — no payments or escrow. Contact reveals only after both
-          sides accept.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
+            Freelancer Connect
+          </h1>
+          <p className="mt-2 text-sm text-ink-dim">
+            Connect-only — no payments or escrow. Contact reveals only after both
+            sides accept.
+          </p>
+        </div>
+        <BackLink href="/dashboard">Back to Chat</BackLink>
       </div>
 
       <section className="space-y-3 rounded-xl border border-border bg-panel/40 p-5">

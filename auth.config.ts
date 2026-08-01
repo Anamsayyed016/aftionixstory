@@ -39,6 +39,7 @@ function buildProviders(): NextAuthConfig["providers"] {
           name: user.name,
           image: user.image,
           plan: user.plan,
+          role: user.role,
         };
       },
     }),
@@ -94,6 +95,7 @@ export const authConfig = {
       if (user) {
         token.id = user.id;
         token.plan = user.plan ?? "FREE";
+        token.role = user.role ?? "USER";
       }
       return token;
     },
@@ -101,6 +103,7 @@ export const authConfig = {
       if (session.user) {
         session.user.id = (token.id as string) ?? "";
         session.user.plan = (token.plan as string) ?? "FREE";
+        session.user.role = (token.role as string) ?? "USER";
       }
       return session;
     },

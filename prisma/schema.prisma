@@ -13,6 +13,11 @@ enum Plan {
   STUDIO
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 enum StoryVisibility {
   PRIVATE
   UNLISTED
@@ -96,6 +101,7 @@ model User {
   image                  String?
   passwordHash           String?
   plan                   Plan      @default(FREE)
+  role                   UserRole  @default(USER)
   monthlyGenerationCount Int       @default(0)
   generationLimit        Int       @default(20)
   generationPeriodStart  DateTime  @default(now())
@@ -114,6 +120,7 @@ model User {
 
   @@index([email])
   @@index([createdAt])
+  @@index([role])
 }
 
 model Account {

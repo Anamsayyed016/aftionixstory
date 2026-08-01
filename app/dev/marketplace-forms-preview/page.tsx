@@ -4,6 +4,10 @@ import { FreelancerProfileForm } from "@/components/app/marketplace/freelancer-p
 import { GigPostingForm } from "@/components/app/marketplace/gig-posting-form";
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
+import { BackLink } from "@/components/ui/back-link";
+
+/** Runtime gate — must not bake 404 at build time. */
+export const dynamic = "force-dynamic";
 
 export default function MarketplaceFormsPreviewPage() {
   if (
@@ -17,7 +21,8 @@ export default function MarketplaceFormsPreviewPage() {
     <div className="min-h-screen bg-void py-10 text-ink">
       <Container className="max-w-2xl space-y-12">
         <div>
-          <Badge variant="success" dot>
+          <BackLink href="/connect">Back to Connect</BackLink>
+          <Badge variant="success" dot className="mt-3">
             Forms preview
           </Badge>
           <h1 className="mt-3 font-display text-2xl font-semibold">

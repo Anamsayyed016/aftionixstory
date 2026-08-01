@@ -5,6 +5,7 @@ import { Briefcase, MapPin, ExternalLink } from "lucide-react";
 
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
+import { BackLink } from "@/components/ui/back-link";
 import { prisma } from "@/lib/db";
 import { publicFreelancerViewContact } from "@/lib/freelance-agent/contact-reveal";
 
@@ -42,13 +43,19 @@ export default async function FreelancerPublicPage({ params }: Props) {
   return (
     <div className="min-h-screen bg-void text-ink">
       <header className="border-b border-border">
-        <Container className="flex h-14 items-center justify-between">
-          <Link href="/" className="font-display text-sm font-semibold">
-            AFTIONIX Freelancer Connect
-          </Link>
+        <Container className="flex h-14 items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <BackLink href="/">Back to home</BackLink>
+            <Link
+              href="/studio"
+              className="hidden font-display text-sm font-semibold sm:inline"
+            >
+              AFTIONIX Freelancer Connect
+            </Link>
+          </div>
           <Link
             href="/sign-up"
-            className="text-sm text-violet-soft hover:underline"
+            className="shrink-0 text-sm text-violet-soft hover:underline"
           >
             Get Started
           </Link>
