@@ -38,7 +38,12 @@ const ICONS: Record<string, LucideIcon> = {
   connect: Briefcase,
 };
 
-export function Features() {
+export function Features({
+  exampleBusinessHref,
+}: {
+  /** Live public shopfront URL when a directory listing exists. */
+  exampleBusinessHref?: string;
+}) {
   return (
     <section id="features" className="py-24 sm:py-32">
       <Container>
@@ -89,10 +94,13 @@ export function Features() {
                 >
                   {group.features.map((feature, i) => {
                     const Icon = ICONS[feature.id] ?? Sparkles;
-                    const href =
+                    let href =
                       "href" in feature
                         ? (feature.href as string | undefined)
                         : undefined;
+                    if (feature.id === "shopfront" && exampleBusinessHref) {
+                      href = exampleBusinessHref;
+                    }
                     const card = (
                       <GlassCard
                         hover={!comingSoon}

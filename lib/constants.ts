@@ -50,24 +50,44 @@ export const FEATURE_GROUPS = [
         title: "AI Episode Generation",
         description:
           "Describe what happens next in plain language. Get a full episode in your voice, ready to read or revise.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent(
+            "I want to start a new story. Help me shape the concept, then write the first episode."
+          ),
       },
       {
         id: "memory",
         title: "Persistent Character Memory",
         description:
           "Confessions, secrets, and grudges carry forward — no re-explaining who knows what.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent(
+            "Help me build the main characters for a new story — names, roles, and what they want."
+          ),
       },
       {
         id: "language",
         title: "Hinglish & Multilingual Writing",
         description:
           "Dialogue the way your characters actually speak, including natural code-switched Hinglish.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent(
+            "Write a short scene in natural Hinglish — everyday dialogue, not forced English."
+          ),
       },
       {
         id: "editable",
         title: "Editable AI Drafts",
         description:
           "Nothing is locked. Rewrite any line or take an episode in a new direction without losing continuity.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent(
+            "Help me rewrite a scene to improve pacing, dialogue, emotion, and clarity."
+          ),
       },
     ],
   },
@@ -84,24 +104,38 @@ export const FEATURE_GROUPS = [
         title: "Ask anything",
         description:
           "General questions, explanations, and brainstorming — without forcing every message into a story slot.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent(
+            "What are the key ideas behind good product onboarding for a new SaaS user?"
+          ),
       },
       {
         id: "coding",
         title: "Coding help",
         description:
           "Debug, explain, and sketch solutions when you need a technical hand mid-flow.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent(
+            "Help me debug this TypeScript error: Property 'x' does not exist on type 'y'. Explain and suggest a fix."
+          ),
       },
       {
         id: "current",
         title: "Current information",
         description:
           "Weather, news-style lookups, and other live questions via grounded search when you need it.",
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent("What's the weather in Pune today?"),
       },
       {
         id: "images",
         title: "Image attach",
         description:
           "Share a photo in chat — the assistant acknowledges it and can help turn it into story fuel.",
+        href: "/dashboard",
       },
     ],
   },
@@ -118,14 +152,19 @@ export const FEATURE_GROUPS = [
         title: "List in chat",
         description:
           "Describe your business once — name, summary, location, and contact — and publish a /b/ page.",
-        href: "/dashboard?prompt=" + encodeURIComponent("List my business on the directory"),
+        href:
+          "/dashboard?prompt=" +
+          encodeURIComponent(
+            "List my business on the directory. I'll share the name, what we do, location, and contact email."
+          ),
       },
       {
         id: "shopfront",
         title: "Public shopfront",
         description:
           "Owner-chosen email and phone appear on your listing so customers can reach you.",
-        href: "/connect/business",
+        /** Demo listing from seed-marketplace-demo; Features can override with a live slug. */
+        href: "/b/bright-print-co",
       },
     ],
   },
