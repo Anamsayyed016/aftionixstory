@@ -48,9 +48,16 @@ export async function saveBusinessProfileAction(
 
   revalidatePath("/connect");
   revalidatePath(`/b/${business.slug}`);
+  const publicPath = `/b/${business.slug}`;
+  if (!business.verifiedAt) {
+    return ok(
+      { publicPath },
+      `Saved, but not public yet. Set contact email to ${user.email ?? "your account email"} to verify and publish ${publicPath}.`
+    );
+  }
   return ok(
-    { publicPath: `/b/${business.slug}` },
-    "Business listing saved."
+    { publicPath },
+    `Business listing live at ${publicPath}.`
   );
 }
 

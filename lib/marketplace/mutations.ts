@@ -5,6 +5,7 @@ import {
   allocateBusinessSlug,
   allocateFreelancerSlug,
 } from "@/lib/marketplace/slugs";
+import { resolveBusinessVerifiedAt } from "@/lib/marketplace/verification";
 import type {
   BusinessProfileInput,
   FreelancerProfileInput,
@@ -13,6 +14,7 @@ import type {
 
 /**
  * Shared write path for Business — used by chat agent and form actions.
+ * Sets verifiedAt when contactEmail matches the owner's account email.
  */
 export async function saveBusinessProfile(input: {
   userId: string;
@@ -24,12 +26,23 @@ export async function saveBusinessProfile(input: {
     orderBy: { createdAt: "asc" },
   });
 
+  const owner = await prisma.user.findUnique({
+    where: { id: input.userId },
+    select: { email: true },
+  });
+
   const name = input.data.name.trim();
   const contactEmail =
     input.data.contactEmail?.trim() ||
     existing?.contactEmail ||
     input.fallbackEmail ||
     null;
+
+  const verifiedAt = resolveBusinessVerifiedAt({
+    ownerEmail: owner?.email,
+    contactEmail,
+    previousVerifiedAt: existing?.verifiedAt ?? null,
+  });
 
   const payload = {
     name,
@@ -38,6 +51,7 @@ export async function saveBusinessProfile(input: {
     location: input.data.location?.trim() || null,
     contactEmail,
     contactPhone: input.data.contactPhone?.trim() || null,
+    verifiedAt,
   };
 
   if (existing) {

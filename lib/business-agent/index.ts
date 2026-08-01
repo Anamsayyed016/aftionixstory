@@ -169,6 +169,7 @@ export async function runBusinessProfileTurn(input: {
   const stillNeed = missingBusinessFields(savedDraft).filter(
     (f) => f !== "business name"
   );
+  const isPublic = business.verifiedAt != null;
 
   if (stillNeed.length > 0) {
     return {
@@ -184,7 +185,22 @@ export async function runBusinessProfileTurn(input: {
         },
       ],
       businessId: business.id,
-      publicPath,
+      publicPath: isPublic ? publicPath : undefined,
+      nextDraft: savedDraft,
+    };
+  }
+
+  if (!isPublic) {
+    const accountEmail = input.userEmail || "your account email";
+    return {
+      assistantReply: `Saved **${business.name}**, but it isn’t public yet. To verify and publish ${publicPath}, set the contact email to your account email (**${accountEmail}**) — e.g. “email - ${accountEmail}”.`,
+      suggestions: [
+        {
+          label: "Verify with my email",
+          prompt: `email - ${accountEmail}`,
+        },
+      ],
+      businessId: business.id,
       nextDraft: savedDraft,
     };
   }

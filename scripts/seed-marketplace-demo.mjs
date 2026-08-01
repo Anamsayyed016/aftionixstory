@@ -38,8 +38,10 @@ async function main() {
         "Local printing and branding studio for shops and startups across Pune.",
       category: "Printing & branding",
       location: "Pune",
-      contactEmail: "hello@brightprint.example",
+      // Must match owner email for public /b/[slug] verification.
+      contactEmail: "demo-business@aftionix.example",
       contactPhone: "+91 98765 43210",
+      verifiedAt: new Date(),
     },
     create: {
       ownerUserId: bizUser.id,
@@ -49,8 +51,9 @@ async function main() {
         "Local printing and branding studio for shops and startups across Pune.",
       category: "Printing & branding",
       location: "Pune",
-      contactEmail: "hello@brightprint.example",
+      contactEmail: "demo-business@aftionix.example",
       contactPhone: "+91 98765 43210",
+      verifiedAt: new Date(),
     },
   });
 

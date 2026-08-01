@@ -384,19 +384,22 @@ model GenerationLog {
   @@index([requestId])
 }
 
-/// Phase A — Business Directory (shopfront). Owner-chosen contact is public.
+/// Phase A — Business Directory (shopfront). Owner-chosen contact is public
+/// only when verifiedAt is set (contact email matches the owner's account email).
 model Business {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   ownerUserId  String
   name         String
-  slug         String   @unique
-  summary      String?  @db.Text
+  slug         String    @unique
+  summary      String?   @db.Text
   category     String?
   location     String?
   contactEmail String?
   contactPhone String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  /** Set when listing is public: contactEmail matches owner User.email. */
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   owner User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   gigs  GigRequest[]
@@ -404,6 +407,7 @@ model Business {
   @@index([ownerUserId])
   @@index([category])
   @@index([createdAt])
+  @@index([verifiedAt])
 }
 
 /// Phase B — Freelancer Connect. Contact is private until GigMatch ACCEPTED.

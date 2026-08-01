@@ -6,16 +6,36 @@ import { Building2, MapPin, Mail, Phone } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/db";
+import { isBusinessPubliclyVisible } from "@/lib/marketplace/verification";
 
 type Props = { params: Promise<{ slug: string }> };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
+async function loadPublicBusiness(slug: string) {
   const business = await prisma.business.findUnique({
     where: { slug },
-    select: { name: true, summary: true, category: true, location: true },
+    include: {
+      gigs: {
+        where: { status: "OPEN" },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+      },
+    },
   });
-  if (!business) return { title: "Business not found" };
+  if (!business || !isBusinessPubliclyVisible(business.verifiedAt)) {
+    return null;
+  }
+  return business;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const business = await loadPublicBusiness(slug);
+  if (!business) {
+    return {
+      title: "Business not found",
+      robots: { index: false, follow: false },
+    };
+  }
   const description =
     business.summary?.slice(0, 160) ||
     `${business.name}${business.category ? ` · ${business.category}` : ""}${
@@ -34,20 +54,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BusinessPublicPage({ params }: Props) {
   const { slug } = await params;
-  const business = await prisma.business.findUnique({
-    where: { slug },
-    include: {
-      gigs: {
-        where: { status: "OPEN" },
-        orderBy: { createdAt: "desc" },
-        take: 8,
-      },
-    },
-  });
+  const business = await loadPublicBusiness(slug);
   if (!business) notFound();
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: business.name,
+    description: business.summary || undefined,
+    url: `https://aftionix.tech/b/${business.slug}`,
+    email: business.contactEmail || undefined,
+    telephone: business.contactPhone || undefined,
+    address: business.location
+      ? {
+          "@type": "PostalAddress",
+          addressLocality: business.location,
+        }
+      : undefined,
+  };
 
   return (
     <div className="min-h-screen bg-void text-ink">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <header className="border-b border-border">
         <Container className="flex h-14 items-center justify-between">
           <Link href="/" className="font-display text-sm font-semibold">

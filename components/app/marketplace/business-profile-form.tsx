@@ -136,6 +136,9 @@ export function BusinessProfileForm({
               className={fieldClass}
               placeholder="hello@example.com"
             />
+            <p className="mt-1 text-xs text-ink-faint">
+              Use your account email to verify and publish the public /b/ page.
+            </p>
             {fieldErrors?.contactEmail?.[0] ? (
               <p className="mt-1 text-xs text-danger">
                 {fieldErrors.contactEmail[0]}
