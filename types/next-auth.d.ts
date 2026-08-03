@@ -20,5 +20,7 @@ declare module "next-auth/jwt" {
     id?: string;
     plan?: string;
     role?: string;
+    /** ms epoch — last DB refresh of role/plan */
+    roleRefreshedAt?: number;
   }
 }

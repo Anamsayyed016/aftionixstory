@@ -1,14 +1,20 @@
 /**
  * Promote a user to ADMIN by email.
  *
- * Usage:
+ * LOCAL:
  *   node --env-file=.env scripts/promote-admin.mjs you@example.com
  *
- * Or SQL:
- *   UPDATE "User" SET role = 'ADMIN' WHERE email = 'you@example.com';
+ * PRODUCTION (VPS — uses the server's .env / Docker Postgres, not your laptop DB):
+ *   ssh root@aftionix.tech
+ *   cd /var/www/storyverse-ai
+ *   docker compose exec -T db psql -U storyverse -d storyverse \
+ *     -c "UPDATE \"User\" SET role = 'ADMIN' WHERE email = 'you@example.com' RETURNING id, email, role;"
  *
- * Sign out and back in after promoting so the session picks up the role
- * (admin pages also re-check the DB on every request).
+ * Or from the VPS app dir with Node (same DATABASE_URL as Docker):
+ *   node --env-file=.env scripts/promote-admin.mjs you@example.com
+ *
+ * Sidebar "Admin Dashboard" is DB-backed — a normal page refresh after
+ * promote is enough. JWT role claim also refreshes within ~60s via auth.ts.
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -32,7 +38,7 @@ try {
     select: { id: true, email: true, role: true },
   });
   console.log("Promoted:", updated);
-  console.log("Open /admin after signing in.");
+  console.log("Refresh /dashboard (or sign out/in) — Admin Dashboard should appear.");
 } finally {
   await prisma.$disconnect();
 }

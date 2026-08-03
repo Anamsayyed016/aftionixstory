@@ -81,10 +81,14 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
+      // Keep in sync with proxy.ts protected prefixes.
       const isProtected =
         pathname.startsWith("/dashboard") ||
         pathname.startsWith("/stories") ||
-        pathname.startsWith("/settings");
+        pathname.startsWith("/settings") ||
+        pathname.startsWith("/connect") ||
+        pathname.startsWith("/create") ||
+        pathname.startsWith("/admin");
 
       if (isProtected) {
         return !!auth?.user;
@@ -92,6 +96,8 @@ export const authConfig = {
       return true;
     },
     jwt({ token, user }) {
+      // Edge-safe: no Prisma here (shared with proxy.ts).
+      // Full Node auth in auth.ts refreshes role/plan from DB.
       if (user) {
         token.id = user.id;
         token.plan = user.plan ?? "FREE";
