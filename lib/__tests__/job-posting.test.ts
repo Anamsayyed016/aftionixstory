@@ -4,6 +4,7 @@ import {
   buildGigJobPostingJsonLd,
   escapeHtml,
   gigValidThrough,
+  isGigPastValidThrough,
   isRemoteLocation,
 } from "@/lib/marketplace/job-posting";
 import { isSafeAppPath } from "@/lib/marketplace/schemas";
@@ -39,6 +40,7 @@ describe("JobPosting JSON-LD", () => {
       "@type": "Organization",
       name: "Bright Print Co",
       sameAs: expect.stringContaining("/b/bright-print-co"),
+      logo: expect.stringContaining("/icon.png"),
     });
     expect(ld.jobLocation).toMatchObject({
       address: {
@@ -53,7 +55,7 @@ describe("JobPosting JSON-LD", () => {
     expect(String(ld.description)).not.toMatch(/@/);
   });
 
-  it("uses TELECOMMUTE for remote locations", () => {
+  it("uses TELECOMMUTE for remote locations and states that in description", () => {
     const ld = buildGigJobPostingJsonLd({
       ...baseGig,
       location: "remote",
@@ -64,6 +66,7 @@ describe("JobPosting JSON-LD", () => {
       name: "IN",
     });
     expect(ld.jobLocation).toBeUndefined();
+    expect(String(ld.description)).toMatch(/100% remote/i);
   });
 
   it("rejects unverified businesses", () => {
@@ -73,6 +76,14 @@ describe("JobPosting JSON-LD", () => {
         business: { ...baseGig.business, verifiedAt: null },
       })
     ).toThrow(/verified/);
+  });
+
+  it("flags gigs past validThrough", () => {
+    const old = new Date("2020-01-01T00:00:00.000Z");
+    expect(isGigPastValidThrough(old, new Date("2026-08-01"))).toBe(true);
+    expect(
+      isGigPastValidThrough(new Date("2026-07-01"), new Date("2026-08-01"))
+    ).toBe(false);
   });
 
   it("escapes HTML in descriptions", () => {

@@ -1,12 +1,18 @@
 import type { MetadataRoute } from "next";
 
 import { prisma } from "@/lib/db";
-import { absoluteUrl } from "@/lib/marketplace/job-posting";
+import {
+  absoluteUrl,
+  isGigPastValidThrough,
+} from "@/lib/marketplace/job-posting";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
+  // Only include gigs still within the 60-day JobPosting window.
+  const gigCreatedAfter = new Date(now.getTime());
+  gigCreatedAfter.setUTCDate(gigCreatedAfter.getUTCDate() - 60);
 
   const staticEntries: MetadataRoute.Sitemap = [
     { url: absoluteUrl("/"), lastModified: now, changeFrequency: "weekly", priority: 1 },
@@ -31,13 +37,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     prisma.gigRequest.findMany({
       where: {
         status: "OPEN",
+        createdAt: { gte: gigCreatedAfter },
         business: { verifiedAt: { not: null } },
       },
-      select: { id: true, updatedAt: true },
+      select: { id: true, updatedAt: true, createdAt: true },
       orderBy: { updatedAt: "desc" },
       take: 5000,
     }),
   ]);
+
+  const indexableGigs = openGigs.filter(
+    (g) => !isGigPastValidThrough(g.createdAt, now)
+  );
 
   return [
     ...staticEntries,
@@ -53,7 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.7,
     })),
-    ...openGigs.map((g) => ({
+    ...indexableGigs.map((g) => ({
       url: absoluteUrl(`/g/${g.id}`),
       lastModified: g.updatedAt,
       changeFrequency: "daily" as const,

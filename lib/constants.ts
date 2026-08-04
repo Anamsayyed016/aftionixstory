@@ -207,6 +207,61 @@ export const FEATURE_GROUPS = [
   },
 ] as const;
 
+/**
+ * Simplified /studio product pitch — one card per product (no nested feature grids).
+ * Keep FEATURE_GROUPS for any residual detail links; Features UI uses this list.
+ */
+export const STUDIO_PRODUCT_CARDS = [
+  {
+    id: "story-studio",
+    title: "Story Studio",
+    benefit:
+      "Long-running fiction with memory — characters and plot that stay coherent episode after episode.",
+    href:
+      "/dashboard?prompt=" +
+      encodeURIComponent(
+        "I want to start a new story. Help me shape the concept, then write the first episode."
+      ),
+    cta: "Try Story Studio",
+    status: "live" as const,
+  },
+  {
+    id: "assistant",
+    title: "Ask anything",
+    benefit:
+      "The same chat answers questions, helps with code, and looks up current info — not everything has to be a story.",
+    href:
+      "/dashboard?prompt=" +
+      encodeURIComponent(
+        "What are the key ideas behind good product onboarding for a new SaaS user?"
+      ),
+    cta: "Ask the assistant",
+    status: "live" as const,
+  },
+  {
+    id: "business-directory",
+    title: "Business Directory",
+    benefit:
+      "List your business in chat and get a public /b shopfront with the contact details you choose.",
+    href:
+      "/dashboard?prompt=" +
+      encodeURIComponent(
+        "List my business on the directory. I'll share the name, what we do, location, and contact email."
+      ),
+    cta: "List a business",
+    status: "live" as const,
+  },
+  {
+    id: "freelancer-connect",
+    title: "Freelancer Connect",
+    benefit:
+      "Post gigs or list skills — mutual interest unlocks contact. Connect-only; no payments in v1.",
+    href: "/connect",
+    cta: "Open Connect",
+    status: "live" as const,
+  },
+] as const;
+
 /** @deprecated Prefer FEATURE_GROUPS — kept for any residual imports during transition. */
 export const FEATURES = FEATURE_GROUPS.flatMap((g) =>
   g.features.map((f) => ({ ...f, group: g.id }))

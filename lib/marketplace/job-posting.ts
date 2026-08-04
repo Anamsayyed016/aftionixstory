@@ -34,15 +34,20 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * Gig public after createdAt + 60 days for Google validThrough.
- * Pure helper — no DB column.
+ * Gig is indexable / public until createdAt + 60 days.
  */
-export function gigValidThrough(createdAt: Date, now = new Date()): Date {
+export function gigValidThrough(createdAt: Date): Date {
   const d = new Date(createdAt.getTime());
   d.setUTCDate(d.getUTCDate() + 60);
-  // If somehow already past, still return the computed expiry (caller may 404 OPEN gigs separately)
-  void now;
   return d;
+}
+
+/** True when the 60-day JobPosting window has ended. */
+export function isGigPastValidThrough(
+  createdAt: Date,
+  now: Date = new Date()
+): boolean {
+  return gigValidThrough(createdAt).getTime() < now.getTime();
 }
 
 export type PublicGigForJobPosting = {
@@ -65,6 +70,7 @@ export type PublicGigForJobPosting = {
 /**
  * schema.org JobPosting for Google for Jobs.
  * No contact emails/phones. Omits baseSalary (budget is freeform text).
+ * Logo uses the platform mark (third-party job board pattern per Google).
  */
 export function buildGigJobPostingJsonLd(gig: PublicGigForJobPosting) {
   if (!isBusinessPubliclyVisible(gig.business.verifiedAt)) {
@@ -76,10 +82,15 @@ export function buildGigJobPostingJsonLd(gig: PublicGigForJobPosting) {
   const businessUrl = absoluteUrl(`/b/${gig.business.slug}`);
   const gigUrl = absoluteUrl(`/g/${gig.id}`);
   const validThrough = gigValidThrough(gig.createdAt);
+  const orgLogo = absoluteUrl("/icon.png");
 
-  const descriptionParts = [
-    `<p>${escapeHtml(gig.description)}</p>`,
-  ];
+  const descriptionParts: string[] = [];
+  if (remote) {
+    descriptionParts.push(
+      `<p><strong>This is a 100% remote (TELECOMMUTE) role.</strong> Applicants may work from anywhere in India.</p>`
+    );
+  }
+  descriptionParts.push(`<p>${escapeHtml(gig.description)}</p>`);
   if (gig.skillNeeded) {
     descriptionParts.push(
       `<p><strong>Skill needed:</strong> ${escapeHtml(gig.skillNeeded)}</p>`
@@ -117,6 +128,7 @@ export function buildGigJobPostingJsonLd(gig: PublicGigForJobPosting) {
       "@type": "Organization",
       name: gig.business.name,
       sameAs: businessUrl,
+      logo: orgLogo,
     },
   };
 
@@ -136,7 +148,6 @@ export function buildGigJobPostingJsonLd(gig: PublicGigForJobPosting) {
       },
     };
   } else {
-    // Google requires a location signal; default to India when unspecified.
     jsonLd.jobLocation = {
       "@type": "Place",
       address: {
