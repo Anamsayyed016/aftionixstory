@@ -34,13 +34,44 @@ describe("extractBusinessDraft — informal free text", () => {
   });
 });
 
+describe("extractBusinessDraft — meta listing prompts must not invent fields", () => {
+  it("returns empty for the exact studio starter prompt", () => {
+    const d = extractBusinessDraft(
+      "List my business on the directory. I'll share the name, what we do, location, and contact email."
+    );
+    expect(d).toEqual({});
+  });
+
+  it("returns empty for short list-my-business intent", () => {
+    expect(extractBusinessDraft("List my business on the directory")).toEqual(
+      {}
+    );
+    expect(
+      extractBusinessDraft("I want to list my business, I'll share details")
+    ).toEqual({});
+  });
+
+  it("rejects junk location tokens like Ads", () => {
+    const d = extractBusinessDraft(
+      "name - Aftionix, category - digital marketing, location - Ads"
+    );
+    expect(d.name).toMatch(/Aftionix/i);
+    expect(d.category).toMatch(/digital marketing/i);
+    expect(d.location).toBeUndefined();
+  });
+
+  it("does not take Ads as the business name from a comma list", () => {
+    const d = extractBusinessDraft("Aftionix, digital marketing, Ads");
+    expect(d.name?.toLowerCase()).not.toBe("ads");
+    expect(d.location?.toLowerCase()).not.toBe("ads");
+  });
+});
+
 describe("business profile multi-turn accumulation (bug regression)", () => {
   it("progresses through the exact reported conversation without re-asking name blindly", () => {
-    // Turn 1: starter → empty prior
     let state: unknown = {};
     let prior = readBusinessDraftFromState(state);
 
-    // Turn 2: informal details
     const turn2 = extractBusinessDraft(
       "software developer, hoor, anamsayyed58@gmail.com"
     );
@@ -52,12 +83,8 @@ describe("business profile multi-turn accumulation (bug regression)", () => {
     expect(missingBusinessFields(prior)).toContain("location");
     expect(missingBusinessFields(prior)).not.toContain("business name");
 
-    // Turn 3: follow-up with location (and redundant name)
     const turn3 = extractBusinessDraft("name - hoor, location- banswara");
-    prior = mergeBusinessDrafts(
-      readBusinessDraftFromState(state),
-      turn3
-    );
+    prior = mergeBusinessDrafts(readBusinessDraftFromState(state), turn3);
     state = withBusinessDraftInState(state, prior);
 
     expect(prior.name?.toLowerCase()).toBe("hoor");
@@ -68,7 +95,11 @@ describe("business profile multi-turn accumulation (bug regression)", () => {
 
   it("keeps earlier email when later message only adds location", () => {
     const merged = mergeBusinessDrafts(
-      { name: "hoor", contactEmail: "anamsayyed58@gmail.com", category: "software developer" },
+      {
+        name: "hoor",
+        contactEmail: "anamsayyed58@gmail.com",
+        category: "software developer",
+      },
       extractBusinessDraft("location - banswara")
     );
     expect(merged.contactEmail).toBe("anamsayyed58@gmail.com");

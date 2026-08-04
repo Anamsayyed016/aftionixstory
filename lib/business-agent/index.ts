@@ -14,6 +14,8 @@ import {
   draftHasAnyField,
   extractBusinessDraft,
   formatCaptured,
+  isBusinessListingMetaMessage,
+  isPlausibleBusinessName,
   mergeBusinessDrafts,
   missingBusinessFields,
   readBusinessDraftFromState,
@@ -147,21 +149,56 @@ export async function runBusinessProfileTurn(input: {
   const starter =
     /^(list my business|add my (business|shop)|create (a )?business profile|help me (list|add) (my )?business)\b/i.test(
       input.message.trim()
-    );
+    ) || isBusinessListingMetaMessage(input.message);
 
-  if (starter && !draftHasAnyField(priorDraft) && !existing) {
-    return {
-      assistantReply:
-        "I can list your business on the directory. Tell me the business name, what you do, where you're based, and a contact email (phone optional).",
-      suggestions: [
-        {
-          label: "Example listing",
-          prompt:
-            "My business is called Bright Print Co. We do local printing and branding in Pune. Contact email hello@brightprint.example",
-        },
-      ],
-      nextDraft: priorDraft,
-    };
+  // Meta / starter intent alone — never create a Business from this text.
+  if (starter) {
+    const need = missingBusinessFields(priorDraft);
+    if (!priorDraft.name || !isPlausibleBusinessName(priorDraft.name)) {
+      return {
+        assistantReply:
+          "I can list your business on the directory. Tell me the business name, what you do, where you're based, and a contact email (phone optional).",
+        suggestions: [
+          {
+            label: "Example listing",
+            prompt:
+              "My business is called Bright Print Co. We do local printing and branding in Pune. Contact email hello@brightprint.example",
+          },
+        ],
+        nextDraft: priorDraft,
+      };
+    }
+    if (need.length > 0) {
+      return {
+        assistantReply: `Still need: ${need.join(", ")}. Reply with just those — e.g. "location - Banswara" or "email - ${input.userEmail || "me@example.com"}".`,
+        suggestions: [
+          { label: "Add location", prompt: "location - " },
+          {
+            label: "Add email",
+            prompt: `email - ${input.userEmail || "me@example.com"}`,
+          },
+        ],
+        nextDraft: priorDraft,
+        businessId: existing?.id,
+      };
+    }
+    // Already have a complete draft — remind, don't re-extract meta text into fields
+    if (existing) {
+      return {
+        assistantReply: `Your listing **${existing.name}** is already saved${
+          existing.verifiedAt ? ` at /b/${existing.slug}` : " (not public yet — contact email must match your account email)"
+        }. Send updates like "location - Pune" if you want to change anything.`,
+        suggestions: [
+          {
+            label: "View listing",
+            prompt: "Show my business listing link again",
+          },
+        ],
+        businessId: existing.id,
+        publicPath: existing.verifiedAt ? `/b/${existing.slug}` : undefined,
+        nextDraft: priorDraft,
+      };
+    }
   }
 
   const extracted = extractBusinessDraft(input.message);
@@ -189,15 +226,15 @@ export async function runBusinessProfileTurn(input: {
     };
   }
 
-  // Need name before we persist to DB
-  if (!merged.name?.trim()) {
-    const captured = formatCaptured(merged);
+  // Need a plausible name before we persist to DB
+  if (!merged.name?.trim() || !isPlausibleBusinessName(merged.name)) {
+    const captured = formatCaptured({ ...merged, name: undefined });
     return {
       assistantReply: captured
         ? `Got it so far (${captured}). What's the business name?`
         : `What's the business name? You can also include category, location, and contact email.`,
       suggestions: [],
-      nextDraft: merged,
+      nextDraft: { ...merged, name: undefined },
     };
   }
 
