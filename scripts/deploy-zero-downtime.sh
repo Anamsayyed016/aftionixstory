@@ -64,10 +64,15 @@ echo "==> Building standalone image (commit ${BUILD_ID})"
 docker compose build "web_${NEXT}"
 
 echo "==> Applying Prisma migrations (old app still serving)"
-set -a
-# shellcheck disable=SC1091
-source ./.env
-set +a
+# Load DATABASE_URL only — never `source .env` (spaces after `=` break bash).
+DATABASE_URL="$(
+  grep -E '^[[:space:]]*DATABASE_URL=' .env | tail -n1 | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+)"
+if [[ -z "${DATABASE_URL}" ]]; then
+  echo "ERROR: DATABASE_URL missing from .env"
+  exit 1
+fi
+export DATABASE_URL
 docker run --rm \
   --network storyverse-ai_default \
   -v "$ROOT_DIR/prisma:/prisma" \
