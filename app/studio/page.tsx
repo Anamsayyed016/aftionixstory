@@ -3,23 +3,17 @@ import { SiteHeader } from "@/components/shared/site-header";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { Hero } from "@/components/landing/hero";
 import { Features } from "@/components/landing/features";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { ProductShowcase } from "@/components/landing/product-showcase";
-import { Testimonials } from "@/components/landing/testimonials";
 import { Pricing } from "@/components/landing/pricing";
-import { FAQ } from "@/components/landing/faq";
-import { FinalCta } from "@/components/landing/final-cta";
 
 export const metadata: Metadata = {
-  title: "AFTIONIX Studio — One assistant. Stories, answers, and what's next.",
+  title: "AFTIONIX Studio — Stories, answers, businesses, and gigs",
   description:
-    "An AI platform for writing stories with memory, getting answers, listing businesses, and connecting freelancers to gigs.",
+    "Write stories, ask questions, list a business, or find a freelancer — in one place.",
 };
 
 /**
  * Static marketing page — must not query the database at build time.
- * Docker `npm run build` has no Postgres (db:5432); a Prisma call here
- * fails the whole image build ("Export encountered an error on /studio").
+ * Keep the first screen scannable: intro + four products. Pricing stays for #pricing.
  */
 export default function StudioLandingPage() {
   return (
@@ -28,12 +22,7 @@ export default function StudioLandingPage() {
       <main className="flex-1">
         <Hero />
         <Features />
-        <HowItWorks />
-        <ProductShowcase />
-        <Testimonials />
         <Pricing />
-        <FAQ />
-        <FinalCta />
       </main>
       <SiteFooter />
     </>

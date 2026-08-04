@@ -209,56 +209,56 @@ export const FEATURE_GROUPS = [
 
 /**
  * Simplified /studio product pitch — one card per product (no nested feature grids).
- * Keep FEATURE_GROUPS for any residual detail links; Features UI uses this list.
  */
 export const STUDIO_PRODUCT_CARDS = [
   {
     id: "story-studio",
     title: "Story Studio",
     benefit:
-      "Long-running fiction with memory — characters and plot that stay coherent episode after episode.",
+      "Write long-running fiction that remembers characters and plot.",
     href:
       "/dashboard?prompt=" +
       encodeURIComponent(
         "I want to start a new story. Help me shape the concept, then write the first episode."
       ),
-    cta: "Try Story Studio",
+    cta: "Try it",
     status: "live" as const,
+    featured: true,
   },
   {
     id: "assistant",
-    title: "Ask anything",
-    benefit:
-      "The same chat answers questions, helps with code, and looks up current info — not everything has to be a story.",
+    title: "Ask Anything",
+    benefit: "Questions, code help, and current info in the same chat.",
     href:
       "/dashboard?prompt=" +
       encodeURIComponent(
         "What are the key ideas behind good product onboarding for a new SaaS user?"
       ),
-    cta: "Ask the assistant",
+    cta: "Try it",
     status: "live" as const,
+    featured: false,
   },
   {
     id: "business-directory",
     title: "Business Directory",
-    benefit:
-      "List your business in chat and get a public /b shopfront with the contact details you choose.",
+    benefit: "List your business in chat and get a public shopfront page.",
     href:
       "/dashboard?prompt=" +
       encodeURIComponent(
         "List my business on the directory. I'll share the name, what we do, location, and contact email."
       ),
-    cta: "List a business",
+    cta: "Try it",
     status: "live" as const,
+    featured: false,
   },
   {
     id: "freelancer-connect",
     title: "Freelancer Connect",
-    benefit:
-      "Post gigs or list skills — mutual interest unlocks contact. Connect-only; no payments in v1.",
+    benefit: "Post gigs or list skills — mutual interest unlocks contact.",
     href: "/connect",
-    cta: "Open Connect",
+    cta: "Try it",
     status: "live" as const,
+    featured: false,
   },
 ] as const;
 

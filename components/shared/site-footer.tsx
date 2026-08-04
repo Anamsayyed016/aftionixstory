@@ -8,7 +8,6 @@ const FOOTER_LINKS = {
     { label: "Business Directory", href: "/connect/business" },
     { label: "Freelancer Connect", href: "/connect" },
     { label: "Features", href: "/studio#features" },
-    { label: "How it works", href: "/studio#how-it-works" },
     { label: "Pricing", href: "/studio#pricing" },
   ],
   Company: [
