@@ -161,7 +161,14 @@ export default async function BusinessPublicPage({ params }: Props) {
                   key={gig.id}
                   className="rounded-xl border border-border bg-panel/40 p-5"
                 >
-                  <h3 className="font-medium text-ink">{gig.title}</h3>
+                  <h3 className="font-medium text-ink">
+                    <Link
+                      href={`/g/${gig.id}`}
+                      className="hover:text-lilac hover:underline"
+                    >
+                      {gig.title}
+                    </Link>
+                  </h3>
                   <p className="mt-2 text-sm leading-relaxed text-ink-dim">
                     {gig.description}
                   </p>
@@ -171,6 +178,12 @@ export default async function BusinessPublicPage({ params }: Props) {
                     ) : null}
                     {gig.location ? <span>· {gig.location}</span> : null}
                     {gig.budget ? <span>· Budget: {gig.budget}</span> : null}
+                    <Link
+                      href={`/g/${gig.id}`}
+                      className="text-lilac hover:underline"
+                    >
+                      View gig →
+                    </Link>
                   </div>
                 </li>
               ))}
