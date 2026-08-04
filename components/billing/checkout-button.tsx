@@ -68,11 +68,19 @@ export function CheckoutButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = (await res.json()) as {
+      const raw = await res.text();
+      let data: {
         error?: string;
         subscriptionId?: string;
         keyId?: string;
-      };
+      } = {};
+      try {
+        data = raw ? (JSON.parse(raw) as typeof data) : {};
+      } catch {
+        throw new Error(
+          res.ok ? "Invalid billing response" : `Checkout failed (${res.status})`
+        );
+      }
       if (!res.ok || !data.subscriptionId || !data.keyId) {
         if (res.status === 401) {
           router.push(
