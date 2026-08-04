@@ -71,8 +71,13 @@ export function CheckoutButton({
       const raw = await res.text();
       let data: {
         error?: string;
+        mode?: "subscription" | "order";
         subscriptionId?: string;
+        orderId?: string;
+        amount?: number;
+        currency?: string;
         keyId?: string;
+        prefill?: { email?: string; name?: string };
       } = {};
       try {
         data = raw ? (JSON.parse(raw) as typeof data) : {};
@@ -81,22 +86,31 @@ export function CheckoutButton({
           res.ok ? "Invalid billing response" : `Checkout failed (${res.status})`
         );
       }
-      if (!res.ok || !data.subscriptionId || !data.keyId) {
-        if (res.status === 401) {
-          router.push(
-            `/sign-in?callbackUrl=${encodeURIComponent("/studio#pricing")}`
-          );
-          return;
-        }
+
+      if (res.status === 401) {
+        router.push(
+          `/sign-in?callbackUrl=${encodeURIComponent("/studio#pricing")}`
+        );
+        return;
+      }
+
+      if (!res.ok || !data.keyId) {
+        throw new Error(data.error || "Could not start checkout");
+      }
+
+      const isOrder = data.mode === "order" || Boolean(data.orderId);
+      if (isOrder && (!data.orderId || !data.amount)) {
+        throw new Error(data.error || "Could not start checkout");
+      }
+      if (!isOrder && !data.subscriptionId) {
         throw new Error(data.error || "Could not start checkout");
       }
 
       await loadRazorpayScript();
       if (!window.Razorpay) throw new Error("Razorpay Checkout unavailable");
 
-      const rzp = new window.Razorpay({
+      const options: Record<string, unknown> = {
         key: data.keyId,
-        subscription_id: data.subscriptionId,
         name: "AFTIONIX Studio",
         description: `${plan === "WRITER" ? "Writer" : "Studio"} plan`,
         theme: { color: "#0e7490" },
@@ -105,12 +119,21 @@ export function CheckoutButton({
           router.push("/settings?billing=pending");
           router.refresh();
         },
-      });
+      };
 
+      if (isOrder) {
+        options.order_id = data.orderId;
+        options.amount = data.amount;
+        options.currency = data.currency || "INR";
+        if (data.prefill) options.prefill = data.prefill;
+      } else {
+        options.subscription_id = data.subscriptionId;
+      }
+
+      const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", () => {
         setError("Payment failed. You can try again.");
       });
-
       rzp.open();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");

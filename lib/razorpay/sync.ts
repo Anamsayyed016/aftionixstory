@@ -128,6 +128,65 @@ export async function syncSubscriptionFromRazorpayEntity(entity: {
   return subscription;
 }
 
+/**
+ * Grant plan access after a captured Order payment (subscriptions fallback).
+ * Webhook-only — never trust client checkout success alone.
+ */
+export async function activatePaidPlanFromOrderPayment(payment: {
+  order_id?: string | null;
+  notes?: Record<string, string> | null;
+  created_at?: number | null;
+}) {
+  const orderId = payment.order_id;
+  if (!orderId) return null;
+
+  const existing = await prisma.subscription.findUnique({
+    where: { razorpaySubscriptionId: orderId },
+  });
+
+  const notes = payment.notes || undefined;
+  const plan =
+    existing?.plan ??
+    planFromNotes(notes as Record<string, string> | undefined);
+  const userId = existing?.userId ?? notes?.userId;
+
+  if (!userId || !plan || !isPaidPlan(plan)) {
+    throw new Error("Cannot resolve order payment entitlements");
+  }
+
+  const currentPeriodEnd = new Date(
+    ((payment.created_at || Math.floor(Date.now() / 1000)) + 30 * 24 * 60 * 60) *
+      1000
+  );
+
+  const subscription = await prisma.subscription.upsert({
+    where: { razorpaySubscriptionId: orderId },
+    create: {
+      userId,
+      plan,
+      status: "ACTIVE",
+      razorpaySubscriptionId: orderId,
+      razorpayPlanId: existing?.razorpayPlanId || `order_${plan}`,
+      currentPeriodEnd,
+    },
+    update: {
+      status: "ACTIVE",
+      currentPeriodEnd,
+    },
+  });
+
+  const limits = getPlanLimits(plan);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      plan,
+      generationLimit: limits.generationLimit,
+    },
+  });
+
+  return subscription;
+}
+
 export async function markSubscriptionPastDue(razorpaySubscriptionId: string) {
   const existing = await prisma.subscription.findUnique({
     where: { razorpaySubscriptionId },

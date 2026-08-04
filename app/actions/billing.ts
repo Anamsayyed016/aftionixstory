@@ -22,8 +22,19 @@ export async function cancelSubscriptionAction() {
     throw new Error("No active subscription to cancel");
   }
 
-  const razorpay = getRazorpayClient();
-  await razorpay.subscriptions.cancel(active.razorpaySubscriptionId, false);
+  const isOrderBacked = active.razorpaySubscriptionId.startsWith("order_");
+
+  if (!isOrderBacked) {
+    const razorpay = getRazorpayClient();
+    try {
+      await razorpay.subscriptions.cancel(active.razorpaySubscriptionId, false);
+    } catch (err) {
+      console.error(
+        "[billing.cancel]",
+        err instanceof Error ? err.message : "cancel_failed"
+      );
+    }
+  }
 
   await prisma.subscription.update({
     where: { id: active.id },

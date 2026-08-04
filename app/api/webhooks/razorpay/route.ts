@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { verifyRazorpayWebhookSignature } from "@/lib/razorpay/client";
 import {
-  verifyRazorpayWebhookSignature,
-} from "@/lib/razorpay/client";
-import {
+  activatePaidPlanFromOrderPayment,
   markSubscriptionPastDue,
   syncSubscriptionFromRazorpayEntity,
 } from "@/lib/razorpay/sync";
@@ -15,6 +14,7 @@ type WebhookPayload = {
   payload?: {
     subscription?: { entity?: Record<string, unknown> };
     payment?: { entity?: Record<string, unknown> };
+    order?: { entity?: Record<string, unknown> };
   };
 };
 
@@ -64,24 +64,46 @@ export async function POST(req: Request) {
         await syncSubscriptionFromRazorpayEntity(subscriptionEntity);
         break;
       }
+      case "payment.captured":
+      case "order.paid": {
+        const paymentEntity = (payload.payload?.payment?.entity ||
+          {}) as {
+          order_id?: string;
+          notes?: Record<string, string>;
+          created_at?: number;
+          status?: string;
+        };
+        const orderEntity = (payload.payload?.order?.entity || {}) as {
+          id?: string;
+          notes?: Record<string, string>;
+          created_at?: number;
+        };
+
+        await activatePaidPlanFromOrderPayment({
+          order_id: paymentEntity.order_id || orderEntity.id,
+          notes: paymentEntity.notes || orderEntity.notes,
+          created_at: paymentEntity.created_at || orderEntity.created_at,
+        });
+        break;
+      }
       case "payment.failed": {
         const notes = (payload.payload?.payment?.entity?.notes ||
           {}) as Record<string, string>;
         const subId =
           (payload.payload?.payment?.entity?.subscription_id as
             | string
-            | undefined) || notes.subscription_id;
+            | undefined) ||
+          (payload.payload?.payment?.entity?.order_id as string | undefined) ||
+          notes.subscription_id;
         if (typeof subId === "string" && subId) {
           await markSubscriptionPastDue(subId);
         }
         break;
       }
       default:
-        // Acknowledge unknown events so Razorpay does not retry forever.
         break;
     }
   } catch (err) {
-    // Do not include secrets; log only safe message.
     console.error(
       "[razorpay.webhook]",
       event,

@@ -37,8 +37,13 @@ export function isRazorpayTestMode(): boolean {
 export function isRazorpayConfigured(): boolean {
   return Boolean(
     process.env.RAZORPAY_KEY_ID?.trim() &&
-      process.env.RAZORPAY_KEY_SECRET?.trim() &&
-      process.env.RAZORPAY_PLAN_WRITER_ID?.trim() &&
+      process.env.RAZORPAY_KEY_SECRET?.trim()
+  );
+}
+
+export function hasRazorpayPlanIds(): boolean {
+  return Boolean(
+    process.env.RAZORPAY_PLAN_WRITER_ID?.trim() &&
       process.env.RAZORPAY_PLAN_STUDIO_ID?.trim()
   );
 }

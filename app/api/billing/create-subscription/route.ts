@@ -2,14 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/auth";
+import { PAID_PLAN_INR, isPaidPlan, type PaidPlan } from "@/lib/billing/plans";
 import { prisma } from "@/lib/db";
 import {
   getRazorpayClient,
   getRazorpayKeyId,
-  isPaidPlan,
   isRazorpayConfigured,
   razorpayPlanIdFor,
-  type PaidPlan,
 } from "@/lib/razorpay/client";
 
 export const runtime = "nodejs";
@@ -18,80 +17,24 @@ const bodySchema = z.object({
   plan: z.enum(["WRITER", "STUDIO"]),
 });
 
-type RazorpayCustomer = { id: string };
-
 function razorpayErrorMessage(err: unknown): string {
   if (!err || typeof err !== "object") return "Billing request failed";
   const e = err as {
-    error?: { description?: string; code?: string };
-    statusCode?: number;
+    error?: { description?: string; code?: string; field?: string };
     message?: string;
   };
-  return (
-    e.error?.description ||
-    e.message ||
-    "Billing request failed"
-  );
+  const field = e.error?.field ? ` (${e.error.field})` : "";
+  return (e.error?.description || e.message || "Billing request failed") + field;
 }
 
-function isCustomerExistsError(err: unknown): boolean {
-  const msg = razorpayErrorMessage(err).toLowerCase();
-  return msg.includes("customer already exists");
-}
-
-async function getOrCreateRazorpayCustomer(
-  razorpay: ReturnType<typeof getRazorpayClient>,
-  user: { id: string; email: string; name: string | null }
-): Promise<RazorpayCustomer> {
-  try {
-    // Prefer returning an existing customer; SDK types accept 0|1.
-    // If Razorpay still rejects as "already exists", fall through to lookup.
-    const customer = await razorpay.customers.create({
-      name: user.name || user.email.split("@")[0],
-      email: user.email,
-      fail_existing: 0,
-      notes: { userId: user.id },
-    });
-    return { id: String(customer.id) };
-  } catch (err) {
-    if (!isCustomerExistsError(err)) throw err;
-
-    // Reuse customer id from a prior Subscription row if we have one.
-    const prior = await prisma.subscription.findFirst({
-      where: {
-        userId: user.id,
-        razorpayCustomerId: { not: null },
-      },
-      orderBy: { createdAt: "desc" },
-      select: { razorpayCustomerId: true },
-    });
-    if (prior?.razorpayCustomerId) {
-      return { id: prior.razorpayCustomerId };
-    }
-
-    // SDK pagination types omit email — Razorpay accepts it at runtime.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const listed = (await (razorpay.customers.all as any)({
-      email: user.email,
-      count: 10,
-    })) as { items?: Array<{ id: string; email?: string }> };
-
-    const existing =
-      listed.items?.find(
-        (c) => (c.email || "").toLowerCase() === user.email.toLowerCase()
-      ) || listed.items?.[0];
-
-    if (!existing?.id) {
-      throw new Error("Customer exists but could not be loaded");
-    }
-    return { id: String(existing.id) };
-  }
+function isValidationFailed(err: unknown): boolean {
+  return razorpayErrorMessage(err).toLowerCase().includes("validation failed");
 }
 
 /**
- * Creates a Razorpay subscription for the signed-in user.
- * Returns subscription_id + public key_id for Checkout — does NOT grant plan access.
- * Access is granted only via verified webhooks.
+ * Prefer Subscriptions API; if the merchant account rejects subscription
+ * create (common when recurring is not enabled), fall back to a one-time
+ * Order for the monthly amount. Webhook still grants access.
  */
 export async function POST(req: Request) {
   try {
@@ -123,19 +66,55 @@ export async function POST(req: Request) {
     });
 
     const razorpay = getRazorpayClient();
-    const razorpayPlanId = razorpayPlanIdFor(plan);
-    const customer = await getOrCreateRazorpayCustomer(razorpay, user);
+    const amountPaise = PAID_PLAN_INR[plan] * 100;
+    const notes = { userId: user.id, plan };
+    const keyId = getRazorpayKeyId();
 
-    const subscription = await razorpay.subscriptions.create({
-      plan_id: razorpayPlanId,
-      // Razorpay requires finite total_count — 120 months ≈ ongoing.
-      total_count: 120,
-      quantity: 1,
-      customer_notify: 1,
-      notes: {
-        userId: user.id,
+    // --- Try true Razorpay Subscription (recurring) ---
+    let razorpayPlanId = "";
+    try {
+      razorpayPlanId = razorpayPlanIdFor(plan);
+      const subscription = await razorpay.subscriptions.create({
+        plan_id: razorpayPlanId,
+        total_count: 120,
+        quantity: 1,
+        customer_notify: true as unknown as 0 | 1,
+        notes,
+      });
+
+      await prisma.subscription.create({
+        data: {
+          userId: user.id,
+          plan,
+          status: "CREATED",
+          razorpaySubscriptionId: String(subscription.id),
+          razorpayPlanId,
+        },
+      });
+
+      return NextResponse.json({
+        mode: "subscription",
+        subscriptionId: subscription.id,
+        keyId,
         plan,
-      },
+      });
+    } catch (subErr) {
+      // Recurring not enabled / merchant rejection → Order checkout.
+      if (!isValidationFailed(subErr)) {
+        throw subErr;
+      }
+      console.error(
+        "[billing.create-subscription] subscriptions.create failed; using order fallback:",
+        razorpayErrorMessage(subErr)
+      );
+    }
+
+    // --- Order fallback (one-time monthly charge) ---
+    const order = await razorpay.orders.create({
+      amount: amountPaise,
+      currency: "INR",
+      receipt: `plan_${plan}_${user.id.slice(0, 8)}_${Date.now()}`.slice(0, 40),
+      notes,
     });
 
     await prisma.subscription.create({
@@ -143,16 +122,23 @@ export async function POST(req: Request) {
         userId: user.id,
         plan,
         status: "CREATED",
-        razorpayCustomerId: customer.id,
-        razorpaySubscriptionId: String(subscription.id),
-        razorpayPlanId,
+        // Store order id in this column until Subscriptions API works.
+        razorpaySubscriptionId: String(order.id),
+        razorpayPlanId: razorpayPlanId || `order_${plan}`,
       },
     });
 
     return NextResponse.json({
-      subscriptionId: subscription.id,
-      keyId: getRazorpayKeyId(),
+      mode: "order",
+      orderId: order.id,
+      amount: amountPaise,
+      currency: "INR",
+      keyId,
       plan,
+      prefill: {
+        email: user.email,
+        name: user.name || undefined,
+      },
     });
   } catch (err) {
     console.error(
