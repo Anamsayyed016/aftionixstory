@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 
 import "./globals.css";
 
@@ -44,16 +43,22 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className="h-full antialiased">
       <head>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      </head>
-      <body className="min-h-full flex flex-col bg-void text-ink font-sans">
-        <Script
-          id="google-adsense"
+        {/*
+          AdSense verification crawlers often read initial SSR HTML without JS.
+          next/script afterInteractive only preloads — use a raw head script so
+          view-source / curl show the real <script src="...adsbygoogle.js?client=...">.
+        */}
+        <script
           async
           src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
           crossOrigin="anonymous"
-          strategy="afterInteractive"
         />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
+      <body className="min-h-full flex flex-col bg-void text-ink font-sans">
         {children}
       </body>
     </html>
