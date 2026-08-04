@@ -104,31 +104,40 @@ if [[ "$ok" -ne 1 ]]; then
 fi
 
 echo "==> Switching Nginx traffic to :${NEXT_PORT}"
-python3 - <<PY
+export SITE_FILE NEXT_PORT
+python3 - <<'PY'
 from pathlib import Path
+import os
 import re
-path = Path("${SITE_FILE}")
+
+path = Path(os.environ["SITE_FILE"])
+next_port = os.environ["NEXT_PORT"]
 text = path.read_text()
-next_port = "${NEXT_PORT}"
-replaced = False
+replaced = 0
 out = []
 for line in text.splitlines(keepends=True):
-    if (not replaced) and re.search(r"proxy_pass http://127\\.0\\.0\\.1:(3000|3001);", line):
-        indent = re.match(r"^(\\s*)", line).group(1)
+    if "storyverse-upstream.conf" in line:
+        continue
+    if re.search(r"set \$storyverse_upstream 127\.0\.0\.1:(3000|3001);", line):
+        indent = re.match(r"^(\s*)", line).group(1)
+        out.append(f"{indent}set $storyverse_upstream 127.0.0.1:{next_port};\n")
+        replaced += 1
+        continue
+    if re.search(r"proxy_pass http://127\.0\.0\.1:(3000|3001);", line):
+        indent = re.match(r"^(\s*)", line).group(1)
         out.append(f"{indent}proxy_pass http://127.0.0.1:{next_port};\n")
-        replaced = True
-    elif (not replaced) and "proxy_pass http://storyverse_backend;" in line:
-        indent = re.match(r"^(\\s*)", line).group(1)
+        replaced += 1
+        continue
+    if "proxy_pass http://storyverse_backend;" in line:
+        indent = re.match(r"^(\s*)", line).group(1)
         out.append(f"{indent}proxy_pass http://127.0.0.1:{next_port};\n")
-        replaced = True
-    else:
-        if "storyverse-upstream.conf" in line:
-            continue
-        out.append(line)
-if not replaced:
-    raise SystemExit("Could not find proxy_pass target to update in Nginx site config")
+        replaced += 1
+        continue
+    out.append(line)
+if replaced < 1:
+    raise SystemExit("Could not find proxy_pass / $storyverse_upstream target in Nginx site config")
 path.write_text("".join(out))
-print(f"nginx proxy_pass -> 127.0.0.1:{next_port}")
+print(f"nginx upstream -> 127.0.0.1:{next_port} ({replaced} replacement(s))")
 PY
 nginx -t
 systemctl reload nginx
