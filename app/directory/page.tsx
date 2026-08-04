@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Building2, MapPin, Search } from "lucide-react";
+import { Building2, ChevronDown, MapPin, Search } from "lucide-react";
 
 import { SiteHeader } from "@/components/shared/site-header";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { Container } from "@/components/ui/container";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/db";
 import {
   DIRECTORY_CATEGORIES,
@@ -17,7 +18,7 @@ import {
 export const metadata: Metadata = {
   title: "Business Directory — AFTIONIX",
   description:
-    "Browse and search verified local businesses on AFTIONIX.",
+    "Browse verified local businesses by city on AFTIONIX.",
 };
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,8 @@ export default async function DirectoryPage({
       : businesses
   ).slice(0, 60);
 
+  const cityEmpty = Boolean(city) && filtered.length === 0;
+
   return (
     <>
       <SiteHeader />
@@ -96,51 +99,58 @@ export default async function DirectoryPage({
               Directory
             </p>
             <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-              Find a business
+              Browse by city
             </h1>
             <p className="mt-2 max-w-xl text-sm text-ink-dim">
-              Search verified listings. No ratings or map distances yet — only
-              what merchants publish.
+              Enter a city to find verified local businesses. No ratings or map
+              distances yet — only what merchants publish.
             </p>
 
-            <form
-              method="get"
-              className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-end"
-            >
-              <label className="block min-w-0 flex-1">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-                  Search
-                </span>
-                <div className="relative mt-1.5">
-                  <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+            <form method="get" className="mt-8 space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="block min-w-0 flex-1">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                    City
+                  </span>
+                  <div className="relative mt-1.5">
+                    <MapPin className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+                    <input
+                      name="city"
+                      defaultValue={city}
+                      placeholder="e.g. Pune"
+                      autoComplete="address-level2"
+                      className="w-full rounded-md border border-border bg-panel py-2.5 pr-3 pl-10 text-sm text-ink outline-none focus:border-violet"
+                    />
+                  </div>
+                </label>
+                {activeCategory ? (
+                  <input
+                    type="hidden"
+                    name="category"
+                    value={activeCategory.id}
+                  />
+                ) : null}
+                <Button type="submit" size="md" className="sm:shrink-0">
+                  Browse
+                </Button>
+              </div>
+
+              <details className="group" open={q ? true : undefined}>
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm text-ink-dim hover:text-ink [&::-webkit-details-marker]:hidden">
+                  <Search className="h-3.5 w-3.5" />
+                  <span>Filter by keyword</span>
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                </summary>
+                <label className="mt-3 block max-w-md">
+                  <span className="sr-only">Keyword search</span>
                   <input
                     name="q"
                     defaultValue={q}
                     placeholder="Name, category, or keyword"
-                    className="w-full rounded-md border border-border bg-panel py-2.5 pr-3 pl-10 text-sm text-ink outline-none focus:border-violet"
+                    className="w-full rounded-md border border-border bg-panel px-3 py-2.5 text-sm text-ink outline-none focus:border-violet"
                   />
-                </div>
-              </label>
-              <label className="block w-full sm:w-48">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-                  City / area
-                </span>
-                <input
-                  name="city"
-                  defaultValue={city}
-                  placeholder="e.g. Pune"
-                  className="mt-1.5 w-full rounded-md border border-border bg-panel px-3 py-2.5 text-sm text-ink outline-none focus:border-violet"
-                />
-              </label>
-              {activeCategory ? (
-                <input type="hidden" name="category" value={activeCategory.id} />
-              ) : null}
-              <button
-                type="submit"
-                className="rounded-md bg-violet px-5 py-2.5 text-sm font-medium text-white hover:opacity-90"
-              >
-                Search
-              </button>
+                </label>
+              </details>
             </form>
           </Container>
         </section>
@@ -194,13 +204,32 @@ export default async function DirectoryPage({
             </div>
 
             {filtered.length === 0 ? (
-              <GlassCard className="mt-8 p-8 text-center text-sm text-ink-dim">
-                No verified businesses match yet. Try another city or category,
-                or{" "}
-                <Link href="/connect/business" className="text-lilac hover:underline">
-                  list yours
-                </Link>
-                .
+              <GlassCard className="mt-8 p-8 text-center">
+                {cityEmpty ? (
+                  <>
+                    <p className="text-sm text-ink-dim">
+                      No businesses in {city} yet — be the first to list yours
+                    </p>
+                    <Link
+                      href="/connect/business"
+                      className="mt-4 inline-flex rounded-md bg-violet px-5 py-2.5 text-sm font-medium text-white hover:opacity-90"
+                    >
+                      List your business
+                    </Link>
+                  </>
+                ) : (
+                  <p className="text-sm text-ink-dim">
+                    No verified businesses match yet. Try another city or
+                    category, or{" "}
+                    <Link
+                      href="/connect/business"
+                      className="text-lilac hover:underline"
+                    >
+                      list yours
+                    </Link>
+                    .
+                  </p>
+                )}
               </GlassCard>
             ) : (
               <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
