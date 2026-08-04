@@ -3,13 +3,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Building2, MapPin, Mail, Phone } from "lucide-react";
 
+import { auth } from "@/auth";
 import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
 import { BackLink } from "@/components/ui/back-link";
+import { GoogleBusinessProfileNudge } from "@/components/app/marketplace/google-business-profile-nudge";
 import { prisma } from "@/lib/db";
 import { isBusinessPubliclyVisible } from "@/lib/marketplace/verification";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ gbp?: string | string[] }>;
+};
+
+function first(v: string | string[] | undefined): string {
+  if (Array.isArray(v)) return v[0] ?? "";
+  return v ?? "";
+}
 
 async function loadPublicBusiness(slug: string) {
   const business = await prisma.business.findUnique({
@@ -53,10 +63,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function BusinessPublicPage({ params }: Props) {
+export default async function BusinessPublicPage({
+  params,
+  searchParams,
+}: Props) {
   const { slug } = await params;
+  const sp = await searchParams;
   const business = await loadPublicBusiness(slug);
   if (!business) notFound();
+
+  const session = await auth();
+  const isOwner = Boolean(
+    session?.user?.id && session.user.id === business.ownerUserId
+  );
+  const showGbpNudge =
+    first(sp.gbp) === "1" &&
+    (isOwner ||
+      process.env.NODE_ENV === "development" ||
+      process.env.MARKETPLACE_PREVIEW === "1");
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -147,6 +171,19 @@ export default async function BusinessPublicPage({ params }: Props) {
             </span>
           ) : null}
         </div>
+
+        {showGbpNudge ? (
+          <GoogleBusinessProfileNudge
+            businessId={business.id}
+            business={{
+              name: business.name,
+              category: business.category,
+              location: business.location,
+              contactPhone: business.contactPhone,
+              contactEmail: business.contactEmail,
+            }}
+          />
+        ) : null}
 
         {business.gigs.length > 0 ? (
           <section className="mt-14">

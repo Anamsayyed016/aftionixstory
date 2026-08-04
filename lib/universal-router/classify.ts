@@ -166,6 +166,7 @@ export function classifyUniversalIntentDeterministic(
 
   // ---- Business directory profile ----
   if (
+    /\bhelp me list on google maps\b/i.test(lower) ||
     /\b(list (my )?business|add (my )?(business|shop|store)( to (the )?directory)?|business (directory )?profile|create (a )?business (listing|profile))\b/i.test(
       lower
     ) ||

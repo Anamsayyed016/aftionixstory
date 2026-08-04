@@ -45,6 +45,14 @@ describe("marketplace intent disambiguation", () => {
     expect(hit!.intent).toBe("business_profile_request");
   });
 
+  it("routes Google Maps assist prompt to business_profile_request", () => {
+    const hit = classifyUniversalIntentDeterministic({
+      userMessage: "Help me list on Google Maps",
+      conversationFlow: DEFAULT_CONVERSATION_FLOW,
+    });
+    expect(hit!.intent).toBe("business_profile_request");
+  });
+
   it("keeps generate-an-image as image_generation_request", () => {
     const hit = classifyUniversalIntentDeterministic({
       userMessage: "Generate an image of a mountain at sunrise",

@@ -3,6 +3,13 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { saveBusinessProfile } from "@/lib/marketplace/mutations";
 import { businessProfileSchema } from "@/lib/marketplace/schemas";
+import { absoluteUrl } from "@/lib/marketplace/job-posting";
+import {
+  formatBusinessDetailsForClipboard,
+  GBP_CHAT_PROMPT,
+  GOOGLE_BUSINESS_PROFILE_CREATE_URL,
+  isGbpAssistPrompt,
+} from "@/lib/marketplace/google-business-profile";
 import {
   draftHasAnyField,
   extractBusinessDraft,
@@ -46,7 +53,7 @@ export async function upsertBusinessFromDraft(input: {
     userId: input.userId,
     data: parsed.data,
     fallbackEmail: input.fallbackEmail,
-  });
+  }).then((result) => result.business);
 }
 
 function draftFromBusiness(row: {
@@ -92,6 +99,50 @@ export async function runBusinessProfileTurn(input: {
     existing ? draftFromBusiness(existing) : {},
     readBusinessDraftFromState(input.conversationState)
   );
+
+  if (isGbpAssistPrompt(input.message)) {
+    if (existing?.verifiedAt) {
+      const helperPath = `${absoluteUrl(`/b/${existing.slug}`)}?gbp=1`;
+      const details = formatBusinessDetailsForClipboard(existing);
+      return {
+        assistantReply: [
+          `You're already listed on AFTIONIX at /b/${existing.slug}.`,
+          ``,
+          `Want to also show up on Google Maps? It takes about 5 minutes. Google's signup is separate — we don't create the Maps listing for you.`,
+          ``,
+          `1) Copy these details:`,
+          details,
+          ``,
+          `2) Open the helper card on your listing (one-click copy): ${helperPath}`,
+          `3) Or go straight to Google Business Profile: ${GOOGLE_BUSINESS_PROFILE_CREATE_URL}`,
+        ].join("\n"),
+        suggestions: [
+          {
+            label: "View listing",
+            prompt: "Show my business listing link again",
+          },
+          {
+            label: "Post a gig",
+            prompt: "I need someone for a day of deliveries",
+          },
+        ],
+        businessId: existing.id,
+        publicPath: `/b/${existing.slug}?gbp=1`,
+        nextDraft: priorDraft,
+      };
+    }
+    return {
+      assistantReply:
+        "Get your AFTIONIX directory listing live first (set contact email to your account email to verify). After that, tap “Help me list on Google Maps” and I’ll help you copy your details into Google’s signup — we don’t create the Maps listing for you.",
+      suggestions: [
+        {
+          label: "List my business",
+          prompt: "List my business on the directory",
+        },
+      ],
+      nextDraft: priorDraft,
+    };
+  }
 
   const starter =
     /^(list my business|add my (business|shop)|create (a )?business profile|help me (list|add) (my )?business)\b/i.test(
@@ -157,6 +208,7 @@ export async function runBusinessProfileTurn(input: {
     }.`;
   }
 
+  const previouslyVerified = existing?.verifiedAt != null;
   const business = await upsertBusinessFromDraft({
     userId: input.userId,
     draft: merged,
@@ -170,6 +222,7 @@ export async function runBusinessProfileTurn(input: {
     (f) => f !== "business name"
   );
   const isPublic = business.verifiedAt != null;
+  const justVerified = !previouslyVerified && isPublic;
 
   if (stillNeed.length > 0) {
     return {
@@ -205,9 +258,21 @@ export async function runBusinessProfileTurn(input: {
     };
   }
 
+  const gbpHint = justVerified
+    ? ` Want Google Maps too? Tap “Help me list on Google Maps” — we’ll help you copy your details (Google’s signup is separate; we don’t create the Maps listing for you).`
+    : "";
+
   return {
-    assistantReply: `Your business **${business.name}** is live at ${publicPath}. Owner-chosen contact is shown on that page (shopfront model). You can post a gig anytime — e.g. “I need a logo designed.”`,
+    assistantReply: `Your business **${business.name}** is live at ${publicPath}. Owner-chosen contact is shown on that page (shopfront model). You can post a gig anytime — e.g. “I need a logo designed.”${gbpHint}`,
     suggestions: [
+      ...(justVerified
+        ? [
+            {
+              label: "Help me list on Google Maps",
+              prompt: GBP_CHAT_PROMPT,
+            },
+          ]
+        : []),
       {
         label: "View listing",
         prompt: `Show my business listing link again`,
@@ -218,7 +283,7 @@ export async function runBusinessProfileTurn(input: {
       },
     ],
     businessId: business.id,
-    publicPath,
+    publicPath: justVerified ? `${publicPath}?gbp=1` : publicPath,
     nextDraft: savedDraft,
   };
 }

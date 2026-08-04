@@ -38,11 +38,13 @@ export async function saveBusinessProfile(input: {
     input.fallbackEmail ||
     null;
 
+  const previousVerifiedAt = existing?.verifiedAt ?? null;
   const verifiedAt = resolveBusinessVerifiedAt({
     ownerEmail: owner?.email,
     contactEmail,
-    previousVerifiedAt: existing?.verifiedAt ?? null,
+    previousVerifiedAt,
   });
+  const justVerified = previousVerifiedAt == null && verifiedAt != null;
 
   const payload = {
     name,
@@ -59,20 +61,22 @@ export async function saveBusinessProfile(input: {
       existing.name === name
         ? existing.slug
         : await allocateBusinessSlug(name, existing.id);
-    return prisma.business.update({
+    const business = await prisma.business.update({
       where: { id: existing.id },
       data: { ...payload, slug },
     });
+    return { business, justVerified };
   }
 
   const slug = await allocateBusinessSlug(name);
-  return prisma.business.create({
+  const business = await prisma.business.create({
     data: {
       ownerUserId: input.userId,
       slug,
       ...payload,
     },
   });
+  return { business, justVerified };
 }
 
 /**

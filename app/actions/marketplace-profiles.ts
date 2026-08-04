@@ -40,7 +40,7 @@ export async function saveBusinessProfileAction(
     );
   }
 
-  const business = await saveBusinessProfile({
+  const { business, justVerified } = await saveBusinessProfile({
     userId: user.id,
     data: parsed.data,
     fallbackEmail: user.email,
@@ -48,16 +48,18 @@ export async function saveBusinessProfileAction(
 
   revalidatePath("/connect");
   revalidatePath(`/b/${business.slug}`);
-  const publicPath = `/b/${business.slug}`;
+  const publicPath = justVerified
+    ? `/b/${business.slug}?gbp=1`
+    : `/b/${business.slug}`;
   if (!business.verifiedAt) {
     return ok(
-      { publicPath },
-      `Saved, but not public yet. Set contact email to ${user.email ?? "your account email"} to verify and publish ${publicPath}.`
+      { publicPath: `/b/${business.slug}` },
+      `Saved, but not public yet. Set contact email to ${user.email ?? "your account email"} to verify and publish /b/${business.slug}.`
     );
   }
   return ok(
     { publicPath },
-    `Business listing live at ${publicPath}.`
+    `Business listing live at /b/${business.slug}.`
   );
 }
 
