@@ -16,9 +16,15 @@ if (!key_id || !key_secret) {
   process.exit(1);
 }
 
-if (!key_id.startsWith("rzp_test_")) {
-  console.error("Refusing to create plans: key is not rzp_test_ (test mode).");
+const allowLive = process.env.RAZORPAY_ALLOW_LIVE === "1";
+if (!key_id.startsWith("rzp_test_") && !allowLive) {
+  console.error(
+    "Refusing to create plans: key is not rzp_test_. Set RAZORPAY_ALLOW_LIVE=1 to use live keys."
+  );
   process.exit(1);
+}
+if (allowLive && key_id.startsWith("rzp_live_")) {
+  console.warn("Creating plans with LIVE keys (real money).");
 }
 
 const razorpay = new Razorpay({ key_id, key_secret });
