@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 
 import "./globals.css";
+
+/** Google AdSense publisher client — sitewide verification + future ad units. */
+const ADSENSE_CLIENT = "ca-pub-6006196480466195";
 
 export const metadata: Metadata = {
   title: {
@@ -43,6 +47,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
       <body className="min-h-full flex flex-col bg-void text-ink font-sans">
+        <Script
+          id="google-adsense"
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
         {children}
       </body>
     </html>
