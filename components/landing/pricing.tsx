@@ -1,14 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import { Container } from "@/components/ui/container";
 import { SectionEyebrow } from "@/components/ui/section-eyebrow";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CheckoutButton } from "@/components/billing/checkout-button";
+import { buttonVariants } from "@/components/ui/button";
 import { PRICING_TIERS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+
+function planKeyFromTierName(name: string): "FREE" | "WRITER" | "STUDIO" {
+  if (name === "Writer") return "WRITER";
+  if (name === "Studio") return "STUDIO";
+  return "FREE";
+}
 
 export function Pricing() {
   return (
@@ -19,60 +27,83 @@ export function Pricing() {
           <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
             Start free. Write as much as the story needs.
           </h2>
+          <p className="mt-3 text-sm text-ink-dim">
+            Prices in Indian Rupees (₹). Built for creators and freelancers in
+            India — not a USD sticker price with a currency swap.
+          </p>
         </div>
 
         <div className="mx-auto mt-14 grid max-w-5xl gap-6 lg:grid-cols-3">
-          {PRICING_TIERS.map((tier, i) => (
-            <motion.div
-              key={tier.name}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
-            >
-              <GlassCard
-                className={cn(
-                  "relative flex h-full flex-col p-7",
-                  tier.highlighted && "border-violet/50 shadow-[0_30px_60px_-30px_rgba(14,116,144,0.18)]"
-                )}
+          {PRICING_TIERS.map((tier, i) => {
+            const planKey = planKeyFromTierName(tier.name);
+            return (
+              <motion.div
+                key={tier.name}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: i * 0.08 }}
               >
-                {tier.highlighted && (
-                  <Badge
-                    variant="violet"
-                    className="absolute -top-3 left-7 bg-charcoal"
-                  >
-                    Most Popular
-                  </Badge>
-                )}
-                <p className="font-display text-lg font-semibold text-ink">
-                  {tier.name}
-                </p>
-                <p className="mt-1 text-sm text-ink-faint">{tier.description}</p>
-                <div className="mt-6 flex items-baseline gap-1">
-                  <span className="font-display text-4xl font-semibold text-ink">
-                    {tier.price}
-                  </span>
-                  <span className="text-sm text-ink-faint">{tier.period}</span>
-                </div>
-
-                <ul className="mt-7 flex-1 space-y-3">
-                  {tier.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2.5 text-sm text-ink-dim">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet-soft" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-
-                <Button
-                  className="mt-8 w-full"
-                  variant={tier.highlighted ? "primary" : "secondary"}
+                <GlassCard
+                  className={cn(
+                    "relative flex h-full flex-col p-7",
+                    tier.highlighted &&
+                      "border-violet/50 shadow-[0_30px_60px_-30px_rgba(14,116,144,0.18)]"
+                  )}
                 >
-                  {tier.cta}
-                </Button>
-              </GlassCard>
-            </motion.div>
-          ))}
+                  {tier.highlighted && (
+                    <Badge
+                      variant="violet"
+                      className="absolute -top-3 left-7 bg-charcoal"
+                    >
+                      Most Popular
+                    </Badge>
+                  )}
+                  <p className="font-display text-lg font-semibold text-ink">
+                    {tier.name}
+                  </p>
+                  <p className="mt-1 text-sm text-ink-faint">{tier.description}</p>
+                  <div className="mt-6 flex items-baseline gap-1">
+                    <span className="font-display text-4xl font-semibold text-ink">
+                      {tier.price}
+                    </span>
+                    <span className="text-sm text-ink-faint">{tier.period}</span>
+                  </div>
+
+                  <ul className="mt-7 flex-1 space-y-3">
+                    {tier.features.map((f) => (
+                      <li
+                        key={f}
+                        className="flex items-start gap-2.5 text-sm text-ink-dim"
+                      >
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet-soft" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {planKey === "FREE" ? (
+                    <Link
+                      href="/sign-up"
+                      className={cn(
+                        buttonVariants({ variant: "secondary" }),
+                        "mt-8 w-full"
+                      )}
+                    >
+                      {tier.cta}
+                    </Link>
+                  ) : (
+                    <CheckoutButton
+                      className="mt-8"
+                      plan={planKey}
+                      label={tier.cta}
+                      variant={tier.highlighted ? "primary" : "secondary"}
+                    />
+                  )}
+                </GlassCard>
+              </motion.div>
+            );
+          })}
         </div>
       </Container>
     </section>

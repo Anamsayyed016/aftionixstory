@@ -296,7 +296,7 @@ export const HOW_IT_WORKS = [
 export const PRICING_TIERS = [
   {
     name: "Free",
-    price: "$0",
+    price: "₹0",
     period: "forever",
     description: "Try the assistant, Story Studio, and Connect with light limits.",
     features: [
@@ -310,7 +310,7 @@ export const PRICING_TIERS = [
   },
   {
     name: "Writer",
-    price: "$14",
+    price: "₹199",
     period: "/ month",
     description: "For serious, ongoing storytelling and daily assistant use.",
     features: [
@@ -325,7 +325,7 @@ export const PRICING_TIERS = [
   },
   {
     name: "Studio",
-    price: "$39",
+    price: "₹599",
     period: "/ month",
     description: "For collaborative and long-running series.",
     features: [

@@ -2,14 +2,47 @@ import { Settings } from "lucide-react";
 
 import { auth } from "@/auth";
 import { EmptyState } from "@/components/app/empty-state";
+import { SubscriptionPanel } from "@/components/billing/subscription-panel";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
+import { prisma } from "@/lib/db";
+import { isRazorpayConfigured, isRazorpayTestMode } from "@/lib/razorpay/client";
 
-export default async function SettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ billing?: string }>;
+}) {
   const session = await auth();
+  const params = await searchParams;
+
+  const subscription = session?.user?.id
+    ? await prisma.subscription.findFirst({
+        where: { userId: session.user.id },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          plan: true,
+          status: true,
+          currentPeriodEnd: true,
+          razorpaySubscriptionId: true,
+        },
+      })
+    : null;
+
+  const dbUser = session?.user?.id
+    ? await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { plan: true },
+      })
+    : null;
+
+  const plan = dbUser?.plan || session?.user?.plan || "FREE";
+  const billingConfigured = isRazorpayConfigured();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6 overflow-y-auto pb-8">
       <div>
         <p className="font-mono text-xs uppercase tracking-wider text-violet-soft">
           Account
@@ -18,9 +51,17 @@ export default async function SettingsPage() {
           Settings
         </h2>
         <p className="mt-2 text-sm text-ink-dim">
-          Profile editing, exports, and account deletion ship in a later phase.
+          Profile and billing. Plan changes apply after Razorpay confirms
+          payment (webhook) — not only after Checkout closes.
         </p>
       </div>
+
+      {params.billing === "pending" ? (
+        <GlassCard className="border-violet/30 bg-violet/5 p-4 text-sm text-ink-dim">
+          Payment submitted. Your plan updates when Razorpay confirms (usually
+          within a minute). Refresh this page if it still shows Free.
+        </GlassCard>
+      ) : null}
 
       <GlassCard className="space-y-4 p-6">
         <h3 className="font-display text-lg font-semibold text-ink">Profile</h3>
@@ -36,16 +77,35 @@ export default async function SettingsPage() {
           <div className="flex items-center justify-between gap-4">
             <dt className="text-ink-faint">Plan</dt>
             <dd>
-              <Badge variant="violet">{session?.user?.plan || "FREE"}</Badge>
+              <Badge variant="violet">{plan}</Badge>
             </dd>
           </div>
         </dl>
       </GlassCard>
 
+      <GlassCard className="space-y-4 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-display text-lg font-semibold text-ink">
+            Subscription
+          </h3>
+          {billingConfigured && isRazorpayTestMode() ? (
+            <Badge variant="warning">Razorpay test mode</Badge>
+          ) : null}
+        </div>
+        {!billingConfigured ? (
+          <p className="text-sm text-ink-dim">
+            Billing isn’t configured on this environment yet. Add Razorpay test
+            keys and plan IDs to enable Checkout.
+          </p>
+        ) : (
+          <SubscriptionPanel plan={plan} subscription={subscription} />
+        )}
+      </GlassCard>
+
       <EmptyState
         icon={Settings}
         title="More settings coming later"
-        description="Default language, writing style, appearance preferences, data export, and account deletion are planned — not available in Phase A."
+        description="Default language, writing style, appearance preferences, data export, and account deletion are planned."
       />
     </div>
   );
