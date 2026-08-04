@@ -128,7 +128,7 @@ export function SignUpForm({ googleEnabled }: { googleEnabled: boolean }) {
           </div>
 
           <GoogleSignInButton
-            callbackUrl="/dashboard"
+            callbackUrl="/home"
             onError={(message) => setToastMessage(message)}
           />
         </>

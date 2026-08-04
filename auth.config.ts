@@ -83,6 +83,7 @@ export const authConfig = {
       const { pathname } = request.nextUrl;
       // Keep in sync with proxy.ts protected prefixes.
       const isProtected =
+        pathname.startsWith("/home") ||
         pathname.startsWith("/dashboard") ||
         pathname.startsWith("/stories") ||
         pathname.startsWith("/settings") ||

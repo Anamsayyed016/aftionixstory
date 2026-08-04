@@ -10,6 +10,9 @@ import {
   MessageSquare,
   Settings,
   Shield,
+  LayoutGrid,
+  Building2,
+  Handshake,
 } from "lucide-react";
 import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -19,15 +22,21 @@ import { logoutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 
 const NAV = [
-  { href: "/dashboard", label: "Chat", icon: MessageSquare },
+  { href: "/home", label: "Home", icon: LayoutGrid },
   { href: "/stories", label: "My Stories", icon: Library },
+  { href: "/directory", label: "Directory", icon: Building2 },
+  { href: "/connect", label: "Connect", icon: Handshake },
+  { href: "/dashboard", label: "Chat", icon: MessageSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 function titleForPath(pathname: string) {
+  if (pathname.startsWith("/home")) return "Home";
   if (pathname.startsWith("/stories")) return "My Stories";
   if (pathname.startsWith("/settings")) return "Settings";
   if (pathname.startsWith("/dashboard")) return "Chat";
+  if (pathname.startsWith("/connect")) return "Connect";
+  if (pathname.startsWith("/directory")) return "Directory";
   return "Workspace";
 }
 

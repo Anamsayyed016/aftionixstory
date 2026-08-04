@@ -9,6 +9,8 @@ import {
   LogOut,
   Handshake,
   Shield,
+  LayoutGrid,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/constants";
@@ -16,9 +18,11 @@ import { logoutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 
 const NAV = [
-  { href: "/dashboard", label: "Chat", icon: MessageSquare },
+  { href: "/home", label: "Home", icon: LayoutGrid },
   { href: "/stories", label: "My Stories", icon: Library },
+  { href: "/directory", label: "Directory", icon: Building2 },
   { href: "/connect", label: "Connect", icon: Handshake },
+  { href: "/dashboard", label: "Chat", icon: MessageSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -59,8 +63,10 @@ export function AppSidebar({
               ? pathname === "/stories" ||
                 (pathname.startsWith("/stories/") &&
                   !pathname.startsWith("/stories/new"))
-              : pathname === item.href ||
-                pathname.startsWith(`${item.href}/`);
+              : item.href === "/home"
+                ? pathname === "/home"
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}
@@ -83,8 +89,8 @@ export function AppSidebar({
             Freelancer Connect
           </div>
           <p className="mt-2 text-xs leading-relaxed text-ink-dim">
-            Post gigs or list skills in chat. Mutual accept reveals contact —
-            no payments in v1.
+            Post gigs or list skills. Mutual accept reveals contact — no
+            payments in v1.
           </p>
         </div>
       </nav>

@@ -68,7 +68,7 @@ export default async function ConnectPage() {
             sides accept.
           </p>
         </div>
-        <BackLink href="/dashboard">Back to Chat</BackLink>
+        <BackLink href="/home">Back to Home</BackLink>
       </div>
 
       <section className="space-y-3 rounded-xl border border-border bg-panel/40 p-5">

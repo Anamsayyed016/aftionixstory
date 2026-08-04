@@ -26,7 +26,7 @@ export default async function AdminLayout({
             </div>
             <div className="flex items-center gap-4 text-sm">
               <span className="truncate text-ink-dim">{admin.email}</span>
-              <BackLink href="/dashboard">Back to app</BackLink>
+              <BackLink href="/home">Back to app</BackLink>
             </div>
           </div>
           <AdminNav />

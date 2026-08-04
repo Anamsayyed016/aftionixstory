@@ -2,14 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Library, MessageSquare, Settings, Handshake } from "lucide-react";
+import {
+  Library,
+  MessageSquare,
+  Settings,
+  Handshake,
+  LayoutGrid,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
-  { href: "/dashboard", label: "Chat", icon: MessageSquare },
+  { href: "/home", label: "Home", icon: LayoutGrid },
   { href: "/stories", label: "Stories", icon: Library },
   { href: "/connect", label: "Connect", icon: Handshake },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Chat", icon: MessageSquare },
 ] as const;
 
 export function MobileNavigation() {
@@ -25,8 +31,10 @@ export function MobileNavigation() {
               ? pathname === "/stories" ||
                 (pathname.startsWith("/stories/") &&
                   !pathname.startsWith("/stories/new"))
-              : pathname === item.href ||
-                pathname.startsWith(`${item.href}/`);
+              : item.href === "/home"
+                ? pathname === "/home"
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
           return (
             <li key={item.href} className="flex-1">
               <Link

@@ -4,8 +4,8 @@ import { SITE } from "@/lib/constants";
 
 const FOOTER_LINKS = {
   Product: [
-    { label: "Story Studio", href: "/dashboard" },
-    { label: "Business Directory", href: "/connect/business" },
+    { label: "Story Studio", href: "/stories" },
+    { label: "Business Directory", href: "/directory" },
     { label: "Freelancer Connect", href: "/connect" },
     { label: "Features", href: "/studio#features" },
     { label: "Pricing", href: "/studio#pricing" },

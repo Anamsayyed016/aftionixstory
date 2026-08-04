@@ -15,5 +15,5 @@ export default async function CreatePage({
   const params = await searchParams;
   const rawPrompt = Array.isArray(params.prompt) ? params.prompt[0] : params.prompt;
   const prompt = sanitizeStarterPrompt(rawPrompt);
-  redirect(prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/dashboard");
+  redirect(prompt ? `/dashboard?prompt=${encodeURIComponent(prompt)}` : "/home");
 }

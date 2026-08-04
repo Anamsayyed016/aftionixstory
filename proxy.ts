@@ -15,6 +15,7 @@ export const proxy = proxyAuth((req) => {
   const isLoggedIn = !!req.auth?.user;
 
   const isProtected =
+    pathname.startsWith("/home") ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/stories") ||
     pathname.startsWith("/settings") ||
@@ -39,7 +40,7 @@ export const proxy = proxyAuth((req) => {
     pathname === "/forgot-password";
 
   if (isAuthPage && isLoggedIn) {
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin));
+    return NextResponse.redirect(new URL("/home", req.nextUrl.origin));
   }
 
   return NextResponse.next();
@@ -47,6 +48,8 @@ export const proxy = proxyAuth((req) => {
 
 export const config = {
   matcher: [
+    "/home",
+    "/home/:path*",
     "/dashboard/:path*",
     "/stories/:path*",
     "/settings/:path*",

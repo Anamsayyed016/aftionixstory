@@ -35,7 +35,7 @@ function oauthErrorMessage(code: string | null): string | null {
 
 export function SignInForm({ googleEnabled }: { googleEnabled: boolean }) {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const callbackUrl = searchParams.get("callbackUrl") || "/home";
   const errorParam = searchParams.get("error");
 
   const [state, formAction, pending] = useActionState(loginAction, initial);

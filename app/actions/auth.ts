@@ -64,7 +64,7 @@ export async function registerAction(
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: "/dashboard",
+      redirectTo: "/home",
     });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -97,11 +97,11 @@ export async function loginAction(
     };
   }
 
-  const callbackUrl = String(formData.get("callbackUrl") || "/dashboard");
+  const callbackUrl = String(formData.get("callbackUrl") || "/home");
   const safeCallback =
     callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
       ? callbackUrl
-      : "/dashboard";
+      : "/home";
 
   try {
     await signIn("credentials", {
@@ -123,11 +123,11 @@ export async function loginAction(
 }
 
 export async function googleSignInAction(formData: FormData): Promise<void> {
-  const callbackUrl = String(formData.get("callbackUrl") || "/dashboard");
+  const callbackUrl = String(formData.get("callbackUrl") || "/home");
   const safeCallback =
     callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")
       ? callbackUrl
-      : "/dashboard";
+      : "/home";
 
   await signIn("google", { redirectTo: safeCallback });
 }

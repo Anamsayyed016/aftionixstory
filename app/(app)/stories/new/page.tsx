@@ -16,7 +16,7 @@ export default async function NewStoryPage({
   // Chat now lives on the home assistant — forward there with the prompt preserved.
   if (mode === "chat") {
     const cleaned = sanitizeStarterPrompt(prompt);
-    redirect(cleaned ? `/dashboard?prompt=${encodeURIComponent(cleaned)}` : "/dashboard");
+    redirect(cleaned ? `/dashboard?prompt=${encodeURIComponent(cleaned)}` : "/home");
   }
 
   return (

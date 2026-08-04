@@ -55,7 +55,7 @@ export async function requireAdmin(): Promise<AdminUser> {
   }
   const admin = await getAdminUserOrNull(session.user.id);
   if (!admin) {
-    redirect("/dashboard");
+    redirect("/home");
   }
   return admin;
 }

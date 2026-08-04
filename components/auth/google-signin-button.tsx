@@ -42,7 +42,7 @@ function GoogleMark({ className }: { className?: string }) {
 }
 
 export function GoogleSignInButton({
-  callbackUrl = "/dashboard",
+  callbackUrl = "/home",
   onError,
   className,
 }: GoogleSignInButtonProps) {

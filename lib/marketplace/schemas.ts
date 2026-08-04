@@ -77,12 +77,14 @@ export function isSafeAppPath(path: string): boolean {
   if (!path.startsWith("/") || path.startsWith("//")) return false;
   if (path.includes("://")) return false;
   return (
+    path.startsWith("/home") ||
     path.startsWith("/dashboard") ||
     path.startsWith("/connect") ||
     path.startsWith("/stories") ||
     path.startsWith("/settings") ||
     path.startsWith("/create") ||
     path.startsWith("/admin") ||
+    path.startsWith("/directory") ||
     path.startsWith("/b/") ||
     path.startsWith("/f/") ||
     path.startsWith("/g/")

@@ -17,14 +17,14 @@ export const PRODUCT_LINKS = [
     id: "story-studio",
     label: "Story Studio",
     description: "Write & continue stories with lasting memory",
-    href: "/dashboard",
+    href: "/stories",
     status: "live" as const,
   },
   {
     id: "business-directory",
     label: "Business Directory",
-    description: "List and discover local businesses",
-    href: "/connect/business",
+    description: "Browse and search local businesses",
+    href: "/directory",
     status: "live" as const,
   },
   {
@@ -241,12 +241,8 @@ export const STUDIO_PRODUCT_CARDS = [
   {
     id: "business-directory",
     title: "Business Directory",
-    benefit: "List your business in chat and get a public shopfront page.",
-    href:
-      "/dashboard?prompt=" +
-      encodeURIComponent(
-        "List my business on the directory. I'll share the name, what we do, location, and contact email."
-      ),
+    benefit: "Browse verified businesses by search, city, or category.",
+    href: "/directory",
     cta: "Try it",
     status: "live" as const,
     featured: false,
