@@ -25,16 +25,20 @@ import { CREATE_SUGGESTIONS } from "@/lib/chat/constants";
 
 void _unused;
 
-describe("CreateStoryChat wiring", () => {
-  it("calls storyAgentTurnAction and never chatCreateStoryAction", () => {
-    const source = readFileSync(
-      path.resolve("components/app/chat/create-story-chat.tsx"),
+describe("Story agent action wiring", () => {
+  it("storyAgentTurnAction is the canonical turn entry (not chatCreateStoryAction)", () => {
+    const actionSource = readFileSync(
+      path.resolve("app/actions/story-agent.ts"),
       "utf8"
     );
-    expect(source).toContain('from "@/app/actions/story-agent"');
-    expect(source).toContain("storyAgentTurnAction");
-    expect(source).not.toContain("chatCreateStoryAction");
-    expect(source).not.toContain("runChatCreateStoryTurn");
+    const streamSource = readFileSync(
+      path.resolve("app/api/chat/stream/route.ts"),
+      "utf8"
+    );
+    expect(actionSource).toContain("runStoryAgentTurn");
+    expect(streamSource).toContain("runStoryAgentTurn");
+    expect(actionSource).not.toContain("chatCreateStoryAction");
+    expect(streamSource).not.toContain("chatCreateStoryAction");
   });
 });
 

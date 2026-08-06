@@ -234,16 +234,6 @@ describe("universal router wiring", () => {
 });
 
 describe("UI / action wiring", () => {
-  it("CreateStoryChat still uses storyAgentTurnAction only", () => {
-    const source = readFileSync(
-      path.resolve("components/app/chat/create-story-chat.tsx"),
-      "utf8"
-    );
-    expect(source).toContain("storyAgentTurnAction");
-    expect(source).not.toContain("chatCreateStoryAction");
-    expect(source).toContain("creative_draft");
-  });
-
   it("storyAgentTurnAction delegates to Conversation Brain", () => {
     // storyAgentTurnAction (app/actions/story-agent.ts) delegates its turn
     // orchestration to runStoryAgentTurn (lib/story-agent/run-turn.ts), which

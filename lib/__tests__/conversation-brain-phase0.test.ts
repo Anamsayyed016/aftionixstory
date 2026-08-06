@@ -134,12 +134,12 @@ describe("Conversation Brain Phase 0 — wiring", () => {
     );
   });
 
-  it("CreateStoryChat still uses storyAgentTurnAction only", () => {
-    const source = readFileSync(
-      path.resolve("components/app/chat/create-story-chat.tsx"),
+  it("storyAgentTurnAction remains the turn entry (chat UI removed)", () => {
+    const actionSource = readFileSync(
+      path.resolve("app/actions/story-agent.ts"),
       "utf8"
     );
-    expect(source).toContain("storyAgentTurnAction");
-    expect(source).not.toContain("chatCreateStoryAction");
+    expect(actionSource).toContain("runStoryAgentTurn");
+    expect(actionSource).not.toContain("chatCreateStoryAction");
   });
 });

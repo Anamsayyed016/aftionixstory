@@ -114,14 +114,14 @@ describe("canonical story context", () => {
     expect(grounded.ok).toBe(true);
   });
 
-  it("keeps new-chat writes on the grounded writer and filters the Using hint", () => {
+  it("keeps new-chat writes on the grounded writer", () => {
     const router = readFileSync(path.resolve("lib/story-agent/action-router.ts"), "utf8");
     const writer = readFileSync(path.resolve("lib/ai/services/write-scene.ts"), "utf8");
-    const ui = readFileSync(path.resolve("components/app/chat/create-story-chat.tsx"), "utf8");
+    const guards = readFileSync(path.resolve("lib/story-agent/entity-guards.ts"), "utf8");
     expect(router).toContain("generateWriteScene");
     expect(router).not.toContain("generateConversationalDraft(");
     expect(writer).toContain("serializeCanonicalStoryContext(canonical)");
-    expect(ui).toContain("isValidCanonicalEntityName");
+    expect(guards).toContain("isValidCanonicalEntityName");
   });
 
   it("sends the full canonical context through a no-storyId opening write", async () => {

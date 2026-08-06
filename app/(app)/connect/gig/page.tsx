@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { GigPostingForm } from "@/components/app/marketplace/gig-posting-form";
@@ -17,22 +15,15 @@ export default async function GigFormPage() {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4 overflow-y-auto pb-8">
       <BackLink href="/connect">Back to Connect</BackLink>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs text-violet-soft">Freelancer Connect</p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
-            Post a gig
-          </h1>
-          <p className="mt-1 max-w-xl text-sm text-ink-dim">
-            Describe the task — connect-only, no payments in v1.
-          </p>
-        </div>
-        <Link
-          href="/dashboard?prompt=I%20need%20someone%20for%20a%20logo%20design%20gig"
-          className="text-sm text-lilac hover:underline"
-        >
-          Prefer to chat instead?
-        </Link>
+      <div>
+        <p className="text-xs text-violet-soft">Freelancer Connect</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
+          Post a gig
+        </h1>
+        <p className="mt-1 max-w-xl text-sm text-ink-dim">
+          Describe the task — connect-only, no payments in v1. Chat-assisted
+          posting is paused while Story Studio is rebuilt.
+        </p>
       </div>
       <GigPostingForm hasBusiness={Boolean(business)} />
     </div>

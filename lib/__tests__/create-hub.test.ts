@@ -60,47 +60,32 @@ describe("Chat home → routing contracts", () => {
     expect(parseNewStoryEntryMode("chat")).toBe("chat");
   });
 
-  it("CreateStoryChat accepts initialComposerValue without auto-send wiring", () => {
-    const source = readFileSync(
-      path.resolve("components/app/chat/create-story-chat.tsx"),
-      "utf8"
-    );
-    expect(source).toContain("initialComposerValue");
-    expect(source).toContain(
-      'useState(() => initialComposerValue?.trim() ?? "")'
-    );
-    expect(source).not.toMatch(
-      /initialComposerValue[\s\S]{0,200}sendPrompt\(/
-    );
-  });
-
-  it("/create redirects to the chat home, forwarding the prompt", () => {
+  it("/create redirects to the Story Studio hub during rebuild", () => {
     const source = readFileSync(
       path.resolve("app/(app)/create/page.tsx"),
       "utf8"
     );
     expect(source).toContain("redirect(");
-    expect(source).toContain("/dashboard");
-    expect(source).toContain("sanitizeStarterPrompt");
+    expect(source).toContain("/stories");
   });
 
-  it("/stories/new redirects chat mode to the chat home and otherwise renders the wizard", () => {
+  it("/stories/new shows the Story Studio rebuild placeholder", () => {
     const source = readFileSync(
       path.resolve("app/(app)/stories/new/page.tsx"),
       "utf8"
     );
-    expect(source).toContain('mode === "chat"');
-    expect(source).toContain("redirect(");
-    expect(source).toContain("/dashboard");
-    expect(source).toContain("StoryWizard");
+    expect(source).toContain("StoryStudioRebuildPlaceholder");
+    expect(source).not.toContain("StoryWizard");
+    expect(source).not.toContain("CreateStoryChat");
   });
 
-  it("dashboard is the chat home: no stats fetch, renders the universal chat", () => {
+  it("dashboard shows the rebuild placeholder (chat UI removed)", () => {
     const source = readFileSync(
       path.resolve("app/(app)/dashboard/page.tsx"),
       "utf8"
     );
-    expect(source).toContain("CreateStoryChat");
+    expect(source).toContain("StoryStudioRebuildPlaceholder");
+    expect(source).not.toContain("CreateStoryChat");
     expect(source).not.toContain("getDashboardStats");
   });
 

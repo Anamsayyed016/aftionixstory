@@ -42,15 +42,13 @@ describe("Hydration-safe /stories/new params", () => {
     expect(parseNewStoryPageParams(null).mode).toBe("wizard");
   });
 
-  it("page redirects chat mode to the chat home and renders the wizard otherwise", () => {
+  it("page shows rebuild placeholder (wizard/chat UI removed)", () => {
     const page = readFileSync(
       path.resolve("app/(app)/stories/new/page.tsx"),
       "utf8"
     );
-    expect(page).toContain("parseNewStoryPageParams");
-    expect(page).toContain('mode === "chat"');
-    expect(page).toContain("redirect(");
-    expect(page).toContain("StoryWizard");
+    expect(page).toContain("StoryStudioRebuildPlaceholder");
+    expect(page).not.toContain("StoryWizard");
     expect(page).not.toContain("useSearchParams");
     expect(page).not.toContain("Suspense");
   });
@@ -88,27 +86,6 @@ describe("Composer click lock (Send / suggestions)", () => {
       )
     ).toBe(true);
   });
-
-  it("strips prompt via history.replaceState, not App Router navigation", () => {
-    const source = readFileSync(
-      path.resolve("components/app/new-story-entry.tsx"),
-      "utf8"
-    );
-    expect(source).toContain("history.replaceState");
-    expect(source).toContain("stripPromptQueryFromUrl");
-    expect(source).not.toMatch(/\brouter\.replace\b/);
-  });
-
-  it("CreateStoryChat uses composerLocked helper for Send", () => {
-    const source = readFileSync(
-      path.resolve("components/app/chat/create-story-chat.tsx"),
-      "utf8"
-    );
-    expect(source).toContain("isComposerInteractionLocked");
-    expect(source).toContain("composerLocked");
-    expect(source).toContain("disabled={composerLocked}");
-    expect(source).toMatch(/ensureConversationAction/);
-  });
 });
 
 describe("Hydration-safe timestamps", () => {
@@ -121,52 +98,9 @@ describe("Hydration-safe timestamps", () => {
     expect(a).toMatch(/Jul/);
     expect(a).toMatch(/20/);
   });
-
-  it("history item does not use locale-default Intl during render", () => {
-    const source = readFileSync(
-      path.resolve("components/app/chat/conversation-history-item.tsx"),
-      "utf8"
-    );
-    expect(source).toContain("formatConversationWhenUtc");
-    expect(source).not.toMatch(/Intl\.DateTimeFormat\(undefined/);
-    expect(source).not.toContain("suppressHydrationWarning");
-  });
 });
 
 describe("Hydration-safe markup / IDs", () => {
-  it("history item does not nest buttons", () => {
-    const source = readFileSync(
-      path.resolve("components/app/chat/conversation-history-item.tsx"),
-      "utf8"
-    );
-    expect(source).toContain('role="button"');
-    expect(source).toMatch(/type="button"[\s\S]*Archive/);
-    expect(source).not.toMatch(/<button[\s\S]*<button/);
-  });
-
-  it("wizard initial state uses deterministic clientIds (no Math.random)", () => {
-    const wizardSrc = readFileSync(
-      path.resolve("components/app/story-wizard.tsx"),
-      "utf8"
-    );
-    expect(wizardSrc).not.toMatch(/Math\.random/);
-    expect(wizardSrc).toContain('uid("char", index)');
-    expect(wizardSrc).toContain('uid("rule", index)');
-    expect(wizardSrc).toContain("emptyCharacter(0)");
-  });
-
-  it("create-story-chat restores after mount (stable empty first paint)", () => {
-    const source = readFileSync(
-      path.resolve("components/app/chat/create-story-chat.tsx"),
-      "utf8"
-    );
-    expect(source).toMatch(/useState\(true\)/);
-    expect(source).toMatch(
-      /const \[messages, setMessages\] = useState<ChatMessage\[\]>\(\[\]\)/
-    );
-    expect(source).toContain("setRestoring(true)");
-  });
-
   it("does not keep module-level sticky starter prompt", () => {
     const starters = readFileSync(
       path.resolve("lib/create/story-starters.ts"),

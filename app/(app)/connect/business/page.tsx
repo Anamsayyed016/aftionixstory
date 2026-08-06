@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { BusinessProfileForm } from "@/components/app/marketplace/business-profile-form";
@@ -17,22 +15,15 @@ export default async function BusinessFormPage() {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4 overflow-y-auto pb-8">
       <BackLink href="/connect">Back to Connect</BackLink>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs text-violet-soft">Business Directory</p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
-            {existing ? "Edit business listing" : "List your business"}
-          </h1>
-          <p className="mt-1 max-w-xl text-sm text-ink-dim">
-            Structured form — same fields the chat assistant saves.
-          </p>
-        </div>
-        <Link
-          href="/dashboard?prompt=List%20my%20business%20on%20the%20directory"
-          className="text-sm text-lilac hover:underline"
-        >
-          Prefer to chat instead?
-        </Link>
+      <div>
+        <p className="text-xs text-violet-soft">Business Directory</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
+          {existing ? "Edit business listing" : "List your business"}
+        </h1>
+        <p className="mt-1 max-w-xl text-sm text-ink-dim">
+          Use this form to list or update your business. Chat-assisted setup is
+          paused while Story Studio is rebuilt.
+        </p>
       </div>
       <BusinessProfileForm
         defaults={

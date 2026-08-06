@@ -19,6 +19,7 @@ const PRODUCTS = [
     href: "/stories",
     icon: Library,
     featured: true,
+    status: "updating" as const,
   },
   {
     id: "directory",
@@ -27,6 +28,7 @@ const PRODUCTS = [
     href: "/directory",
     icon: Building2,
     featured: false,
+    status: "live" as const,
   },
   {
     id: "connect",
@@ -35,15 +37,17 @@ const PRODUCTS = [
     href: "/connect",
     icon: Handshake,
     featured: false,
+    status: "live" as const,
   },
   {
     id: "chat",
     title: "Chat Assistant",
-    description: "Open the chat when you want the all-in-one assistant.",
+    description: "Temporarily offline while Story Studio is rebuilt.",
     href: "/dashboard",
     icon: MessageSquare,
     featured: false,
     deemphasized: true,
+    status: "updating" as const,
   },
 ] as const;
 
@@ -61,8 +65,8 @@ export default function HomePage() {
           What do you want to do?
         </h2>
         <p className="mt-2 max-w-xl text-sm text-ink-dim">
-          Pick a product. Chat is still available — it&apos;s just not the only
-          door in.
+          Pick a product. Story Studio and Chat are being rebuilt; Directory and
+          Connect stay live. Plans and billing remain in Settings.
         </p>
       </div>
 
@@ -76,16 +80,14 @@ export default function HomePage() {
               <h3 className="font-display text-xl font-semibold text-ink">
                 {featured.title}
               </h3>
-              <Badge variant="success" dot>
-                Live
-              </Badge>
+              <Badge variant="outline">Updating</Badge>
             </div>
             <p className="mt-1 text-sm text-ink-dim">{featured.description}</p>
           </div>
         </div>
         <Link href={featured.href}>
           <Button className="w-full sm:w-auto">
-            Open
+            Status
             <ArrowRight className="h-4 w-4" />
           </Button>
         </Link>
@@ -94,6 +96,7 @@ export default function HomePage() {
       <div className="grid gap-4 sm:grid-cols-3">
         {rest.map((product) => {
           const Icon = product.icon;
+          const isLive = product.status === "live";
           return (
             <GlassCard
               key={product.id}
@@ -108,9 +111,13 @@ export default function HomePage() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-md bg-violet/12 text-violet-soft">
                   <Icon className="h-4 w-4" />
                 </span>
-                <Badge variant="success" dot>
-                  Live
-                </Badge>
+                {isLive ? (
+                  <Badge variant="success" dot>
+                    Live
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">Updating</Badge>
+                )}
               </div>
               <h3 className="mt-4 font-display text-lg font-semibold text-ink">
                 {product.title}
