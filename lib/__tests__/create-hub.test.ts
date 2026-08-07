@@ -60,36 +60,38 @@ describe("Chat home → routing contracts", () => {
     expect(parseNewStoryEntryMode("chat")).toBe("chat");
   });
 
-  it("/create redirects to the Story Studio hub during rebuild", () => {
+  it("/create redirects to /home during Story Studio rebuild", () => {
     const source = readFileSync(
       path.resolve("app/(app)/create/page.tsx"),
       "utf8"
     );
     expect(source).toContain("redirect(");
-    expect(source).toContain("/stories");
+    expect(source).toContain('"/home"');
   });
 
-  it("/stories/new shows the Story Studio rebuild placeholder", () => {
+  it("/stories/new redirects to /home (wizard/chat UI offline)", () => {
     const source = readFileSync(
       path.resolve("app/(app)/stories/new/page.tsx"),
       "utf8"
     );
-    expect(source).toContain("StoryStudioRebuildPlaceholder");
+    expect(source).toContain("redirect(");
+    expect(source).toContain('"/home"');
     expect(source).not.toContain("StoryWizard");
     expect(source).not.toContain("CreateStoryChat");
   });
 
-  it("dashboard shows the rebuild placeholder (chat UI removed)", () => {
+  it("dashboard redirects to /home (chat UI offline)", () => {
     const source = readFileSync(
       path.resolve("app/(app)/dashboard/page.tsx"),
       "utf8"
     );
-    expect(source).toContain("StoryStudioRebuildPlaceholder");
+    expect(source).toContain("redirect(");
+    expect(source).toContain('"/home"');
     expect(source).not.toContain("CreateStoryChat");
     expect(source).not.toContain("getDashboardStats");
   });
 
-  it("sidebar/header/bottom nav no longer link to /create", () => {
+  it("sidebar/header/bottom nav only expose live hub surfaces", () => {
     const sidebar = readFileSync(
       path.resolve("components/app/app-sidebar.tsx"),
       "utf8"
@@ -104,6 +106,13 @@ describe("Chat home → routing contracts", () => {
     );
     for (const source of [sidebar, header, mobileNav]) {
       expect(source).not.toContain('href: "/create"');
+      expect(source).not.toContain('href: "/stories"');
+      expect(source).not.toContain('href: "/dashboard"');
+      expect(source).not.toContain('href: "/admin"');
+      expect(source).toContain('href: "/home"');
+      expect(source).toContain('href: "/directory"');
+      expect(source).toContain('href: "/connect"');
+      expect(source).toContain('href: "/settings"');
     }
   });
 });

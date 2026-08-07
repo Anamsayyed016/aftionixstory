@@ -34,10 +34,7 @@ const initial: ActionResult<{ publicPath: string }> | null = null;
 
 export function FreelancerProfileForm({
   defaults,
-  chatHref = "/dashboard?prompt=" +
-    encodeURIComponent(
-      "I'm looking for gig work. Help me set up my freelancer profile with skills and availability."
-    ),
+  chatHref = "/connect/freelancer",
 }: Props) {
   const [state, formAction, pending] = useActionState(
     saveFreelancerProfileAction,

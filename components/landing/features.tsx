@@ -82,7 +82,9 @@ function ProductCard({
               <Badge variant="success" dot>
                 Live
               </Badge>
-            ) : null}
+            ) : (
+              <Badge variant="outline">Updating</Badge>
+            )}
           </div>
           <h2
             className={cn(

@@ -6,10 +6,7 @@ import {
   Menu,
   X,
   BookOpen,
-  Library,
-  MessageSquare,
   Settings,
-  Shield,
   LayoutGrid,
   Building2,
   Handshake,
@@ -23,18 +20,14 @@ import { Button } from "@/components/ui/button";
 
 const NAV = [
   { href: "/home", label: "Home", icon: LayoutGrid },
-  { href: "/stories", label: "My Stories", icon: Library },
   { href: "/directory", label: "Directory", icon: Building2 },
   { href: "/connect", label: "Connect", icon: Handshake },
-  { href: "/dashboard", label: "Chat", icon: MessageSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 function titleForPath(pathname: string) {
   if (pathname.startsWith("/home")) return "Home";
-  if (pathname.startsWith("/stories")) return "My Stories";
   if (pathname.startsWith("/settings")) return "Settings";
-  if (pathname.startsWith("/dashboard")) return "Chat";
   if (pathname.startsWith("/connect")) return "Connect";
   if (pathname.startsWith("/directory")) return "Directory";
   return "Workspace";
@@ -43,10 +36,10 @@ function titleForPath(pathname: string) {
 export function AppHeader({
   userName,
   usage,
-  isAdmin = false,
 }: {
   userName: string;
   usage?: { used: number; limit: number };
+  /** Kept for call-site compatibility; Admin is intentionally not linked. */
   isAdmin?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -107,8 +100,10 @@ export function AppHeader({
               {NAV.map((item) => {
                 const Icon = item.icon;
                 const active =
-                  pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
+                  item.href === "/home"
+                    ? pathname === "/home"
+                    : pathname === item.href ||
+                      pathname.startsWith(`${item.href}/`);
                 return (
                   <Link
                     key={item.href}
@@ -126,21 +121,6 @@ export function AppHeader({
                   </Link>
                 );
               })}
-              {isAdmin ? (
-                <Link
-                  href="/admin"
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm",
-                    pathname.startsWith("/admin")
-                      ? "bg-panel-raised text-ink"
-                      : "text-ink-dim hover:bg-charcoal"
-                  )}
-                >
-                  <Shield className="h-4 w-4" />
-                  Admin Dashboard
-                </Link>
-              ) : null}
               <form action={logoutAction} className="mt-2">
                 <Button type="submit" variant="secondary" className="w-full">
                   Log out

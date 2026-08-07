@@ -1,11 +1,6 @@
-import { requireUser } from "@/lib/auth/session";
-import { StoryStudioRebuildPlaceholder } from "@/components/app/story-studio-rebuild-placeholder";
+import { redirect } from "next/navigation";
 
-/**
- * New story — wizard/chat UI removed pending rebuild.
- */
-export default async function NewStoryPage() {
-  await requireUser();
-
-  return <StoryStudioRebuildPlaceholder surface="New story" />;
+/** Story Studio UI offline → hub. */
+export default function NewStoryPage() {
+  redirect("/home");
 }

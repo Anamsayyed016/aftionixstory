@@ -3,12 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Library,
-  MessageSquare,
   Settings,
   LogOut,
   Handshake,
-  Shield,
   LayoutGrid,
   Building2,
 } from "lucide-react";
@@ -17,12 +14,11 @@ import { SITE } from "@/lib/constants";
 import { logoutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 
+/** Slim nav while Story Studio UI is mid-rebuild. Admin stays URL-only. */
 const NAV = [
   { href: "/home", label: "Home", icon: LayoutGrid },
-  { href: "/stories", label: "My Stories", icon: Library },
   { href: "/directory", label: "Directory", icon: Building2 },
   { href: "/connect", label: "Connect", icon: Handshake },
-  { href: "/dashboard", label: "Chat", icon: MessageSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -30,11 +26,11 @@ export function AppSidebar({
   userName,
   userEmail,
   plan,
-  isAdmin = false,
 }: {
   userName: string;
   userEmail: string;
   plan: string;
+  /** Kept for call-site compatibility; Admin is intentionally not linked. */
   isAdmin?: boolean;
 }) {
   const pathname = usePathname();
@@ -42,7 +38,7 @@ export function AppSidebar({
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-charcoal/80 md:flex">
       <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/home" className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/aftionix-logo.jpg"
@@ -59,14 +55,10 @@ export function AppSidebar({
         {NAV.map((item) => {
           const Icon = item.icon;
           const active =
-            item.href === "/stories"
-              ? pathname === "/stories" ||
-                (pathname.startsWith("/stories/") &&
-                  !pathname.startsWith("/stories/new"))
-              : item.href === "/home"
-                ? pathname === "/home"
-                : pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
+            item.href === "/home"
+              ? pathname === "/home"
+              : pathname === item.href ||
+                pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}
@@ -105,20 +97,6 @@ export function AppSidebar({
             Plan · {plan}
           </p>
         </div>
-        {isAdmin ? (
-          <Link
-            href="/admin"
-            className={cn(
-              "mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-              pathname.startsWith("/admin")
-                ? "bg-panel-raised text-ink"
-                : "text-ink-dim hover:bg-charcoal hover:text-ink"
-            )}
-          >
-            <Shield className="h-4 w-4" />
-            Admin Dashboard
-          </Link>
-        ) : null}
         <form action={logoutAction}>
           <Button type="submit" variant="ghost" size="sm" className="w-full justify-start">
             <LogOut className="h-4 w-4" />

@@ -35,8 +35,7 @@ const initial: ActionResult<{ publicPath: string }> | null = null;
 
 export function BusinessProfileForm({
   defaults,
-  chatHref = "/dashboard?prompt=" +
-    encodeURIComponent("List my business on the directory"),
+  chatHref = "/connect/business",
 }: Props) {
   const [state, formAction, pending] = useActionState(
     saveBusinessProfileAction,

@@ -46,6 +46,10 @@ function ProductsMenu({
                 <Badge variant="warning" className="text-[10px]">
                   Coming soon
                 </Badge>
+              ) : product.status === "updating" ? (
+                <Badge variant="outline" className="text-[10px]">
+                  Updating
+                </Badge>
               ) : null}
             </div>
             <p className="mt-0.5 text-xs leading-snug text-ink-faint">

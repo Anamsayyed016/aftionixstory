@@ -26,8 +26,7 @@ const initial: ActionResult<{ gigId: string }> | null = null;
 
 export function GigPostingForm({
   hasBusiness,
-  chatHref = "/dashboard?prompt=" +
-    encodeURIComponent("I need someone for a logo design gig"),
+  chatHref = "/connect/gig",
 }: Props) {
   const [state, formAction, pending] = useActionState(createGigAction, initial);
   const [clientError, setClientError] = useState<string | null>(null);

@@ -254,7 +254,7 @@ export const CREATE_MODE_SHORTCUTS: CreateModeShortcut[] = [
     title: "Continue an episode",
     description: "Choose a story from your library.",
     icon: RefreshCw,
-    href: "/stories",
+    href: "/home",
   },
   {
     id: "list-business",

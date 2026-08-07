@@ -42,12 +42,13 @@ describe("Hydration-safe /stories/new params", () => {
     expect(parseNewStoryPageParams(null).mode).toBe("wizard");
   });
 
-  it("page shows rebuild placeholder (wizard/chat UI removed)", () => {
+  it("page redirects to /home (wizard/chat UI offline)", () => {
     const page = readFileSync(
       path.resolve("app/(app)/stories/new/page.tsx"),
       "utf8"
     );
-    expect(page).toContain("StoryStudioRebuildPlaceholder");
+    expect(page).toContain("redirect(");
+    expect(page).toContain('"/home"');
     expect(page).not.toContain("StoryWizard");
     expect(page).not.toContain("useSearchParams");
     expect(page).not.toContain("Suspense");

@@ -17,8 +17,8 @@ export const PRODUCT_LINKS = [
     id: "story-studio",
     label: "Story Studio",
     description: "Write & continue stories with lasting memory",
-    href: "/stories",
-    status: "live" as const,
+    href: "/studio",
+    status: "updating" as const,
   },
   {
     id: "business-directory",
@@ -40,102 +40,76 @@ export const FEATURE_GROUPS = [
   {
     id: "story-studio",
     title: "Story Studio",
-    eyebrow: "Available now",
+    eyebrow: "Updating",
     description:
       "Long-running fiction that stays coherent — characters, plot, and memory in one workspace.",
-    status: "live" as const,
+    status: "updating" as const,
     features: [
       {
         id: "generation",
         title: "AI Episode Generation",
         description:
           "Describe what happens next in plain language. Get a full episode in your voice, ready to read or revise.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent(
-            "I want to start a new story. Help me shape the concept, then write the first episode."
-          ),
+        href: "/home",
       },
       {
         id: "memory",
         title: "Persistent Character Memory",
         description:
           "Confessions, secrets, and grudges carry forward — no re-explaining who knows what.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent(
-            "Help me build the main characters for a new story — names, roles, and what they want."
-          ),
+        href: "/home",
       },
       {
         id: "language",
         title: "Hinglish & Multilingual Writing",
         description:
           "Dialogue the way your characters actually speak, including natural code-switched Hinglish.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent(
-            "Write a short scene in natural Hinglish — everyday dialogue, not forced English."
-          ),
+        href: "/home",
       },
       {
         id: "editable",
         title: "Editable AI Drafts",
         description:
           "Nothing is locked. Rewrite any line or take an episode in a new direction without losing continuity.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent(
-            "Help me rewrite a scene to improve pacing, dialogue, emotion, and clarity."
-          ),
+        href: "/home",
       },
     ],
   },
   {
     id: "assistant",
     title: "Universal assistant",
-    eyebrow: "Available now",
+    eyebrow: "Updating",
     description:
       "The same chat that writes stories also answers questions, helps with code, and looks up current info.",
-    status: "live" as const,
+    status: "updating" as const,
     features: [
       {
         id: "chat",
         title: "Ask anything",
         description:
           "General questions, explanations, and brainstorming — without forcing every message into a story slot.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent(
-            "What are the key ideas behind good product onboarding for a new SaaS user?"
-          ),
+        href: "/home",
       },
       {
         id: "coding",
         title: "Coding help",
         description:
           "Debug, explain, and sketch solutions when you need a technical hand mid-flow.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent(
-            "Help me debug this TypeScript error: Property 'x' does not exist on type 'y'. Explain and suggest a fix."
-          ),
+        href: "/home",
       },
       {
         id: "current",
         title: "Current information",
         description:
           "Weather, news-style lookups, and other live questions via grounded search when you need it.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent("What's the weather in Pune today?"),
+        href: "/home",
       },
       {
         id: "images",
         title: "Image attach",
         description:
           "Share a photo in chat — the assistant acknowledges it and can help turn it into story fuel.",
-        href: "/dashboard",
+        href: "/home",
       },
     ],
   },
@@ -152,11 +126,7 @@ export const FEATURE_GROUPS = [
         title: "List in chat",
         description:
           "Describe your business once — name, summary, location, and contact — and publish a /b/ page.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent(
-            "List my business on the directory. I'll share the name, what we do, location, and contact email."
-          ),
+        href: "/connect/business",
       },
       {
         id: "shopfront",
@@ -181,20 +151,14 @@ export const FEATURE_GROUPS = [
         title: "Post a gig",
         description:
           "Need a logo or a day of deliveries? Describe the task in chat and match to freelancers.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent("I need someone for a logo design gig"),
+        href: "/connect/gig",
       },
       {
         id: "freelancer",
         title: "Freelancer profiles",
         description:
           "Skills, availability, and portfolio on a public /f/ page — contact stays private until matched.",
-        href:
-          "/dashboard?prompt=" +
-          encodeURIComponent(
-            "I'm looking for gig work. Help me set up my freelancer profile with skills and availability."
-          ),
+        href: "/connect/freelancer",
       },
       {
         id: "connect",
@@ -216,26 +180,18 @@ export const STUDIO_PRODUCT_CARDS = [
     title: "Story Studio",
     benefit:
       "Write long-running fiction that remembers characters and plot.",
-    href:
-      "/dashboard?prompt=" +
-      encodeURIComponent(
-        "I want to start a new story. Help me shape the concept, then write the first episode."
-      ),
-    cta: "Try it",
-    status: "live" as const,
+    href: "/home",
+    cta: "Open hub",
+    status: "updating" as const,
     featured: true,
   },
   {
     id: "assistant",
     title: "Ask Anything",
     benefit: "Questions, code help, and current info in the same chat.",
-    href:
-      "/dashboard?prompt=" +
-      encodeURIComponent(
-        "What are the key ideas behind good product onboarding for a new SaaS user?"
-      ),
-    cta: "Try it",
-    status: "live" as const,
+    href: "/home",
+    cta: "Open hub",
+    status: "updating" as const,
     featured: false,
   },
   {
