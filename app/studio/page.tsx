@@ -3,7 +3,6 @@ import { SiteHeader } from "@/components/shared/site-header";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { Hero } from "@/components/landing/hero";
 import { Features } from "@/components/landing/features";
-import { Pricing } from "@/components/landing/pricing";
 
 export const metadata: Metadata = {
   title: "AFTIONIX Studio — Stories, answers, businesses, and gigs",
@@ -13,7 +12,9 @@ export const metadata: Metadata = {
 
 /**
  * Static marketing page — must not query the database at build time.
- * Keep the first screen scannable: intro + four products. Pricing stays for #pricing.
+ * Keep the first screen scannable: intro + four products.
+ * Pricing cards omitted while Story Studio UI is mid-rebuild; billing
+ * still lives in Settings / Razorpay (see components/landing/pricing.tsx).
  */
 export default function StudioLandingPage() {
   return (
@@ -22,7 +23,6 @@ export default function StudioLandingPage() {
       <main className="flex-1">
         <Hero />
         <Features />
-        <Pricing />
       </main>
       <SiteFooter />
     </>
