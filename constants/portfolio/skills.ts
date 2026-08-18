@@ -1,31 +1,18 @@
-export const SKILL_GROUPS = [
-  {
-    id: "frontend",
-    label: "Interface",
-    items: ["React", "Next.js", "TypeScript", "Tailwind CSS", "Framer Motion"],
-  },
-  {
-    id: "backend",
-    label: "Systems",
-    items: ["Node.js", "Python", "Django", "FastAPI"],
-  },
-  {
-    id: "data",
-    label: "Data",
-    items: ["PostgreSQL", "MongoDB", "MySQL", "Redis"],
-  },
-  {
-    id: "cloud",
-    label: "Cloud & AI",
-    items: ["Docker", "AWS", "Firebase", "Supabase", "OpenAI", "Gemini"],
-  },
-] as const;
-
-export const HIGHLIGHT_SKILLS = [
+export const SKILLS = [
   "Next.js",
+  "React",
   "TypeScript",
+  "JavaScript",
+  "Python",
+  "Django",
+  "FastAPI",
+  "Flask",
   "PostgreSQL",
-  "OpenAI",
-  "Gemini",
+  "MySQL",
+  "MongoDB",
+  "Prisma",
+  "Tailwind CSS",
+  "Git",
   "Docker",
+  "AI / LLMs",
 ] as const;

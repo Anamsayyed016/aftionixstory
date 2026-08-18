@@ -2,8 +2,8 @@
 
 import { motion } from "framer-motion";
 
-import { EXPERIENCE } from "@/constants/portfolio/content";
-import { fadeUp, revealViewport, staggerContainer } from "@/animations/portfolio/variants";
+import { JOURNEY } from "@/constants/portfolio/content";
+import { fadeUp, revealViewport, stagger } from "@/animations/portfolio/variants";
 
 export function Experience() {
   return (
@@ -13,48 +13,35 @@ export function Experience() {
           initial="hidden"
           whileInView="visible"
           viewport={revealViewport}
-          variants={staggerContainer(0.08)}
+          variants={stagger(0.08)}
         >
           <motion.p variants={fadeUp} className="pf-kicker">
             Experience
           </motion.p>
-          <motion.h2
-            variants={fadeUp}
-            className="pf-display mt-4 max-w-xl text-4xl font-semibold sm:text-5xl"
-          >
-            A short path. A lot of shipped surface.
+          <motion.h2 variants={fadeUp} className="pf-title mt-4 max-w-xl">
+            The journey.
           </motion.h2>
         </motion.div>
 
-        <ol className="mt-14 space-y-0">
-          {EXPERIENCE.map((item, i) => (
+        <ol className="mt-14">
+          {JOURNEY.map((item, i) => (
             <motion.li
-              key={item.title}
+              key={item.id}
               initial="hidden"
               whileInView="visible"
               viewport={revealViewport}
               variants={fadeUp}
-              className="grid gap-6 border-t border-[var(--pf-line)] py-10 lg:grid-cols-[14rem_1fr]"
+              className="grid gap-4 border-t border-[var(--portfolio-line)] py-9 sm:grid-cols-[7rem_1fr] sm:gap-10"
             >
-              <p className="pf-mono text-sm text-[var(--pf-ink-faint)]">{item.period}</p>
+              <p className="font-mono text-sm text-[var(--portfolio-faint)]">
+                {String(i + 1).padStart(2, "0")}
+              </p>
               <div>
-                <h3 className="pf-display text-2xl font-semibold">
-                  {item.title}
-                  <span className="text-[var(--pf-ink-dim)]"> · {item.org}</span>
-                </h3>
-                <p className="mt-1 text-sm text-[var(--pf-ink-faint)]">{item.location}</p>
-                <ul className="mt-5 space-y-2.5">
-                  {item.points.map((point) => (
-                    <li
-                      key={point}
-                      className="max-w-2xl text-sm leading-relaxed text-[var(--pf-ink-dim)]"
-                    >
-                      {point}
-                    </li>
-                  ))}
-                </ul>
+                <h3 className="pf-display text-2xl font-semibold sm:text-3xl">{item.title}</h3>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--portfolio-muted)] sm:text-base">
+                  {item.body}
+                </p>
               </div>
-              <span className="sr-only">Role {i + 1}</span>
             </motion.li>
           ))}
         </ol>

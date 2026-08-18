@@ -1,17 +1,15 @@
 export const PERSON = {
   name: "Anam Sayyed",
-  role: "Founder & Software Engineer",
-  studio: "AFTIONIX",
-  experience: "4+ Years",
-  location: "India · Remote",
-  tagline: "I build intelligent software, AI products, and systems that hold up in production.",
-  summary:
-    "Founder of AFTIONIX. I design and ship custom software, SaaS platforms, and AI systems for startups, healthcare, and enterprises — from architecture through launch and maintenance.",
+  firstName: "Anam",
+  lastName: "Sayyed",
+  role: "Full-Stack Developer",
+  positioning: "AI • WEB • DIGITAL PRODUCTS",
+  location: "India",
   email: "anamsayyed58@gmail.com",
-  whatsapp:
-    "https://wa.me/918107738186?text=Hi%2C%20I%27d%20like%20to%20discuss%20a%20project",
   url: "https://aftionix.tech/portfolio",
   siteUrl: "https://aftionix.tech",
+  whatsapp:
+    "https://wa.me/918107738186?text=Hi%2C%20I%27d%20like%20to%20discuss%20a%20project",
   socials: {
     linkedin: "https://www.linkedin.com/in/sayyedanam/",
     github: "https://github.com/Anamsayyed016",
@@ -22,87 +20,114 @@ export const PERSON = {
 export const NAV = [
   { label: "About", href: "#about" },
   { label: "Work", href: "#work" },
-  { label: "Stack", href: "#stack" },
   { label: "Experience", href: "#experience" },
   { label: "Services", href: "#services" },
   { label: "Contact", href: "#contact" },
 ] as const;
 
-export const STATS = [
-  { value: "4+", label: "Years shipping" },
-  { value: "8", label: "Service lines" },
-  { value: "AI + SaaS", label: "Focus" },
-  { value: "Remote", label: "Worldwide" },
-] as const;
+export const HERO = {
+  kicker: "Full-Stack Developer",
+  headline: ["Building digital products", "that feel alive."],
+  body: "Full-Stack Developer focused on modern web applications, AI-powered products and meaningful digital experiences.",
+  status: "Available for select projects",
+  meta: [
+    "Based in India",
+    "Full-stack / AI",
+    "Next.js / Python",
+    "Open to opportunities",
+  ],
+} as const;
 
-export const PRINCIPLES = [
-  {
-    title: "Production first",
-    body: "Architecture, auth, billing, and ops are part of the product — not a later phase.",
-  },
-  {
-    title: "Systems that last",
-    body: "Typed, documented, and structured so the next engineer can move without archaeology.",
-  },
-  {
-    title: "Practical AI",
-    body: "Assistants, parsers, and automation that remove real work. No demo that never ships.",
-  },
-] as const;
+export const ABOUT = {
+  heading: "More than code.",
+  body: "I'm a Full-Stack Developer who enjoys turning ideas into useful, polished digital products. I work across frontend, backend, databases and AI integrations — from the first interface to production deployment.",
+  stats: [
+    { value: "3+", label: "Years building" },
+    { value: "10+", label: "Projects" },
+    { value: "Full-stack", label: "Focus" },
+  ],
+} as const;
 
-export const EXPERIENCE = [
+export const JOURNEY = [
   {
-    period: "2022 — Present",
-    title: "Founder & Lead Engineer",
-    org: "AFTIONIX",
-    location: "Remote",
-    points: [
-      "Built and operate AFTIONIX Studio — AI writing with memory, a business directory, and freelancer matching.",
-      "Ship custom software, SaaS, and AI integrations for startups, healthcare, and enterprise clients.",
-      "Own product, architecture, and delivery: Next.js, PostgreSQL, auth, billing, and production deploys.",
-    ],
+    id: "fullstack",
+    title: "Full-Stack Development",
+    body: "Interfaces, APIs and data models designed as one system — typed, reviewable, and ready for real users.",
   },
   {
-    period: "2021 — 2022",
-    title: "Independent Software Engineer",
-    org: "Client work",
-    location: "Remote",
-    points: [
-      "Designed and delivered web platforms, internal tools, and conversion-focused sites end to end.",
-      "Worked across UI, APIs, and deployment — from first brief to a system people actually use.",
-    ],
+    id: "ai",
+    title: "AI integrations",
+    body: "LLM-backed features, assistants and workflows wired into products with clear failure modes and production constraints.",
+  },
+  {
+    id: "product",
+    title: "Product development",
+    body: "From brief to shipped surface: structure, experience, and the details that make software feel finished.",
+  },
+  {
+    id: "websites",
+    title: "Client & business websites",
+    body: "Responsive brand and catalogue sites with performance, SEO and a path to iterate after launch.",
+  },
+  {
+    id: "deploy",
+    title: "Production deployment",
+    body: "Auth, databases, payments and deploys treated as part of the product — not a later phase.",
   },
 ] as const;
 
 export const SERVICES = [
   {
-    id: "custom-software",
-    title: "Custom software",
-    body: "ERP, CRM, HRMS, and domain systems shaped around how the business actually runs.",
-  },
-  {
-    id: "saas",
-    title: "SaaS platforms",
-    body: "Multi-tenant products, subscriptions, and admin surfaces built to grow with usage.",
+    id: "fullstack",
+    index: "01",
+    title: "Full-Stack Development",
+    body: "Modern frontend + scalable backend systems.",
   },
   {
     id: "ai",
-    title: "AI products",
-    body: "Assistants, document parsers, and workflow automation on OpenAI and Gemini.",
+    index: "02",
+    title: "AI-Powered Products",
+    body: "LLM integrations, AI workflows and intelligent product features.",
+  },
+  {
+    id: "saas",
+    index: "03",
+    title: "SaaS & Web Applications",
+    body: "Production-ready platforms and dashboards.",
   },
   {
     id: "web",
-    title: "Web & PWA",
-    body: "Fast, SEO-aware sites and apps — engineered for conversion, not just presentation.",
-  },
-  {
-    id: "commerce",
-    title: "E-commerce",
-    body: "Stores with real payments, inventory, and order flow — not a plugin pile.",
-  },
-  {
-    id: "design",
-    title: "UI / UX",
-    body: "Design systems and prototypes that survive contact with engineering.",
+    index: "04",
+    title: "Business Websites",
+    body: "Premium responsive websites for brands and businesses.",
   },
 ] as const;
+
+export const PROCESS = [
+  {
+    index: "01",
+    title: "Discover",
+    body: "Understand the idea and requirements.",
+  },
+  {
+    index: "02",
+    title: "Design",
+    body: "Create the structure and experience.",
+  },
+  {
+    index: "03",
+    title: "Build",
+    body: "Develop frontend, backend and integrations.",
+  },
+  {
+    index: "04",
+    title: "Launch",
+    body: "Test, optimize and deploy.",
+  },
+] as const;
+
+export const SEO = {
+  title: "Anam Sayyed — Full-Stack Developer",
+  description:
+    "Anam Sayyed is a Full-Stack Developer building modern web applications, AI-powered products and digital experiences.",
+} as const;

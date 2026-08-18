@@ -4,6 +4,7 @@ import { TechStack } from "@/components/portfolio/TechStack";
 import { Projects } from "@/components/portfolio/Projects";
 import { Experience } from "@/components/portfolio/Experience";
 import { Services } from "@/components/portfolio/Services";
+import { Process } from "@/components/portfolio/Process";
 import { Contact } from "@/components/portfolio/Contact";
 
 export default function PortfolioPage() {
@@ -15,6 +16,7 @@ export default function PortfolioPage() {
       <TechStack />
       <Experience />
       <Services />
+      <Process />
       <Contact />
     </>
   );

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 
 import { SERVICES } from "@/constants/portfolio/content";
-import { fadeUp, revealViewport, staggerContainer } from "@/animations/portfolio/variants";
+import { fadeUp, revealViewport, stagger } from "@/animations/portfolio/variants";
 
 export function Services() {
   return (
@@ -13,16 +13,13 @@ export function Services() {
           initial="hidden"
           whileInView="visible"
           viewport={revealViewport}
-          variants={staggerContainer(0.08)}
+          variants={stagger(0.08)}
         >
           <motion.p variants={fadeUp} className="pf-kicker">
             Services
           </motion.p>
-          <motion.h2
-            variants={fadeUp}
-            className="pf-display mt-4 max-w-xl text-4xl font-semibold sm:text-5xl"
-          >
-            What I take on.
+          <motion.h2 variants={fadeUp} className="pf-title mt-4 max-w-xl">
+            What I can build.
           </motion.h2>
         </motion.div>
 
@@ -30,16 +27,22 @@ export function Services() {
           initial="hidden"
           whileInView="visible"
           viewport={revealViewport}
-          variants={staggerContainer(0.07)}
-          className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          variants={stagger(0.08)}
+          className="mt-14 grid gap-4 sm:grid-cols-2"
         >
-          {SERVICES.map((service, i) => (
-            <motion.li key={service.id} variants={fadeUp} className="pf-panel p-6 sm:p-7">
-              <p className="pf-mono text-[0.65rem] uppercase tracking-[0.2em] text-[var(--pf-ink-faint)]">
-                {String(i + 1).padStart(2, "0")}
+          {SERVICES.map((service) => (
+            <motion.li
+              key={service.id}
+              variants={fadeUp}
+              className="pf-panel group p-7 transition-transform duration-300 hover:-translate-y-1 sm:p-8"
+            >
+              <p className="font-mono text-[0.68rem] uppercase tracking-[0.2em] text-[var(--portfolio-faint)]">
+                {service.index}
               </p>
-              <h3 className="pf-display mt-4 text-xl font-semibold">{service.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-[var(--pf-ink-dim)]">{service.body}</p>
+              <h3 className="pf-display mt-5 text-2xl font-semibold">{service.title}</h3>
+              <p className="mt-3 max-w-sm text-sm leading-relaxed text-[var(--portfolio-muted)]">
+                {service.body}
+              </p>
             </motion.li>
           ))}
         </motion.ul>

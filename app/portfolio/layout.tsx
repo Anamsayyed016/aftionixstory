@@ -4,49 +4,57 @@ import "@fontsource/space-grotesk/600.css";
 import "@fontsource/space-grotesk/700.css";
 
 import "./portfolio.css";
-import { PERSON } from "@/constants/portfolio/content";
+import { PERSON, SEO } from "@/constants/portfolio/content";
 import { PortfolioHeader } from "@/components/portfolio/PortfolioHeader";
 import { Footer } from "@/components/portfolio/Footer";
+import { MotionRoot } from "@/components/portfolio/MotionRoot";
 
 export const metadata: Metadata = {
-  title: PERSON.name,
-  description: PERSON.tagline,
+  title: {
+    absolute: SEO.title,
+  },
+  description: SEO.description,
   keywords: [
     PERSON.name,
-    PERSON.studio,
-    "software engineer",
-    "AI products",
-    "SaaS",
+    "Full-Stack Developer",
     "Next.js",
+    "Python",
+    "AI",
     "portfolio",
   ],
   authors: [{ name: PERSON.name, url: PERSON.url }],
   openGraph: {
     type: "profile",
-    title: `${PERSON.name} — ${PERSON.role}`,
-    description: PERSON.tagline,
+    title: SEO.title,
+    description: SEO.description,
     url: PERSON.url,
-    siteName: PERSON.studio,
   },
   robots: { index: true, follow: true },
 };
 
-const personLd = {
+const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "Person",
-  name: PERSON.name,
-  jobTitle: PERSON.role,
-  worksFor: {
-    "@type": "Organization",
-    name: PERSON.studio,
-    url: PERSON.siteUrl,
-  },
-  url: PERSON.url,
-  email: PERSON.email,
-  sameAs: [
-    PERSON.socials.linkedin,
-    PERSON.socials.github,
-    PERSON.socials.instagram,
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": `${PERSON.url}#person`,
+      name: PERSON.name,
+      jobTitle: PERSON.role,
+      url: PERSON.url,
+      email: PERSON.email,
+      address: {
+        "@type": "PostalAddress",
+        addressCountry: "IN",
+      },
+      sameAs: [PERSON.socials.linkedin, PERSON.socials.github, PERSON.socials.instagram],
+    },
+    {
+      "@type": "ProfilePage",
+      "@id": PERSON.url,
+      name: SEO.title,
+      url: PERSON.url,
+      mainEntity: { "@id": `${PERSON.url}#person` },
+    },
   ],
 };
 
@@ -56,19 +64,21 @@ export default function PortfolioLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div data-theme="portfolio" className="pf-shell">
-      <a href="#main" className="pf-skip">
-        Skip to content
-      </a>
-      <PortfolioHeader />
-      <main id="main" className="flex-1">
-        {children}
-      </main>
-      <Footer />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
-      />
-    </div>
+    <MotionRoot>
+      <div data-theme="portfolio" className="pf-shell">
+        <a href="#main" className="pf-skip">
+          Skip to content
+        </a>
+        <PortfolioHeader />
+        <main id="main" className="flex-1">
+          {children}
+        </main>
+        <Footer />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </div>
+    </MotionRoot>
   );
 }

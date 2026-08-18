@@ -1,77 +1,87 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
-import { PERSON, STATS } from "@/constants/portfolio/content";
-import { fadeUp, staggerContainer } from "@/animations/portfolio/variants";
+import { HERO, PERSON } from "@/constants/portfolio/content";
+import { fadeUp, stagger, textReveal } from "@/animations/portfolio/variants";
 import { HeroScene } from "@/components/portfolio/3d/HeroScene";
 
 export function Hero() {
   return (
-    <section className="relative min-h-[100svh] overflow-hidden pb-20 pt-32 sm:pt-40">
+    <section className="relative min-h-[100svh] overflow-hidden pb-16 pt-28 sm:pt-32">
       <HeroScene />
       <div
         className="pointer-events-none absolute inset-0 -z-[5]"
         style={{
           background:
-            "linear-gradient(90deg, rgba(5,7,11,0.92) 0%, rgba(5,7,11,0.55) 48%, rgba(5,7,11,0.22) 100%)",
+            "linear-gradient(90deg, rgba(7,7,12,0.96) 0%, rgba(7,7,12,0.78) 42%, rgba(7,7,12,0.18) 100%)",
         }}
       />
 
-      <div className="pf-wrap relative">
+      <div className="pf-wrap relative flex min-h-[calc(100svh-8rem)] flex-col justify-between">
         <motion.div
-          variants={staggerContainer(0.1, 0.05)}
+          variants={stagger(0.1, 0.08)}
           initial="hidden"
           animate="visible"
-          className="max-w-3xl"
+          className="max-w-2xl pt-6 lg:pt-10"
         >
           <motion.p variants={fadeUp} className="pf-kicker">
-            {PERSON.role} · {PERSON.location}
+            {PERSON.name}
           </motion.p>
-          <motion.h1
-            variants={fadeUp}
-            className="pf-display mt-6 text-5xl font-semibold leading-[0.95] text-[var(--pf-ink)] sm:text-6xl lg:text-[5.25rem]"
-          >
-            {PERSON.name.split(" ")[0]}
-            <br />
-            <span className="pf-gradient-text">{PERSON.name.split(" ").slice(1).join(" ")}</span>
-          </motion.h1>
           <motion.p
             variants={fadeUp}
-            className="mt-7 max-w-xl text-lg leading-relaxed text-[var(--pf-ink-dim)] sm:text-xl"
+            className="mt-3 font-mono text-[0.7rem] uppercase tracking-[0.2em] text-[var(--portfolio-muted)]"
           >
-            {PERSON.tagline}
+            {HERO.kicker}
+            <span className="mx-2 text-[var(--portfolio-faint)]">·</span>
+            {PERSON.positioning}
           </motion.p>
-          <motion.div variants={fadeUp} className="mt-10 flex flex-wrap items-center gap-3">
+          <motion.h1 variants={textReveal} className="pf-title mt-7">
+            {HERO.headline[0]}
+            <br />
+            {HERO.headline[1]}
+          </motion.h1>
+          <motion.p variants={fadeUp} className="pf-lede mt-6">
+            {HERO.body}
+          </motion.p>
+          <motion.div variants={fadeUp} className="mt-8">
+            <p className="pf-status">
+              <span className="pf-status-dot" aria-hidden />
+              {HERO.status}
+            </p>
+          </motion.div>
+          <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
             <a href="#work" className="pf-cta pf-cta-primary">
-              View selected work
-              <ArrowDownRight className="size-4" />
+              View my work
+              <span className="pf-arrow" aria-hidden>
+                →
+              </span>
             </a>
-            <a href={`mailto:${PERSON.email}`} className="pf-cta pf-cta-ghost">
-              {PERSON.email}
-              <ArrowUpRight className="size-4" />
+            <a href="#contact" className="pf-cta pf-cta-ghost">
+              Let&apos;s connect
+              <span className="pf-arrow" aria-hidden>
+                →
+              </span>
             </a>
           </motion.div>
         </motion.div>
 
-        <motion.dl
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55, duration: 0.7 }}
-          className="mt-20 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[var(--pf-line)] bg-[var(--pf-line)] sm:grid-cols-4"
-        >
-          {STATS.map((stat) => (
-            <div key={stat.label} className="bg-[var(--pf-bg)] px-5 py-5 sm:px-6">
-              <dt className="pf-mono text-[0.65rem] uppercase tracking-[0.18em] text-[var(--pf-ink-faint)]">
-                {stat.label}
-              </dt>
-              <dd className="pf-display mt-2 text-2xl font-semibold text-[var(--pf-ink)]">
-                {stat.value}
-              </dd>
-            </div>
-          ))}
-        </motion.dl>
+        <div className="mt-16 flex flex-col gap-8 pb-4 sm:flex-row sm:items-end sm:justify-between">
+          <ul className="grid grid-cols-2 gap-x-8 gap-y-3 sm:flex sm:flex-wrap sm:gap-x-10">
+            {HERO.meta.map((item) => (
+              <li
+                key={item}
+                className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-[var(--portfolio-faint)]"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+          <a href="#about" className="pf-scroll w-fit" aria-label="Scroll to about">
+            <span>Scroll</span>
+            <span className="pf-scroll-line" aria-hidden />
+          </a>
+        </div>
       </div>
     </section>
   );
