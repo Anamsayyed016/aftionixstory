@@ -1,0 +1,255 @@
+[data-theme="portfolio"] {
+  --pf-bg: #05070b;
+  --pf-bg-elevated: #0c1018;
+  --pf-bg-soft: #10161f;
+  --pf-line: rgba(148, 187, 214, 0.12);
+  --pf-line-strong: rgba(148, 187, 214, 0.22);
+  --pf-ink: #eef4fb;
+  --pf-ink-dim: #9aa8bb;
+  --pf-ink-faint: #6d7b8d;
+  --pf-accent: #5eead4;
+  --pf-accent-2: #67e8f9;
+  --pf-accent-3: #a78bfa;
+  --pf-glow: rgba(94, 234, 212, 0.35);
+  --pf-font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --pf-font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --pf-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --pf-radius: 1.25rem;
+  --pf-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  color-scheme: dark;
+  min-height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--pf-bg);
+  color: var(--pf-ink);
+  font-family: var(--pf-font-body);
+}
+
+[data-theme="portfolio"] ::selection {
+  background: color-mix(in srgb, var(--pf-accent) 40%, transparent);
+  color: var(--pf-ink);
+}
+
+[data-theme="portfolio"] :focus-visible {
+  outline: 2px solid var(--pf-accent);
+  outline-offset: 3px;
+}
+
+.pf-skip {
+  position: absolute;
+  left: 1rem;
+  top: -100px;
+  z-index: 80;
+  border-radius: 0.5rem;
+  background: var(--pf-ink);
+  color: var(--pf-bg);
+  padding: 0.5rem 0.85rem;
+  font-size: 0.85rem;
+}
+
+.pf-skip:focus {
+  top: 1rem;
+}
+
+.pf-shell {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+}
+
+.pf-shell::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.pf-wrap {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 72rem;
+  padding-inline: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .pf-wrap {
+    padding-inline: 2.5rem;
+  }
+}
+
+.pf-display {
+  font-family: var(--pf-font-display);
+  letter-spacing: -0.045em;
+}
+
+.pf-mono {
+  font-family: var(--pf-font-mono);
+}
+
+.pf-kicker {
+  font-family: var(--pf-font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--pf-accent);
+}
+
+.pf-gradient-text {
+  background: linear-gradient(120deg, var(--pf-ink) 10%, var(--pf-accent) 52%, var(--pf-accent-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pf-glass {
+  background: color-mix(in srgb, var(--pf-bg-elevated) 78%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--pf-line);
+}
+
+.pf-panel {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pf-bg-elevated) 88%, white 4%), var(--pf-bg-elevated));
+  border: 1px solid var(--pf-line);
+  border-radius: var(--pf-radius);
+}
+
+.pf-link {
+  color: var(--pf-ink-dim);
+  transition: color 200ms var(--pf-ease);
+}
+
+.pf-link:hover {
+  color: var(--pf-ink);
+}
+
+.pf-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.8rem 1.25rem;
+  font-size: 0.92rem;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  transition: transform 280ms var(--pf-ease), filter 280ms var(--pf-ease), background 280ms var(--pf-ease);
+}
+
+.pf-cta-primary {
+  color: #04110e;
+  background: linear-gradient(135deg, var(--pf-accent) 0%, var(--pf-accent-2) 100%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pf-accent) 40%, transparent), 0 18px 40px -18px var(--pf-glow);
+}
+
+.pf-cta-primary:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+}
+
+.pf-cta-ghost {
+  color: var(--pf-ink);
+  border: 1px solid var(--pf-line-strong);
+  background: color-mix(in srgb, var(--pf-bg-soft) 55%, transparent);
+}
+
+.pf-cta-ghost:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--pf-accent) 45%, var(--pf-line-strong));
+}
+
+.pf-scene-fallback {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(50% 45% at 70% 30%, rgba(94, 234, 212, 0.18), transparent 60%),
+    radial-gradient(40% 40% at 30% 70%, rgba(167, 139, 250, 0.14), transparent 62%),
+    radial-gradient(30% 30% at 80% 80%, rgba(103, 232, 249, 0.1), transparent 55%);
+}
+
+.pf-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(8px);
+  opacity: 0.55;
+  animation: pf-drift 14s var(--pf-ease) infinite alternate;
+}
+
+.pf-orb-a {
+  width: 18rem;
+  height: 18rem;
+  right: 8%;
+  top: 12%;
+  background: radial-gradient(circle, rgba(94, 234, 212, 0.55), transparent 68%);
+}
+
+.pf-orb-b {
+  width: 12rem;
+  height: 12rem;
+  right: 28%;
+  bottom: 18%;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.5), transparent 68%);
+  animation-duration: 18s;
+  animation-delay: -4s;
+}
+
+.pf-orb-c {
+  width: 8rem;
+  height: 8rem;
+  right: 42%;
+  top: 38%;
+  background: radial-gradient(circle, rgba(103, 232, 249, 0.45), transparent 68%);
+  animation-duration: 11s;
+  animation-delay: -2s;
+}
+
+@keyframes pf-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-18px, 22px, 0) scale(1.08); }
+}
+
+.pf-cube {
+  width: 4.5rem;
+  height: 4.5rem;
+  transform-style: preserve-3d;
+  animation: pf-spin 18s linear infinite;
+}
+
+.pf-cube span {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--pf-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--pf-accent) 6%, transparent);
+  backface-visibility: hidden;
+}
+
+.pf-cube span:nth-child(1) { transform: rotateY(0deg) translateZ(2.25rem); }
+.pf-cube span:nth-child(2) { transform: rotateY(90deg) translateZ(2.25rem); }
+.pf-cube span:nth-child(3) { transform: rotateY(180deg) translateZ(2.25rem); }
+.pf-cube span:nth-child(4) { transform: rotateY(-90deg) translateZ(2.25rem); }
+.pf-cube span:nth-child(5) { transform: rotateX(90deg) translateZ(2.25rem); }
+.pf-cube span:nth-child(6) { transform: rotateX(-90deg) translateZ(2.25rem); }
+
+@keyframes pf-spin {
+  to { transform: rotateX(360deg) rotateY(280deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-orb,
+  .pf-cube {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .pf-cube {
+    animation: none;
+  }
+}
